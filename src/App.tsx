@@ -7,7 +7,7 @@ import LandingPage from './pages/LandingPage'
 import AgeSelection from './pages/AgeSelection'
 import UserDashboard from './pages/UserDashboard'
 import QuizGameplay from './pages/QuizGameplay'
-import QuizResults from './pages/QuizResults'
+// REMOVED: import QuizResults from './pages/QuizResults'
 import Profile from './pages/Profile'
 import RewardsShop from './pages/RewardsShop'
 import Leaderboard from './pages/Leaderboard'
@@ -22,7 +22,7 @@ function AuthCallback() {
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
 
         // If the profile doesn't exist (deleted from DB), log them out
         if (error || !profile) {
@@ -74,7 +74,6 @@ function App() {
   }, [])
 
   const fetchProfile = async (userId: string) => {
-    // FIX: Use .maybeSingle() instead of .single() to prevent crash if row is missing
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -82,7 +81,6 @@ function App() {
       .maybeSingle()
     
     if (error || !data) {
-      // If the user was deleted from the database, force sign out
       console.warn("Profile not found, logging out.")
       await supabase.auth.signOut()
       setProfile(null)
@@ -155,13 +153,7 @@ function App() {
           } 
         />
 
-        <Route 
-          path="/results" 
-          element={
-            session && profile?.age_category ? <QuizResults /> : 
-            <Navigate to="/onboarding" />
-          } 
-        />
+        {/* REMOVED: The /results route */}
 
         <Route 
           path="/play/:quizId" 
