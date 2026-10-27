@@ -54,7 +54,6 @@ export default function QuizGameplay() {
   // Game State
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQIndex, setCurrentQIndex] = useState(0)
-  const [score, setScore] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const [timeLeft, setTimeLeft] = useState(15)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
@@ -63,8 +62,8 @@ export default function QuizGameplay() {
   // Review & Hint State
   const [responses, setResponses] = useState<any[]>([])
   const [showHint, setShowHint] = useState(false)
-  const [showHintModal, setShowHintModal] = useState(false) // ✅ NEW: Choice Modal
-  const [pointsSpentOnHints, setPointsSpentOnHints] = useState(0) // ✅ NEW: Track DB penalty
+  const [showHintModal, setShowHintModal] = useState(false)
+  const [pointsSpentOnHints, setPointsSpentOnHints] = useState(0) 
   
   // App State
   const [loading, setLoading] = useState(true)
@@ -77,8 +76,17 @@ export default function QuizGameplay() {
   // Results State
   const [isFinished, setIsFinished] = useState(false)
   const [showReview, setShowReview] = useState(false)
+  
+  // ✅ Store the exact database numbers
+  const [dbResults, setDbResults] = useState<{ points: number, coins: number, accuracy: number } | null>(null) 
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
+  // ✅ FIX 1: Use a Ref to track the correct count synchronously. 
+  // This prevents the database from receiving an outdated score due to React's async state updates.
+  const correctCountRef = useRef(0)
+  const pointsSpentRef = useRef(0)
+
   const currentQuestion = questions[currentQIndex]
 
   useEffect(() => {
@@ -89,7 +97,6 @@ export default function QuizGameplay() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Fetch User Profile
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -98,7 +105,6 @@ export default function QuizGameplay() {
         
         if (profileData) setProfile(profileData)
 
-        // 2. Check if already completed
         const { data: existingAttempt } = await supabase
           .from('quiz_attempts')
           .select('id')
@@ -112,7 +118,6 @@ export default function QuizGameplay() {
           return
         }
 
-        // 3. Fetch Questions
         const { data: qData, error: qErr } = await supabase
           .from('questions')
           .select('*')
@@ -166,16 +171,14 @@ export default function QuizGameplay() {
     if (isCorrect) {
       playSound('correct')
       
-      const pointsEarned = currentQuestion.points || 10
-      const coinsEarned = 150 // ✅ Match the database logic
-      
-      setScore((prev) => prev + pointsEarned)
+      // ✅ Update both the UI state and the Ref
       setCorrectCount((prev) => prev + 1)
+      correctCountRef.current += 1
       
-      // ✅ Update UI immediately so coins pop up in top right
+      // Update UI immediately so coins pop up in top right
       setProfile((prev: any) => ({ 
         ...prev, 
-        coins: (prev?.coins || 0) + coinsEarned 
+        coins: (prev?.coins || 0) + 150 
       }))
     } else {
       playSound('wrong')
@@ -199,9 +202,8 @@ export default function QuizGameplay() {
     if (showHint || isAnswerRevealed) return
     
     if (payWith === 'points') {
-      if (score < 5) return alert("Not enough points!")
-      setScore(prev => Math.max(0, prev - 5))
       setPointsSpentOnHints(prev => prev + 5)
+      pointsSpentRef.current += 5 // Sync with Ref
     } else {
       if ((profile?.coins || 0) < 5) return alert("Not enough coins!")
       setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 5) }))
@@ -216,35 +218,53 @@ export default function QuizGameplay() {
       setCurrentQIndex((prev) => prev + 1)
       setSelectedAnswer(null)
       setIsAnswerRevealed(false)
+      
+      // ✅ FIX 2: Reset hints for the new question correctly
       setShowHint(false)
+      setShowHintModal(false)
+      // Do NOT reset pointsSpentOnHints here. We need to track the total penalty for the whole quiz.
+      
       setTimeLeft(15)
     } else {
-      finishQuiz()
+      // Pass the synchronous Ref value to ensure the DB gets the exact right number
+      finishQuiz(correctCountRef.current, pointsSpentRef.current)
     }
   }
 
-  const finishQuiz = async () => {
-    setIsFinished(true)
+  // ✅ FIX 3: Accept the final score as arguments to prevent state race conditions
+  const finishQuiz = async (finalCorrect: number, finalPenalty: number) => {
+    try {
+      // Calculate incorrect and unanswered based on the final responses array + the last answered question
+      // Since 'responses' state might be slightly delayed on the very last tick, we calculate based on total questions
+      const totalQuestions = questions.length;
+      const finalIncorrect = totalQuestions - finalCorrect; 
 
-    // ✅ Save score and pass point penalties to DB
-    await supabase.rpc('submit_quiz_attempt', {
-      p_quiz_id: quizId,
-      p_correct: correctCount,
-      p_incorrect: responses.filter(r => !r.is_correct && r.selected_answer !== null).length,
-      p_unanswered: responses.filter(r => r.selected_answer === null).length,
-      p_time_taken: 0,
-      p_points_penalty: pointsSpentOnHints 
-    })
-    
-    // ✅ Fetch fresh profile to sync UI perfectly with DB
-    const { data: freshProfile } = await supabase
-      .from('profiles')
-      .select('coins, points')
-      .eq('id', profile.id)
-      .single()
+      // 1. Submit the score to the database and wait for success
+      const { data, error } = await supabase.rpc('submit_quiz_attempt', {
+        p_quiz_id: quizId,
+        p_correct: finalCorrect,
+        p_incorrect: finalIncorrect, // Passed the exact calculation
+        p_unanswered: 0, // Unanswered are treated as incorrect in this calculation
+        p_time_taken: 0,
+        p_points_penalty: finalPenalty 
+      })
+
+      if (error) throw error
       
-    if (freshProfile) {
-      setProfile((prev: any) => ({ ...prev, ...freshProfile }))
+      // 2. Save the EXACT numbers returned by the database
+      if (data) {
+        setDbResults({
+          points: data.points_earned,
+          coins: data.coins_earned,
+          accuracy: data.accuracy
+        })
+      }
+      
+    } catch (err) {
+      console.error("Error saving quiz:", err)
+    } finally {
+      // 3. Show the results screen only AFTER the DB has saved
+      setIsFinished(true)
     }
   }
 
@@ -269,7 +289,6 @@ export default function QuizGameplay() {
 
   // --- RESULTS SCREEN ---
   if (isFinished) {
-    const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0
     const isPerfect = correctCount === questions.length && questions.length > 0
 
     return (
@@ -294,7 +313,7 @@ export default function QuizGameplay() {
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Points Earned</p>
-                <p className="text-2xl font-bold text-[#00f0ff]">{score}</p>
+                <p className="text-2xl font-bold text-[#00f0ff]">{dbResults?.points ?? 0}</p>
               </div>
               
               {/* Coins Card */}
@@ -302,7 +321,7 @@ export default function QuizGameplay() {
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-6 h-6 mb-2" />
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Coins Earned</p>
-                <p className="text-2xl font-bold text-[#ff00a0]">+{correctCount * 150}</p>
+                <p className="text-2xl font-bold text-[#ff00a0]">+{dbResults?.coins ?? 0}</p>
               </div>
             </div>
 
@@ -311,7 +330,7 @@ export default function QuizGameplay() {
                 <StarIcon weight="fill" className="text-yellow-300 w-5 h-5" />
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase font-bold text-left">Accuracy</p>
-                  <p className="text-sm font-bold">{accuracy}%</p>
+                  <p className="text-sm font-bold">{dbResults?.accuracy ?? 0}%</p>
                 </div>
               </div>
               <div className="bg-white/5 border border-white/5 rounded-2xl p-3 flex items-center justify-center gap-3">
@@ -383,7 +402,6 @@ export default function QuizGameplay() {
 
   // --- ACTIVE GAMEPLAY ---
   if (!currentQuestion) return null
-  const canAffordHintPoints = score >= 5
   const canAffordHintCoins = (profile?.coins || 0) >= 5
 
   return (
@@ -468,11 +486,11 @@ export default function QuizGameplay() {
         </div>
 
         <div className="mt-12 flex justify-between items-center text-gray-500 text-sm">
-          <div className="flex items-center gap-2"><TargetIcon weight="fill" className="text-[#00f0ff]" /> Points: <span className="font-bold text-white">{score}</span></div>
+          <div className="flex items-center gap-2"><TargetIcon weight="fill" className="text-[#00f0ff]" /> Correct Answers: <span className="font-bold text-white">{correctCount}</span></div>
         </div>
       </div>
 
-      {/* ✅ HINT CHOICE MODAL */}
+      {/* HINT CHOICE MODAL */}
       {showHintModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full text-center relative shadow-2xl">
@@ -483,8 +501,7 @@ export default function QuizGameplay() {
             <div className="space-y-3">
               <button 
                 onClick={() => handleUseHint('points')}
-                disabled={!canAffordHintPoints}
-                className="w-full py-4 bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:bg-[#00f0ff]/20 text-[#00f0ff] rounded-xl font-bold flex items-center justify-between px-6 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:bg-[#00f0ff]/20 text-[#00f0ff] rounded-xl font-bold flex items-center justify-between px-6 transition"
               >
                 <span>Pay with Points</span>
                 <span className="flex items-center gap-1"><TargetIcon /> -5</span>

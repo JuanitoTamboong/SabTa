@@ -184,13 +184,13 @@ export default function Profile() {
                 {/* ✅ FIXED AVATAR & BORDER WRAPPER */}
                 <div className="relative w-32 h-32 md:w-36 md:h-36 flex items-center justify-center">
                   
-                  {/* Avatar: ALWAYS circular, no matter what */}
-                  <div className="w-full h-full rounded-full border-4 border-[#0f1014] bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden relative z-10 shadow-inner">
+                  {/* Avatar: ALWAYS circular and inset so it fits inside the border ring */}
+                  <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
                     {avatarUrl ? (
                       <img 
                         src={avatarUrl} 
                         alt="Avatar" 
-                        className="w-full h-full object-cover" // No conditional classes here, it's always object-cover
+                        className="w-full h-full object-cover" 
                       />
                     ) : (
                       profile?.display_name?.charAt(0) || 'P'
@@ -202,13 +202,12 @@ export default function Profile() {
                     <img 
                       src={equippedBorder.cosmetic_items.preview_url} 
                       alt="Border" 
-                      // Use scale-[1.25] to make sure the border ring hugs the avatar edges perfectly
-                      className="absolute inset-0 w-full h-full object-contain scale-[1.25] pointer-events-none z-20" 
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" 
                     />
                   )}
 
-                  {/* Hover Edit Overlay (always circular) */}
-                  <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-30">
+                  {/* Hover Edit Overlay (matches the inset circle) */}
+                  <div className="absolute inset-[15%] bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-30">
                     <PencilSimpleIcon weight="bold" className="w-8 h-8 text-white" />
                   </div>
                 </div>

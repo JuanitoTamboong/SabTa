@@ -41,89 +41,93 @@ export default function UserDashboard() {
   }
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return navigate('/')
+    // ✅ Add a 500ms delay to ensure the quiz results have finished saving to the database
+    const timer = setTimeout(() => {
+      const fetchData = async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return navigate('/')
 
-      // 1. Get User Avatar
-      if (user.user_metadata?.avatar_url || user.user_metadata?.picture) {
-        setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
-      }
-
-      // 2. Fetch Profile
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      if (profileData) setProfile(profileData)
-
-      // 3. Fetch Equipped Border
-      const { data: invData } = await supabase
-        .from('user_inventory')
-        .select('*, cosmetic_items(*)')
-        .eq('user_id', user.id)
-        .eq('is_equipped', true)
-      
-      if (invData) {
-        const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'border')
-        if (border?.cosmetic_items?.preview_url) {
-          setEquippedBorder(border.cosmetic_items.preview_url)
+        // 1. Get User Avatar
+        if (user.user_metadata?.avatar_url || user.user_metadata?.picture) {
+          setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
         }
-      }
 
-      // 4. Fetch Attempts
-      const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+        // 2. Fetch Profile
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+        if (profileData) setProfile(profileData)
 
-      if (attempts && attempts.length > 0) {
-        const quizIds = attempts.map(a => a.quiz_id)
-        const { data: quizzes } = await supabase.from('quizzes').select('id, category').in('id', quizIds)
-
-        const attemptsWithCategory = attempts.map(attempt => ({
-          ...attempt,
-          quizzes: quizzes?.find(q => q.id === attempt.quiz_id),
-        }))
-
-        const totalQuizzes = attempts.length
-        const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
-        const avgAccuracy = totalQuizzes > 0 ? attempts.reduce((acc, curr) => acc + (curr.accuracy || 0), 0) / totalQuizzes : 0
-        const currentPoints = profileData?.points || 0
-        const level = Math.floor(currentPoints / 100) + 1
-        const today = new Date().toISOString().split('T')[0]
-        const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
-        const quizzesToday = todayAttempts.length
-        const coinsEarnedToday = todayAttempts.reduce((sum, a) => sum + (a.score || 0), 0)
-
-        setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday, coinsEarnedToday })
-        setRecentActivity(attemptsWithCategory.slice(0, 3))
-      }
-
-      // 5. Fetch Top Players (WITH EQUIPPED BORDERS)
-      if (profileData?.age_category) {
-        const { data: topProfiles } = await supabase
-          .from('profiles')
-          .select(`
-            id, display_name, points, coins, avatar_url,
-            user_inventory (
-              is_equipped,
-              cosmetic_items ( preview_url, cosmetic_type )
-            )
-          `)
-          .eq('age_category', profileData.age_category)
-          .order('points', { ascending: false })
-          .limit(3)
-
-        if (topProfiles) {
-          // ✅ FIX: Use (p: any) to bypass the strict TypeScript nested array check
-          const mappedPlayers = topProfiles.map((p: any) => {
-            const border = p.user_inventory?.find((inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border')
-            return {
-              ...p,
-              border_url: border?.cosmetic_items?.preview_url || null
-            }
-          })
-          setTopPlayers(mappedPlayers)
+        // 3. Fetch Equipped Border
+        const { data: invData } = await supabase
+          .from('user_inventory')
+          .select('*, cosmetic_items(*)')
+          .eq('user_id', user.id)
+          .eq('is_equipped', true)
+        
+        if (invData) {
+          const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'border')
+          if (border?.cosmetic_items?.preview_url) {
+            setEquippedBorder(border.cosmetic_items.preview_url)
+          }
         }
+
+        // 4. Fetch Attempts
+        const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+
+        if (attempts && attempts.length > 0) {
+          const quizIds = attempts.map(a => a.quiz_id)
+          const { data: quizzes } = await supabase.from('quizzes').select('id, category').in('id', quizIds)
+
+          const attemptsWithCategory = attempts.map(attempt => ({
+            ...attempt,
+            quizzes: quizzes?.find(q => q.id === attempt.quiz_id),
+          }))
+
+          const totalQuizzes = attempts.length
+          const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
+          const avgAccuracy = totalQuizzes > 0 ? attempts.reduce((acc, curr) => acc + (curr.accuracy || 0), 0) / totalQuizzes : 0
+          const currentPoints = profileData?.points || 0
+          const level = Math.floor(currentPoints / 100) + 1
+          const today = new Date().toISOString().split('T')[0]
+          const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
+          const quizzesToday = todayAttempts.length
+          const coinsEarnedToday = todayAttempts.reduce((sum, a) => sum + (a.correct_answers * 150), 0)
+
+          setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday, coinsEarnedToday })
+          setRecentActivity(attemptsWithCategory.slice(0, 3))
+        }
+
+        // 5. Fetch Top Players (WITH EQUIPPED BORDERS)
+        if (profileData?.age_category) {
+          const { data: topProfiles } = await supabase
+            .from('profiles')
+            .select(`
+              id, display_name, points, coins, avatar_url,
+              user_inventory (
+                is_equipped,
+                cosmetic_items ( preview_url, cosmetic_type )
+              )
+            `)
+            .eq('age_category', profileData.age_category)
+            .order('points', { ascending: false })
+            .limit(3)
+
+          if (topProfiles) {
+            const mappedPlayers = topProfiles.map((p: any) => {
+              const border = p.user_inventory?.find((inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border')
+              return {
+                ...p,
+                border_url: border?.cosmetic_items?.preview_url || null
+              }
+            })
+            setTopPlayers(mappedPlayers)
+          }
+        }
+        setLoading(false)
       }
-      setLoading(false)
-    }
-    fetchData()
+      fetchData()
+    }, 500) // 500ms delay
+
+    return () => clearTimeout(timer)
   }, [navigate])
 
   const openPlayMenu = async () => {
@@ -204,7 +208,6 @@ export default function UserDashboard() {
               <span className="font-bold text-xs">{profile?.points || 0} PTS</span>
             </div>
             
-            {/* ✅ Header Avatar with Border */}
             <div className="relative w-9 h-9">
               <div className="absolute inset-[15%] rounded-full bg-gradient-to-br from-[#00f0ff] to-blue-600 flex items-center justify-center font-bold text-black uppercase overflow-hidden z-10">
                 {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : profile?.display_name?.charAt(0) || 'P'}
@@ -269,7 +272,7 @@ export default function UserDashboard() {
                     </div>
                     <div className="text-right flex items-center gap-2">
                       <span className="font-bold text-[#ccff00] text-xs">+{attempt.score} pts</span>
-                      <span className="font-bold text-[#ff00a0] text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+{attempt.score}</span>
+                      <span className="font-bold text-[#ff00a0] text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+{attempt.correct_answers * 150}</span>
                     </div>
                   </div>
                 ))}
@@ -292,7 +295,6 @@ export default function UserDashboard() {
             </p>
           </div>
 
-          {/* TOP PLAYERS — NOW WITH BORDERS */}
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-4">
             <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold">Top {profile?.age_category || 'Players'}</h3><MedalIcon weight="fill" className="text-[#ccff00] w-4 h-4" /></div>
             <div className="space-y-3">
@@ -302,8 +304,6 @@ export default function UserDashboard() {
                 topPlayers.map((player, idx) => (
                   <div key={idx} className="flex items-center gap-3">
                     <span className={`text-xs font-bold w-4 ${idx === 0 ? 'text-[#ccff00]' : idx === 1 ? 'text-gray-300' : 'text-[#cd7f32]'}`}>#{idx + 1}</span>
-                    
-                    {/* ✅ Top Player Avatar with Border */}
                     <div className="relative w-8 h-8 shrink-0">
                       <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold uppercase overflow-hidden z-10">
                         {player.avatar_url ? (
@@ -316,7 +316,6 @@ export default function UserDashboard() {
                         <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                       )}
                     </div>
-
                     <div className="flex-1"><p className="text-xs font-bold truncate">{player.display_name}</p></div>
                     <div className="flex flex-col items-end gap-0.5">
                       <span className="text-[10px] font-bold text-[#ccff00]">{player.points} pts</span>
