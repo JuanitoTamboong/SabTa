@@ -56,7 +56,6 @@ export default function QuizGameplay() {
   const [currentQIndex, setCurrentQIndex] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   
-  // ✅ NEW: Timer state (default to 15, but will be overwritten by DB)
   const [initialTime, setInitialTime] = useState(15)
   const [timeLeft, setTimeLeft] = useState(15)
   
@@ -108,11 +107,13 @@ export default function QuizGameplay() {
         
         if (profileData) setProfile(profileData)
 
+        // Check if they ALREADY completed this quiz in the past
         const { data: existingAttempt } = await supabase
           .from('quiz_attempts')
           .select('id')
           .eq('user_id', user.id)
           .eq('quiz_id', quizId)
+          .eq('status', 'completed') // <--- IMPORTANT: Only lock if COMPLETED
           .maybeSingle()
 
         if (existingAttempt) {
@@ -121,7 +122,6 @@ export default function QuizGameplay() {
           return
         }
 
-        // ✅ NEW: Fetch the Quiz data to get the custom timer
         const { data: quizData, error: quizErr } = await supabase
           .from('quizzes')
           .select('time_limit_seconds')
@@ -130,12 +130,10 @@ export default function QuizGameplay() {
 
         if (quizErr) throw quizErr
 
-        // Set the timer based on the database (fallback to 20 if null)
         const dbTime = quizData?.time_limit_seconds || 20
         setInitialTime(dbTime)
         setTimeLeft(dbTime)
 
-        // Fetch questions
         const { data: qData, error: qErr } = await supabase
           .from('questions')
           .select('*')
@@ -217,8 +215,10 @@ export default function QuizGameplay() {
     if (showHint || isAnswerRevealed) return
     
     if (payWith === 'points') {
+      if ((profile?.points || 0) < 5) return alert("Not enough points!")
       setPointsSpentOnHints(prev => prev + 5)
       pointsSpentRef.current += 5 
+      setProfile((prev: any) => ({ ...prev, points: Math.max(0, (prev?.points || 0) - 5) }))
     } else {
       if ((profile?.coins || 0) < 5) return alert("Not enough coins!")
       setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 5) }))
@@ -237,7 +237,6 @@ export default function QuizGameplay() {
       setShowHint(false)
       setShowHintModal(false)
       
-      // ✅ FIX: Reset to the custom DB time, not hardcoded 15
       setTimeLeft(initialTime) 
       
     } else {
@@ -276,8 +275,6 @@ export default function QuizGameplay() {
     }
   }
 
-  // --- RENDER STATES ---
-
   if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING...</div>
 
   if (error) {
@@ -295,7 +292,6 @@ export default function QuizGameplay() {
     )
   }
 
-  // --- RESULTS SCREEN ---
   if (isFinished) {
     const isPerfect = correctCount === questions.length && questions.length > 0
 
@@ -316,7 +312,6 @@ export default function QuizGameplay() {
             </p>
 
             <div className="grid grid-cols-2 gap-4 mb-8">
-              {/* Points Card */}
               <div className="bg-black/40 border border-[#00f0ff]/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
@@ -324,7 +319,6 @@ export default function QuizGameplay() {
                 <p className="text-2xl font-bold text-[#00f0ff]">{dbResults?.points ?? 0}</p>
               </div>
               
-              {/* Coins Card */}
               <div className="bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-6 h-6 mb-2" />
@@ -405,8 +399,9 @@ export default function QuizGameplay() {
     )
   }
 
-  // --- ACTIVE GAMEPLAY ---
   if (!currentQuestion) return null
+  
+  const canAffordHintPoints = (profile?.points || 0) >= 5
   const canAffordHintCoins = (profile?.coins || 0) >= 5
 
   return (
@@ -421,7 +416,6 @@ export default function QuizGameplay() {
           <ArrowLeftIcon weight="bold" /> Quit Quiz
         </button>
 
-        {/* Coin Balance Display (Updates Live) */}
         <div className="flex items-center gap-2 bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
           <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
           <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
@@ -506,7 +500,8 @@ export default function QuizGameplay() {
             <div className="space-y-3">
               <button 
                 onClick={() => handleUseHint('points')}
-                className="w-full py-4 bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:bg-[#00f0ff]/20 text-[#00f0ff] rounded-xl font-bold flex items-center justify-between px-6 transition"
+                disabled={!canAffordHintPoints}
+                className="w-full py-4 bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:bg-[#00f0ff]/20 text-[#00f0ff] rounded-xl font-bold flex items-center justify-between px-6 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>Pay with Points</span>
                 <span className="flex items-center gap-1"><TargetIcon /> -5</span>

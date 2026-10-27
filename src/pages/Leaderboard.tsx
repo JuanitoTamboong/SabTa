@@ -26,6 +26,7 @@ export default function Leaderboard() {
       if (profileData) setProfile(profileData)
       if (!profileData?.age_category) { setLoading(false); return }
 
+      // Fetch ALL attempts for this age category
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -39,32 +40,49 @@ export default function Leaderboard() {
           ),
           quizzes!inner ( difficulty )
         `)
-        .eq('quizzes.difficulty', activeDifficulty)
         .eq('profiles.age_category', profileData.age_category)
-        .order('score', { ascending: false })
 
       if (!error && attempts) {
-        const bestScores: Record<string, any> = {}
-        
+        const playerStats: Record<string, any> = {}
+
+        // Loop through every attempt and group them by player AND difficulty
         attempts.forEach((attempt: any) => {
           const playerId = attempt.profiles.id
-          
+          const difficulty = attempt.quizzes.difficulty
+
           const equippedBorder = attempt.profiles.user_inventory?.find(
             (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
           )
 
-          if (!bestScores[playerId] || attempt.score > bestScores[playerId].points) {
-            bestScores[playerId] = {
+          if (!playerStats[playerId]) {
+            playerStats[playerId] = {
               id: playerId,
               display_name: attempt.profiles.display_name,
               avatar_url: attempt.profiles.avatar_url,
-              points: attempt.score,
-              border_url: equippedBorder?.cosmetic_items?.preview_url || null
+              border_url: equippedBorder?.cosmetic_items?.preview_url || null,
+              scores: {
+                normal: 0,
+                intermediate: 0,
+                hard: 0
+              }
             }
+          }
+
+          // Add the score to the specific difficulty pool
+          if (playerStats[playerId].scores[difficulty] !== undefined) {
+            playerStats[playerId].scores[difficulty] += attempt.score
           }
         })
 
-        const sortedPlayers = Object.values(bestScores).sort((a, b) => b.points - a.points)
+        // Convert object to array, filter out players with 0 points in the active difficulty, and sort
+        const sortedPlayers = Object.values(playerStats)
+          .filter((p: any) => p.scores[activeDifficulty] > 0)
+          .map((p: any) => ({
+            ...p,
+            points: p.scores[activeDifficulty] // Set their "points" to their specific difficulty score
+          }))
+          .sort((a, b) => b.points - a.points)
+
         setPlayers(sortedPlayers)
       }
 
@@ -84,6 +102,7 @@ export default function Leaderboard() {
   }
 
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1
+  const currentUserPoints = players[currentUserRank - 1]?.points || 0
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex">
@@ -97,7 +116,7 @@ export default function Leaderboard() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={() => navigate('/play/new')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
@@ -149,7 +168,7 @@ export default function Leaderboard() {
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
             <p className="text-gray-500 text-sm">Be the first to complete a {activeDifficulty} quiz in this tier!</p>
-            <button onClick={() => navigate('/play/new')} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
+            <button onClick={() => navigate('/dashboard')} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
               Play Now
             </button>
           </div>
@@ -161,7 +180,6 @@ export default function Leaderboard() {
               {players[1] ? (
                 <div className="flex flex-col items-center">
                   <div className="relative mb-2 w-16 h-16 md:w-20 md:h-20">
-                    {/* Inset Avatar */}
                     <div className="absolute inset-[15%] rounded-full bg-gray-300 overflow-hidden flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg z-10">
                       {players[1].avatar_url ? (
                         <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -169,7 +187,6 @@ export default function Leaderboard() {
                         players[1].display_name?.charAt(0)
                       )}
                     </div>
-                    {/* Border Overlay */}
                     {players[1].border_url && (
                       <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
@@ -177,7 +194,7 @@ export default function Leaderboard() {
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                     <MedalIcon weight="fill" className="text-gray-300 w-6 h-6 mx-auto mb-1" />
                     <p className="text-xs md:text-sm font-bold truncate">{players[1].display_name}</p>
-                    <p className="text-[10px] md:text-xs text-gray-400">{players[1].points} PTS</p>
+                    <p className="text-[10px] md:text-xs text-gray-400 font-bold">{players[1].points} PTS</p>
                   </div>
                 </div>
               ) : <div />}
@@ -187,7 +204,6 @@ export default function Leaderboard() {
                 <div className="flex flex-col items-center">
                   <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 mb-1 animate-bounce" />
                   <div className="relative mb-2 w-20 h-20 md:w-24 md:h-24">
-                    {/* Inset Avatar */}
                     <div className="absolute inset-[15%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] z-10">
                       {players[0].avatar_url ? (
                         <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -195,7 +211,6 @@ export default function Leaderboard() {
                         players[0].display_name?.charAt(0)
                       )}
                     </div>
-                    {/* Border Overlay */}
                     {players[0].border_url && (
                       <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
@@ -213,7 +228,6 @@ export default function Leaderboard() {
               {players[2] ? (
                 <div className="flex flex-col items-center">
                   <div className="relative mb-2 w-16 h-16 md:w-20 md:h-20">
-                    {/* Inset Avatar */}
                     <div className="absolute inset-[15%] rounded-full bg-[#cd7f32] overflow-hidden flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg z-10">
                       {players[2].avatar_url ? (
                         <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -221,7 +235,6 @@ export default function Leaderboard() {
                         players[2].display_name?.charAt(0)
                       )}
                     </div>
-                    {/* Border Overlay */}
                     {players[2].border_url && (
                       <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
@@ -229,7 +242,7 @@ export default function Leaderboard() {
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                     <MedalIcon weight="fill" className="text-[#cd7f32] w-6 h-6 mx-auto mb-1" />
                     <p className="text-xs md:text-sm font-bold truncate">{players[2].display_name}</p>
-                    <p className="text-[10px] md:text-xs text-gray-400">{players[2].points} PTS</p>
+                    <p className="text-[10px] md:text-xs text-gray-400 font-bold">{players[2].points} PTS</p>
                   </div>
                 </div>
               ) : <div />}
@@ -239,7 +252,7 @@ export default function Leaderboard() {
               <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-black/20 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Rank</span>
                 <span className="flex-1 ml-4">Player</span>
-                <span>{activeDifficulty} Score</span>
+                <span className="capitalize">{activeDifficulty} PTS</span>
               </div>
               
               <div className="divide-y divide-white/5">
@@ -254,9 +267,7 @@ export default function Leaderboard() {
                       </span>
                       <div className="flex-1 ml-2 md:ml-4 flex items-center gap-3 md:gap-4">
                         
-                        {/* ✅ Fixed List Avatar */}
                         <div className="relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
-                          {/* Inset Avatar */}
                           <div className={`absolute inset-[15%] rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
                             {player.avatar_url ? (
                               <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -264,7 +275,6 @@ export default function Leaderboard() {
                               player.display_name?.charAt(0)
                             )}
                           </div>
-                          {/* Border Overlay */}
                           {player.border_url && (
                             <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                           )}
@@ -289,7 +299,6 @@ export default function Leaderboard() {
                 <div className="flex items-center gap-3">
                   <span className="font-bold font-mono text-lg">#{currentUserRank}</span>
                   
-                  {/* ✅ Fixed Sticky Avatar */}
                   <div className="relative w-10 h-10">
                     <div className="absolute inset-[15%] rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden z-10">
                       {profile?.avatar_url ? (
@@ -306,7 +315,7 @@ export default function Leaderboard() {
                   <span className="font-bold">{profile?.display_name} (You)</span>
                 </div>
                 <span className="font-bold flex items-center gap-1">
-                  <LightningIcon weight="fill" /> {players[currentUserRank - 1]?.points || 0}
+                  <LightningIcon weight="fill" /> {currentUserPoints}
                 </span>
               </div>
             )}
@@ -319,7 +328,7 @@ export default function Leaderboard() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        <button onClick={() => navigate('/play/new')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+        <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
         </button>

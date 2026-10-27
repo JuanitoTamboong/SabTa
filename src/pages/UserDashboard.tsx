@@ -41,22 +41,18 @@ export default function UserDashboard() {
   }
 
   useEffect(() => {
-    // ✅ Add a 500ms delay to ensure the quiz results have finished saving to the database
     const timer = setTimeout(() => {
       const fetchData = async () => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Get User Avatar
         if (user.user_metadata?.avatar_url || user.user_metadata?.picture) {
           setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
         }
 
-        // 2. Fetch Profile
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         if (profileData) setProfile(profileData)
 
-        // 3. Fetch Equipped Border
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('*, cosmetic_items(*)')
@@ -70,7 +66,6 @@ export default function UserDashboard() {
           }
         }
 
-        // 4. Fetch Attempts
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
 
         if (attempts && attempts.length > 0) {
@@ -96,7 +91,6 @@ export default function UserDashboard() {
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
-        // 5. Fetch Top Players (WITH EQUIPPED BORDERS)
         if (profileData?.age_category) {
           const { data: topProfiles } = await supabase
             .from('profiles')
@@ -125,7 +119,7 @@ export default function UserDashboard() {
         setLoading(false)
       }
       fetchData()
-    }, 500) // 500ms delay
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [navigate])
@@ -137,11 +131,26 @@ export default function UserDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || !profile?.age_category) return
 
-      const { data: completed } = await supabase.from('quiz_attempts').select('quiz_id').eq('user_id', user.id)
+      // 1. Get only COMPLETED quiz IDs. (If they quit, it's not here, so it will show up)
+      const { data: completed } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id')
+        .eq('user_id', user.id)
+        .eq('status', 'completed') 
+        
       const completedIds = completed?.map(c => c.quiz_id) || []
 
-      let query = supabase.from('quizzes').select('id, title, category, difficulty, questions(count)').eq('age_category', profile.age_category).eq('status', 'published')
-      if (completedIds.length > 0) query = query.not('id', 'in', `(${completedIds.join(',')})`)
+      // 2. Fetch available quizzes
+      let query = supabase
+        .from('quizzes')
+        .select('id, title, category, difficulty, questions(count)')
+        .eq('age_category', profile.age_category)
+        .eq('status', 'published')
+
+      // 3. Filter out completed quizzes
+      if (completedIds.length > 0) {
+        query = query.not('id', 'in', `(${completedIds.join(',')})`)
+      }
 
       const { data: quizzes } = await query
       setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
