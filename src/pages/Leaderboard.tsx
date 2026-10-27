@@ -46,19 +46,43 @@ export default function Leaderboard() {
         return
       }
 
-      // 2. Fetch all players in the same age category, sorted by total points
-      // We use the profiles table because it always has the correct updated total points
-      const { data: leaderboardData, error } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url, points')
-        .eq('age_category', profileData.age_category)
-        .order('points', { ascending: false })
-        .limit(50)
+      // 2. Fetch attempts specifically for THIS difficulty
+      const { data: attempts, error } = await supabase
+        .from('quiz_attempts')
+        .select(`
+          score,
+          profiles!inner (
+            id, display_name, avatar_url, age_category
+          ),
+          quizzes!inner (
+            difficulty
+          )
+        `)
+        .eq('quizzes.difficulty', activeDifficulty)
+        .eq('profiles.age_category', profileData.age_category)
+        .order('score', { ascending: false })
 
-      if (!error && leaderboardData) {
-        // Filter out players who have 0 points to keep the leaderboard clean
-        const activePlayers = leaderboardData.filter(p => p.points > 0)
-        setPlayers(activePlayers)
+      if (!error && attempts) {
+        // 3. Deduplicate: We only want the highest score for each player
+        const bestScores: Record<string, any> = {}
+        
+        attempts.forEach((attempt: any) => {
+          const playerId = attempt.profiles.id
+          // If we haven't seen this player yet, OR if this attempt is higher than their previous best
+          if (!bestScores[playerId] || attempt.score > bestScores[playerId].points) {
+            bestScores[playerId] = {
+              id: playerId,
+              display_name: attempt.profiles.display_name,
+              avatar_url: attempt.profiles.avatar_url,
+              points: attempt.score // We display the score for this specific difficulty
+            }
+          }
+        })
+
+        // Convert to array and sort again to be safe
+        const sortedPlayers = Object.values(bestScores).sort((a, b) => b.points - a.points)
+        
+        setPlayers(sortedPlayers)
       }
 
       setLoading(false)
@@ -80,7 +104,7 @@ export default function Leaderboard() {
     )
   }
 
-  // Find the current user's rank (if they are on the leaderboard)
+  // Find the current user's rank
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1
 
   return (
@@ -141,7 +165,7 @@ export default function Leaderboard() {
           </div>
         </header>
 
-        {/* DIFFICULTY TABS (Note: Since we rank by total points now, these tabs are just for UI) */}
+        {/* DIFFICULTY TABS */}
         <div className="flex gap-2 mb-8 relative z-10">
           {['normal', 'intermediate', 'hard'].map(diff => (
             <button
@@ -158,131 +182,136 @@ export default function Leaderboard() {
           ))}
         </div>
 
-        {/* PODIUM (Top 3) */}
-        <div className="grid grid-cols-3 gap-2 md:gap-4 mb-12 relative z-10 items-end">
-          {/* 2nd Place */}
-          {players[1] && (
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-300 border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
-                {players[1].avatar_url ? (
-                  <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  players[1].display_name?.charAt(0)
-                )}
-              </div>
-              <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
-                <MedalIcon weight="fill" className="text-gray-300 w-6 h-6 mx-auto mb-1" />
-                <p className="text-xs md:text-sm font-bold truncate">{players[1].display_name}</p>
-                <p className="text-[10px] md:text-xs text-gray-400">{players[1].points} PTS</p>
-              </div>
-            </div>
-          )}
-
-          {/* 1st Place */}
-          {players[0] && (
-            <div className="flex flex-col items-center">
-              <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 mb-1 animate-bounce" />
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ccff00] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] mb-2 z-10 overflow-hidden">
-                {players[0].avatar_url ? (
-                  <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  players[0].display_name?.charAt(0)
-                )}
-              </div>
-              <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-8 md:pb-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-t from-[#ccff00]/10 to-transparent" />
-                <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 mx-auto mb-1 relative z-10" />
-                <p className="text-sm md:text-base font-bold truncate relative z-10">{players[0].display_name}</p>
-                <p className="text-xs md:text-sm text-[#ccff00] font-bold relative z-10">{players[0].points} PTS</p>
-              </div>
-            </div>
-          )}
-
-          {/* 3rd Place */}
-          {players[2] && (
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#cd7f32] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
-                {players[2].avatar_url ? (
-                  <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  players[2].display_name?.charAt(0)
-                )}
-              </div>
-              <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
-                <MedalIcon weight="fill" className="text-[#cd7f32] w-6 h-6 mx-auto mb-1" />
-                <p className="text-xs md:text-sm font-bold truncate">{players[2].display_name}</p>
-                <p className="text-[10px] md:text-xs text-gray-400">{players[2].points} PTS</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* REST OF THE LIST */}
-        <div className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden relative z-10">
-          <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-black/20 text-xs font-bold text-gray-400 uppercase tracking-wider">
-            <span>Rank</span>
-            <span className="flex-1 ml-4">Player</span>
-            <span>Points</span>
+        {players.length === 0 ? (
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-12 text-center relative z-10">
+            <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
+            <p className="text-gray-500 text-sm">Be the first to complete a {activeDifficulty} quiz in this tier!</p>
+            <button onClick={() => navigate('/play/new')} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
+              Play Now
+            </button>
           </div>
-          
-          <div className="divide-y divide-white/5">
-            {players.slice(3).map((player, idx) => {
-              const rank = idx + 4
-              const isMe = player.id === profile?.id
-
-              return (
-                <div key={player.id} className={`flex items-center p-4 md:p-6 transition ${isMe ? 'bg-[#ccff00]/5' : 'hover:bg-white/5'}`}>
-                  <span className={`w-8 md:w-12 font-mono font-bold text-sm md:text-base ${isMe ? 'text-[#ccff00]' : 'text-gray-500'}`}>
-                    #{rank}
-                  </span>
-                  <div className="flex-1 ml-2 md:ml-4 flex items-center gap-3 md:gap-4">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
-                      {player.avatar_url ? (
-                        <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        player.display_name?.charAt(0)
-                      )}
-                    </div>
-                    <span className={`font-bold text-sm md:text-base truncate ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
-                      {player.display_name} {isMe && '(You)'}
-                    </span>
+        ) : (
+          <>
+            {/* PODIUM (Top 3) */}
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-12 relative z-10 items-end">
+              {/* 2nd Place */}
+              {players[1] ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-300 border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
+                    {players[1].avatar_url ? (
+                      <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      players[1].display_name?.charAt(0)
+                    )}
                   </div>
-                  <span className="font-bold text-sm md:text-base flex items-center gap-1">
-                    <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
-                    {player.points}
-                  </span>
+                  <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
+                    <MedalIcon weight="fill" className="text-gray-300 w-6 h-6 mx-auto mb-1" />
+                    <p className="text-xs md:text-sm font-bold truncate">{players[1].display_name}</p>
+                    <p className="text-[10px] md:text-xs text-gray-400">{players[1].points} PTS</p>
+                  </div>
                 </div>
-              )
-            })}
+              ) : <div />}
 
-            {players.length === 0 && (
-              <div className="p-12 text-center">
-                <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400 font-bold mb-1">No players yet</p>
-                <p className="text-gray-500 text-sm">Be the first to earn points in this tier!</p>
+              {/* 1st Place */}
+              {players[0] && (
+                <div className="flex flex-col items-center">
+                  <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 mb-1 animate-bounce" />
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ccff00] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] mb-2 z-10 overflow-hidden">
+                    {players[0].avatar_url ? (
+                      <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      players[0].display_name?.charAt(0)
+                    )}
+                  </div>
+                  <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-8 md:pb-12 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#ccff00]/10 to-transparent" />
+                    <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 mx-auto mb-1 relative z-10" />
+                    <p className="text-sm md:text-base font-bold truncate relative z-10">{players[0].display_name}</p>
+                    <p className="text-xs md:text-sm text-[#ccff00] font-bold relative z-10">{players[0].points} PTS</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 3rd Place */}
+              {players[2] ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#cd7f32] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
+                    {players[2].avatar_url ? (
+                      <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      players[2].display_name?.charAt(0)
+                    )}
+                  </div>
+                  <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
+                    <MedalIcon weight="fill" className="text-[#cd7f32] w-6 h-6 mx-auto mb-1" />
+                    <p className="text-xs md:text-sm font-bold truncate">{players[2].display_name}</p>
+                    <p className="text-[10px] md:text-xs text-gray-400">{players[2].points} PTS</p>
+                  </div>
+                </div>
+              ) : <div />}
+            </div>
+
+            {/* REST OF THE LIST */}
+            <div className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden relative z-10">
+              <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-black/20 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <span>Rank</span>
+                <span className="flex-1 ml-4">Player</span>
+                <span>{activeDifficulty} Score</span>
+              </div>
+              
+              <div className="divide-y divide-white/5">
+                {players.slice(3).map((player, idx) => {
+                  const rank = idx + 4
+                  const isMe = player.id === profile?.id
+
+                  return (
+                    <div key={player.id} className={`flex items-center p-4 md:p-6 transition ${isMe ? 'bg-[#ccff00]/5' : 'hover:bg-white/5'}`}>
+                      <span className={`w-8 md:w-12 font-mono font-bold text-sm md:text-base ${isMe ? 'text-[#ccff00]' : 'text-gray-500'}`}>
+                        #{rank}
+                      </span>
+                      <div className="flex-1 ml-2 md:ml-4 flex items-center gap-3 md:gap-4">
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
+                          {player.avatar_url ? (
+                            <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            player.display_name?.charAt(0)
+                          )}
+                        </div>
+                        <span className={`font-bold text-sm md:text-base truncate ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
+                          {player.display_name} {isMe && '(You)'}
+                        </span>
+                      </div>
+                      <span className="font-bold text-sm md:text-base flex items-center gap-1">
+                        <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
+                        {player.points}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* STICKY USER RANK (If outside top 3) */}
+            {currentUserRank > 3 && (
+              <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-12 bg-[#ccff00] text-black p-4 rounded-2xl shadow-[0_10px_30px_rgba(204,255,0,0.3)] flex items-center justify-between z-40">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold font-mono text-lg">#{currentUserRank}</span>
+                  <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      profile?.display_name?.charAt(0)
+                    )}
+                  </div>
+                  <span className="font-bold">{profile?.display_name} (You)</span>
+                </div>
+                <span className="font-bold flex items-center gap-1">
+                  <LightningIcon weight="fill" /> {players[currentUserRank - 1]?.points || 0}
+                </span>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* STICKY USER RANK (If outside top 3) */}
-        {currentUserRank > 3 && (
-          <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-12 bg-[#ccff00] text-black p-4 rounded-2xl shadow-[0_10px_30px_rgba(204,255,0,0.3)] flex items-center justify-between z-40">
-            <div className="flex items-center gap-3">
-              <span className="font-bold font-mono text-lg">#{currentUserRank}</span>
-              <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  profile?.display_name?.charAt(0)
-                )}
-              </div>
-              <span className="font-bold">{profile?.display_name} (You)</span>
-            </div>
-            <span className="font-bold flex items-center gap-1">
-              <LightningIcon weight="fill" /> {profile?.points || 0}
-            </span>
-          </div>
+          </>
         )}
 
       </main>
