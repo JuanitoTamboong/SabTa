@@ -10,7 +10,7 @@ import QuizGameplay from './pages/QuizGameplay'
 import QuizResults from './pages/QuizResults'
 import Profile from './pages/Profile'
 import RewardsShop from './pages/RewardsShop'
-import Leaderboard from './pages/Leaderboard' // <-- ADDED IMPORT
+import Leaderboard from './pages/Leaderboard'
 
 function AuthCallback() {
   const navigate = useNavigate()
@@ -18,21 +18,20 @@ function AuthCallback() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
 
-        if (!profile) {
-          await supabase.from('profiles').insert({
-            id: session.user.id,
-            display_name: session.user.user_metadata.full_name || 'Player',
-            role: 'player',
-            points: 0
-          })
-          navigate('/onboarding')
-        } else if (!profile.age_category) {
+        // If the profile doesn't exist (deleted from DB), log them out
+        if (error || !profile) {
+          await supabase.auth.signOut()
+          navigate('/')
+          return
+        }
+
+        if (!profile.age_category) {
           navigate('/onboarding')
         } else {
           navigate('/dashboard')
@@ -75,8 +74,21 @@ function App() {
   }, [])
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    setProfile(data)
+    // FIX: Use .maybeSingle() instead of .single() to prevent crash if row is missing
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+    
+    if (error || !data) {
+      // If the user was deleted from the database, force sign out
+      console.warn("Profile not found, logging out.")
+      await supabase.auth.signOut()
+      setProfile(null)
+    } else {
+      setProfile(data)
+    }
     setLoading(false)
   }
 
@@ -105,7 +117,7 @@ function App() {
         <Route 
           path="/onboarding" 
           element={
-            session && !profile?.age_category ? <AgeSelection /> : 
+            session && profile && !profile?.age_category ? <AgeSelection /> : 
             session && profile?.age_category ? <Navigate to="/dashboard" /> : 
             <Navigate to="/" />
           } 
@@ -127,7 +139,6 @@ function App() {
           } 
         />
 
-        {/* ADDED LEADERBOARD ROUTE */}
         <Route 
           path="/leaderboard" 
           element={
@@ -136,7 +147,6 @@ function App() {
           } 
         />
 
-        {/* ADDED REWARDS SHOP ROUTE */}
         <Route 
           path="/rewards" 
           element={

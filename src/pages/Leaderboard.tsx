@@ -21,10 +21,11 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [players, setPlayers] = useState<any[]>([])
-  const [activeDifficulty, setActiveDifficulty] = useState('normal') // normal, intermediate, hard
+  const [activeDifficulty, setActiveDifficulty] = useState('normal')
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
@@ -39,27 +40,45 @@ export default function Leaderboard() {
         setProfile(profileData)
       }
 
-      // 2. Fetch Leaderboard Data for this Age Category
-      // Note: Since we haven't implemented a difficulty filter in the DB yet, 
-      // we are fetching all top players for this age group by total points.
-      // Once you add a `difficulty` column to `quiz_attempts`, you can filter by it here.
-      
-      const { data: topPlayers } = await supabase
-        .from('profiles')
-        .select('id, display_name, points, age_category')
-        .eq('age_category', profileData?.age_category)
-        .order('points', { ascending: false })
-        .limit(50) // Get top 50
+      // 2. Fetch Quiz Attempts for this Age Category & Difficulty
+      // We join the profiles table to get the player's name
+      const { data: attempts, error } = await supabase
+        .from('quiz_attempts')
+        .select(`
+          score,
+          profiles!inner (id, display_name, age_category),
+          quizzes!inner (difficulty, age_category)
+        `)
+        .eq('quizzes.age_category', profileData?.age_category)
+        .eq('quizzes.difficulty', activeDifficulty)
+        .order('score', { ascending: false })
 
-      if (topPlayers) {
-        setPlayers(topPlayers)
+      if (!error && attempts) {
+        // 3. Process the data: Keep only the best score per player
+        const bestScores = new Map()
+
+        attempts.forEach((attempt: any) => {
+          const p = attempt.profiles
+          // If this player isn't in the map yet, or this score is higher than their previous best
+          if (p && (!bestScores.has(p.id) || attempt.score > bestScores.get(p.id).points)) {
+            bestScores.set(p.id, {
+              id: p.id,
+              display_name: p.display_name,
+              points: attempt.score
+            })
+          }
+        })
+
+        // Convert map to array and sort descending
+        const sortedPlayers = Array.from(bestScores.values()).sort((a, b) => b.points - a.points)
+        setPlayers(sortedPlayers)
       }
 
       setLoading(false)
     }
 
     fetchLeaderboard()
-  }, [navigate, activeDifficulty]) // Re-run if they change difficulty tabs
+  }, [navigate, activeDifficulty]) // Re-runs when difficulty tabs change
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -74,7 +93,7 @@ export default function Leaderboard() {
     )
   }
 
-  // Find the current user's rank
+  // Find the current user's rank (if they are on the leaderboard)
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1
 
   return (
@@ -233,17 +252,11 @@ export default function Leaderboard() {
               )
             })}
 
-            {players.length <= 3 && players.length > 0 && (
-              <div className="p-8 text-center text-gray-500 text-sm">
-                Keep playing to fill up the leaderboard!
-              </div>
-            )}
-
             {players.length === 0 && (
               <div className="p-12 text-center">
                 <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-400 font-bold mb-1">No players yet</p>
-                <p className="text-gray-500 text-sm">Be the first to earn points in this tier!</p>
+                <p className="text-gray-500 text-sm">Be the first to play a {activeDifficulty} quiz in this tier!</p>
               </div>
             )}
           </div>
@@ -260,7 +273,7 @@ export default function Leaderboard() {
               <span className="font-bold">{profile?.display_name} (You)</span>
             </div>
             <span className="font-bold flex items-center gap-1">
-              <LightningIcon weight="fill" /> {profile?.points || 0}
+              <LightningIcon weight="fill" /> {players[currentUserRank - 1]?.points || 0}
             </span>
           </div>
         )}
