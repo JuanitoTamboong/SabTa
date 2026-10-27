@@ -3,32 +3,24 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  CoinsIcon,
-  SignOutIcon,
-  HouseIcon,
-  GameControllerIcon,
-  TrophyIcon,
-  ShoppingBagIcon,
-  UserIcon,
-  CheckCircleIcon,
-  StarIcon,
-  PaletteIcon,
-  ImageIcon,
+  CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
+  ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
+  ImageIcon, XCircleIcon
 } from '@phosphor-icons/react'
-
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
 export default function RewardsShop() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
-  const [inventory, setInventory] = useState<any[]>([])
+  const [inventory, setInventory] = useState<string[]>([])
   const [items, setItems] = useState<any[]>([])
   
   // Purchase State
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,6 +42,13 @@ export default function RewardsShop() {
     fetchData()
   }, [navigate])
 
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/')
@@ -58,9 +57,9 @@ export default function RewardsShop() {
   const handlePurchase = async () => {
     if (!selectedItem || purchasing) return
     
-    // Check if they have enough COINS, not points
-    if (profile.coins < selectedItem.price) {
-      alert("You don't have enough coins for this item!")
+    // Check if they have enough COINS
+    if ((profile?.coins || 0) < selectedItem.price) {
+      setToast({ type: 'error', msg: "You don't have enough coins for this item!" })
       return
     }
 
@@ -69,11 +68,13 @@ export default function RewardsShop() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
 
-      // 1. Deduct COINS from Profile (points remain untouched)
-      const { error: profileError } = await supabase
+      // 1. Deduct COINS from Profile
+      const { data: updatedProfile, error: profileError } = await supabase
         .from('profiles')
-        .update({ coins: profile.coins - selectedItem.price })
+        .update({ coins: (profile?.coins || 0) - selectedItem.price })
         .eq('id', user.id)
+        .select('coins')
+        .single()
 
       if (profileError) throw profileError
 
@@ -85,13 +86,14 @@ export default function RewardsShop() {
       if (inventoryError) throw inventoryError
 
       // 3. Update Local State
-      setProfile({ ...profile, coins: profile.coins - selectedItem.price })
-      setInventory([...inventory, selectedItem.id])
+      setProfile((prev: any) => ({ ...prev, coins: updatedProfile.coins }))
+      setInventory((prev) => [...prev, selectedItem.id])
       setSelectedItem(null)
+      setToast({ type: 'success', msg: "Item purchased successfully!" })
 
     } catch (err: any) {
       console.error("Purchase failed:", err)
-      alert("Failed to complete purchase. Please try again.")
+      setToast({ type: 'error', msg: "Failed to complete purchase. Please try again." })
     } finally {
       setPurchasing(false)
     }
@@ -135,6 +137,13 @@ export default function RewardsShop() {
             <UserIcon weight="fill" className="w-6 h-6" /> My Profile
           </button>
         </nav>
+        <div className="w-full mt-4 p-3 bg-gradient-to-br from-[#ff00a0]/10 to-transparent border border-[#ff00a0]/20 rounded-xl">
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Coin Balance</p>
+          <div className="flex items-center gap-2">
+            <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
+            <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
+          </div>
+        </div>
         <div className="mt-auto w-full">
           <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
             <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
@@ -153,7 +162,6 @@ export default function RewardsShop() {
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            {/* Show COINS with the Coins Icon */}
             <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(255,0,160,0.1)]">
               <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
               <span className="font-bold text-[#ff00a0] text-lg">{profile?.coins || 0} COINS</span>
@@ -198,17 +206,18 @@ export default function RewardsShop() {
           ) : (
             filteredItems.map(item => {
               const isOwned = inventory.includes(item.id)
-              // Check coins here
               const canAfford = (profile?.coins || 0) >= item.price
 
               return (
                 <div key={item.id} className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col">
-                  <div className="h-40 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5">
+                  
+                  {/* ✅ FIXED: object-contain and padding so it doesn't look massive */}
+                  <div className="h-32 md:h-48 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-4">
                     {item.preview_url ? (
-                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="text-gray-600 flex flex-col items-center">
-                        <ImageIcon weight="duotone" className="w-10 h-10 mb-2" />
+                        <ImageIcon weight="duotone" className="w-8 h-8 mb-1" />
                         <span className="text-xs">No Preview</span>
                       </div>
                     )}
@@ -223,26 +232,27 @@ export default function RewardsShop() {
                     </div>
                   </div>
 
-                  <div className="p-5 flex-1 flex flex-col">
+                  {/* ✅ FIXED: Responsive padding and text sizes */}
+                  <div className="p-4 md:p-5 flex-1 flex flex-col">
                     <div className="mb-4">
-                      <h3 className="text-lg font-bold text-white mb-1">{item.name}</h3>
-                      <p className="text-sm text-gray-400 line-clamp-2">{item.description}</p>
+                      <h3 className="text-base md:text-lg font-bold text-white mb-1">{item.name}</h3>
+                      <p className="text-xs md:text-sm text-gray-400 line-clamp-2">{item.description}</p>
                     </div>
 
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-white/5">
                       {isOwned ? (
-                        <div className="flex items-center gap-1.5 text-green-400 font-bold text-sm bg-green-500/10 px-3 py-1.5 rounded-lg w-full justify-center">
+                        <div className="flex items-center gap-1.5 text-green-400 font-bold text-xs md:text-sm bg-green-500/10 px-3 py-1.5 rounded-lg w-full justify-center">
                           <CheckCircleIcon weight="fill" /> Already Owned
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-1 font-bold text-[#ff00a0]">
+                          <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-sm md:text-base">
                             <CoinsIcon weight="fill" /> {item.price}
                           </div>
                           <button
                             onClick={() => setSelectedItem(item)}
                             disabled={!canAfford}
-                            className={`px-5 py-2 rounded-xl font-bold text-sm transition ${
+                            className={`px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition ${
                               canAfford 
                                 ? 'bg-white text-black hover:bg-[#ccff00]' 
                                 : 'bg-white/5 text-gray-500 cursor-not-allowed'
@@ -292,6 +302,16 @@ export default function RewardsShop() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TOAST */}
+      {toast && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-xl font-bold text-sm shadow-2xl border flex items-center gap-2 ${
+          toast.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'
+        }`}>
+          {toast.type === 'success' ? <CheckCircleIcon weight="fill" /> : <XCircleIcon weight="fill" />}
+          {toast.msg}
         </div>
       )}
 
