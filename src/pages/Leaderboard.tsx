@@ -3,18 +3,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  TrophyIcon,
-  LightningIcon,
-  SignOutIcon,
-  HouseIcon,
-  GameControllerIcon,
-  ShoppingBagIcon,
-  UserIcon,
-  MedalIcon,
-  CrownIcon,
-  StarIcon,
+  TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
+  GameControllerIcon, ShoppingBagIcon, UserIcon,
+  MedalIcon, CrownIcon, StarIcon,
 } from '@phosphor-icons/react'
-
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
 export default function Leaderboard() {
@@ -30,58 +22,49 @@ export default function Leaderboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
-      // 1. Get Current User Profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle()
-      
-      if (profileData) {
-        setProfile(profileData)
-      }
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+      if (profileData) setProfile(profileData)
+      if (!profileData?.age_category) { setLoading(false); return }
 
-      if (!profileData?.age_category) {
-        setLoading(false)
-        return
-      }
-
-      // 2. Fetch attempts specifically for THIS difficulty
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
         .select(`
           score,
           profiles!inner (
-            id, display_name, avatar_url, age_category
+            id, display_name, avatar_url, age_category,
+            user_inventory (
+              is_equipped,
+              cosmetic_items ( preview_url, cosmetic_type )
+            )
           ),
-          quizzes!inner (
-            difficulty
-          )
+          quizzes!inner ( difficulty )
         `)
         .eq('quizzes.difficulty', activeDifficulty)
         .eq('profiles.age_category', profileData.age_category)
         .order('score', { ascending: false })
 
       if (!error && attempts) {
-        // 3. Deduplicate: We only want the highest score for each player
         const bestScores: Record<string, any> = {}
         
         attempts.forEach((attempt: any) => {
           const playerId = attempt.profiles.id
-          // If we haven't seen this player yet, OR if this attempt is higher than their previous best
+          
+          const equippedBorder = attempt.profiles.user_inventory?.find(
+            (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
+          )
+
           if (!bestScores[playerId] || attempt.score > bestScores[playerId].points) {
             bestScores[playerId] = {
               id: playerId,
               display_name: attempt.profiles.display_name,
               avatar_url: attempt.profiles.avatar_url,
-              points: attempt.score // We display the score for this specific difficulty
+              points: attempt.score,
+              border_url: equippedBorder?.cosmetic_items?.preview_url || null
             }
           }
         })
 
-        // Convert to array and sort again to be safe
         const sortedPlayers = Object.values(bestScores).sort((a, b) => b.points - a.points)
-        
         setPlayers(sortedPlayers)
       }
 
@@ -97,20 +80,14 @@ export default function Leaderboard() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        LOADING RANKINGS...
-      </div>
-    )
+    return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING RANKINGS...</div>
   }
 
-  // Find the current user's rank
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex">
       
-      {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
         <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
@@ -119,30 +96,17 @@ export default function Leaderboard() {
           <span className="text-2xl font-bold tracking-tighter">SAB<span className="text-[#ccff00]">TA</span></span>
         </div>
         <nav className="flex flex-col w-full gap-2">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <HouseIcon weight="fill" className="w-6 h-6" /> Home
-          </button>
-          <button onClick={() => navigate('/play/new')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
-          </button>
-          <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition">
-            <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
-          </button>
-          <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop
-          </button>
-          <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <UserIcon weight="fill" className="w-6 h-6" /> My Profile
-          </button>
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
+          <button onClick={() => navigate('/play/new')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
+          <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
+          <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
         </nav>
         <div className="mt-auto w-full">
-          <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
-            <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
-          </button>
+          <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition"><SignOutIcon weight="fill" className="w-6 h-6" /> Logout</button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#ccff00]/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -153,7 +117,6 @@ export default function Leaderboard() {
               You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> tier leaderboard.
             </p>
           </div>
-          
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
             <div className="bg-[#0f1014] border border-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
               <LightningIcon weight="fill" className="text-[#ccff00] w-5 h-5" />
@@ -165,7 +128,6 @@ export default function Leaderboard() {
           </div>
         </header>
 
-        {/* DIFFICULTY TABS */}
         <div className="flex gap-2 mb-8 relative z-10">
           {['normal', 'intermediate', 'hard'].map(diff => (
             <button
@@ -193,16 +155,23 @@ export default function Leaderboard() {
           </div>
         ) : (
           <>
-            {/* PODIUM (Top 3) */}
             <div className="grid grid-cols-3 gap-2 md:gap-4 mb-12 relative z-10 items-end">
+              
               {/* 2nd Place */}
               {players[1] ? (
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-300 border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
-                    {players[1].avatar_url ? (
-                      <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      players[1].display_name?.charAt(0)
+                  <div className="relative mb-2 w-16 h-16 md:w-20 md:h-20">
+                    {/* Inset Avatar */}
+                    <div className="absolute inset-[15%] rounded-full bg-gray-300 overflow-hidden flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg z-10">
+                      {players[1].avatar_url ? (
+                        <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        players[1].display_name?.charAt(0)
+                      )}
+                    </div>
+                    {/* Border Overlay */}
+                    {players[1].border_url && (
+                      <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
                   </div>
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
@@ -217,11 +186,18 @@ export default function Leaderboard() {
               {players[0] && (
                 <div className="flex flex-col items-center">
                   <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 mb-1 animate-bounce" />
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ccff00] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] mb-2 z-10 overflow-hidden">
-                    {players[0].avatar_url ? (
-                      <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      players[0].display_name?.charAt(0)
+                  <div className="relative mb-2 w-20 h-20 md:w-24 md:h-24">
+                    {/* Inset Avatar */}
+                    <div className="absolute inset-[15%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] z-10">
+                      {players[0].avatar_url ? (
+                        <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        players[0].display_name?.charAt(0)
+                      )}
+                    </div>
+                    {/* Border Overlay */}
+                    {players[0].border_url && (
+                      <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
                   </div>
                   <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-8 md:pb-12 relative overflow-hidden">
@@ -236,11 +212,18 @@ export default function Leaderboard() {
               {/* 3rd Place */}
               {players[2] ? (
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#cd7f32] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
-                    {players[2].avatar_url ? (
-                      <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      players[2].display_name?.charAt(0)
+                  <div className="relative mb-2 w-16 h-16 md:w-20 md:h-20">
+                    {/* Inset Avatar */}
+                    <div className="absolute inset-[15%] rounded-full bg-[#cd7f32] overflow-hidden flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg z-10">
+                      {players[2].avatar_url ? (
+                        <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        players[2].display_name?.charAt(0)
+                      )}
+                    </div>
+                    {/* Border Overlay */}
+                    {players[2].border_url && (
+                      <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
                   </div>
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
@@ -252,7 +235,6 @@ export default function Leaderboard() {
               ) : <div />}
             </div>
 
-            {/* REST OF THE LIST */}
             <div className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden relative z-10">
               <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-black/20 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Rank</span>
@@ -271,13 +253,23 @@ export default function Leaderboard() {
                         #{rank}
                       </span>
                       <div className="flex-1 ml-2 md:ml-4 flex items-center gap-3 md:gap-4">
-                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
-                          {player.avatar_url ? (
-                            <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            player.display_name?.charAt(0)
+                        
+                        {/* ✅ Fixed List Avatar */}
+                        <div className="relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                          {/* Inset Avatar */}
+                          <div className={`absolute inset-[15%] rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
+                            {player.avatar_url ? (
+                              <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              player.display_name?.charAt(0)
+                            )}
+                          </div>
+                          {/* Border Overlay */}
+                          {player.border_url && (
+                            <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                           )}
                         </div>
+
                         <span className={`font-bold text-sm md:text-base truncate ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
                           {player.display_name} {isMe && '(You)'}
                         </span>
@@ -292,18 +284,25 @@ export default function Leaderboard() {
               </div>
             </div>
 
-            {/* STICKY USER RANK (If outside top 3) */}
             {currentUserRank > 3 && (
               <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-12 bg-[#ccff00] text-black p-4 rounded-2xl shadow-[0_10px_30px_rgba(204,255,0,0.3)] flex items-center justify-between z-40">
                 <div className="flex items-center gap-3">
                   <span className="font-bold font-mono text-lg">#{currentUserRank}</span>
-                  <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden">
-                    {profile?.avatar_url ? (
-                      <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      profile?.display_name?.charAt(0)
+                  
+                  {/* ✅ Fixed Sticky Avatar */}
+                  <div className="relative w-10 h-10">
+                    <div className="absolute inset-[15%] rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden z-10">
+                      {profile?.avatar_url ? (
+                        <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        profile?.display_name?.charAt(0)
+                      )}
+                    </div>
+                    {players[currentUserRank - 1]?.border_url && (
+                      <img src={players[currentUserRank - 1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                     )}
                   </div>
+
                   <span className="font-bold">{profile?.display_name} (You)</span>
                 </div>
                 <span className="font-bold flex items-center gap-1">
@@ -313,10 +312,8 @@ export default function Leaderboard() {
             )}
           </>
         )}
-
       </main>
 
-      {/* MOBILE BOTTOM NAVIGATION */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <HouseIcon weight="fill" className="w-5 h-5" />
