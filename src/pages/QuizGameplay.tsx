@@ -55,7 +55,11 @@ export default function QuizGameplay() {
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQIndex, setCurrentQIndex] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
+  
+  // ✅ NEW: Timer state (default to 15, but will be overwritten by DB)
+  const [initialTime, setInitialTime] = useState(15)
   const [timeLeft, setTimeLeft] = useState(15)
+  
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
   
@@ -77,13 +81,12 @@ export default function QuizGameplay() {
   const [isFinished, setIsFinished] = useState(false)
   const [showReview, setShowReview] = useState(false)
   
-  // ✅ Store the exact database numbers
+  // Store the exact database numbers
   const [dbResults, setDbResults] = useState<{ points: number, coins: number, accuracy: number } | null>(null) 
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
-  // ✅ FIX 1: Use a Ref to track the correct count synchronously. 
-  // This prevents the database from receiving an outdated score due to React's async state updates.
+  // Use a Ref to track the correct count synchronously. 
   const correctCountRef = useRef(0)
   const pointsSpentRef = useRef(0)
 
@@ -118,6 +121,21 @@ export default function QuizGameplay() {
           return
         }
 
+        // ✅ NEW: Fetch the Quiz data to get the custom timer
+        const { data: quizData, error: quizErr } = await supabase
+          .from('quizzes')
+          .select('time_limit_seconds')
+          .eq('id', quizId)
+          .single()
+
+        if (quizErr) throw quizErr
+
+        // Set the timer based on the database (fallback to 20 if null)
+        const dbTime = quizData?.time_limit_seconds || 20
+        setInitialTime(dbTime)
+        setTimeLeft(dbTime)
+
+        // Fetch questions
         const { data: qData, error: qErr } = await supabase
           .from('questions')
           .select('*')
@@ -171,11 +189,9 @@ export default function QuizGameplay() {
     if (isCorrect) {
       playSound('correct')
       
-      // ✅ Update both the UI state and the Ref
       setCorrectCount((prev) => prev + 1)
       correctCountRef.current += 1
       
-      // Update UI immediately so coins pop up in top right
       setProfile((prev: any) => ({ 
         ...prev, 
         coins: (prev?.coins || 0) + 150 
@@ -197,13 +213,12 @@ export default function QuizGameplay() {
     }])
   }
 
-  // ✅ Handle Hint Choice (Points or Coins)
   const handleUseHint = (payWith: 'points' | 'coins') => {
     if (showHint || isAnswerRevealed) return
     
     if (payWith === 'points') {
       setPointsSpentOnHints(prev => prev + 5)
-      pointsSpentRef.current += 5 // Sync with Ref
+      pointsSpentRef.current += 5 
     } else {
       if ((profile?.coins || 0) < 5) return alert("Not enough coins!")
       setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 5) }))
@@ -219,39 +234,33 @@ export default function QuizGameplay() {
       setSelectedAnswer(null)
       setIsAnswerRevealed(false)
       
-      // ✅ FIX 2: Reset hints for the new question correctly
       setShowHint(false)
       setShowHintModal(false)
-      // Do NOT reset pointsSpentOnHints here. We need to track the total penalty for the whole quiz.
       
-      setTimeLeft(15)
+      // ✅ FIX: Reset to the custom DB time, not hardcoded 15
+      setTimeLeft(initialTime) 
+      
     } else {
-      // Pass the synchronous Ref value to ensure the DB gets the exact right number
       finishQuiz(correctCountRef.current, pointsSpentRef.current)
     }
   }
 
-  // ✅ FIX 3: Accept the final score as arguments to prevent state race conditions
   const finishQuiz = async (finalCorrect: number, finalPenalty: number) => {
     try {
-      // Calculate incorrect and unanswered based on the final responses array + the last answered question
-      // Since 'responses' state might be slightly delayed on the very last tick, we calculate based on total questions
       const totalQuestions = questions.length;
       const finalIncorrect = totalQuestions - finalCorrect; 
 
-      // 1. Submit the score to the database and wait for success
       const { data, error } = await supabase.rpc('submit_quiz_attempt', {
         p_quiz_id: quizId,
         p_correct: finalCorrect,
-        p_incorrect: finalIncorrect, // Passed the exact calculation
-        p_unanswered: 0, // Unanswered are treated as incorrect in this calculation
+        p_incorrect: finalIncorrect, 
+        p_unanswered: 0, 
         p_time_taken: 0,
         p_points_penalty: finalPenalty 
       })
 
       if (error) throw error
       
-      // 2. Save the EXACT numbers returned by the database
       if (data) {
         setDbResults({
           points: data.points_earned,
@@ -263,7 +272,6 @@ export default function QuizGameplay() {
     } catch (err) {
       console.error("Error saving quiz:", err)
     } finally {
-      // 3. Show the results screen only AFTER the DB has saved
       setIsFinished(true)
     }
   }
@@ -351,12 +359,9 @@ export default function QuizGameplay() {
                 {showReview ? 'Hide Answer Breakdown' : 'Review Your Answers'}
               </button>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div>
                 <button onClick={() => navigate('/dashboard')} className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-bold hover:bg-white transition flex items-center justify-center gap-2">
                   Dashboard <ArrowLeftIcon weight="bold" />
-                </button>
-                <button onClick={() => navigate('/play/new')} className="w-full bg-white/5 text-white py-4 rounded-xl font-bold hover:bg-white/10 transition border border-white/5">
-                  Play Again
                 </button>
               </div>
             </div>
