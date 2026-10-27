@@ -46,67 +46,19 @@ export default function Leaderboard() {
         return
       }
 
-      // 2. Fetch all Quiz Attempts for this Age Category
-      // We fetch the raw attempts first to avoid complex nested query errors
-      const { data: attempts, error } = await supabase
-        .from('quiz_attempts')
-        .select(`
-          score,
-          user_id,
-          quiz_id
-        `)
+      // 2. Fetch all players in the same age category, sorted by total points
+      // We use the profiles table because it always has the correct updated total points
+      const { data: leaderboardData, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, points')
+        .eq('age_category', profileData.age_category)
+        .order('points', { ascending: false })
+        .limit(50)
 
-      if (!error && attempts) {
-        // 3. Filter and process the data manually
-        const bestScores = new Map()
-        
-        // We need to fetch all the quizzes to know their difficulty and age_category
-        const { data: quizzesData } = await supabase.from('quizzes').select('id, difficulty, age_category')
-        const quizMap = new Map(quizzesData?.map(q => [q.id, q]))
-
-        attempts.forEach((attempt: any) => {
-          const quizInfo: any = quizMap.get(attempt.quiz_id)
-          
-          // Only process attempts where the quiz matches the user's age category AND the active difficulty
-          if (quizInfo && quizInfo.age_category === profileData.age_category && quizInfo.difficulty === activeDifficulty) {
-            
-            // If this user isn't in the map yet, or this score is higher than their previous best
-            if (!bestScores.has(attempt.user_id) || attempt.score > bestScores.get(attempt.user_id).points) {
-              bestScores.set(attempt.user_id, {
-                id: attempt.user_id,
-                points: attempt.score
-              })
-            }
-          }
-        })
-
-        // 4. Fetch the Profiles for the users who made it onto the leaderboard
-        const userIds = Array.from(bestScores.keys())
-        
-        if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, display_name, avatar_url')
-            .in('id', userIds)
-
-          const profileMap = new Map(profilesData?.map(p => [p.id, p]))
-
-          // Merge the profile data into the scores
-          const finalLeaderboard = Array.from(bestScores.values()).map(score => {
-            const pInfo: any = profileMap.get(score.id)
-            return {
-              ...score,
-              display_name: pInfo?.display_name || 'Unknown Player',
-              avatar_url: pInfo?.avatar_url
-            }
-          })
-
-          // Sort descending
-          finalLeaderboard.sort((a, b) => b.points - a.points)
-          setPlayers(finalLeaderboard)
-        } else {
-          setPlayers([])
-        }
+      if (!error && leaderboardData) {
+        // Filter out players who have 0 points to keep the leaderboard clean
+        const activePlayers = leaderboardData.filter(p => p.points > 0)
+        setPlayers(activePlayers)
       }
 
       setLoading(false)
@@ -189,7 +141,7 @@ export default function Leaderboard() {
           </div>
         </header>
 
-        {/* DIFFICULTY TABS */}
+        {/* DIFFICULTY TABS (Note: Since we rank by total points now, these tabs are just for UI) */}
         <div className="flex gap-2 mb-8 relative z-10">
           {['normal', 'intermediate', 'hard'].map(diff => (
             <button
@@ -307,7 +259,7 @@ export default function Leaderboard() {
               <div className="p-12 text-center">
                 <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-400 font-bold mb-1">No players yet</p>
-                <p className="text-gray-500 text-sm">Be the first to play a {activeDifficulty} quiz in this tier!</p>
+                <p className="text-gray-500 text-sm">Be the first to earn points in this tier!</p>
               </div>
             )}
           </div>
@@ -328,7 +280,7 @@ export default function Leaderboard() {
               <span className="font-bold">{profile?.display_name} (You)</span>
             </div>
             <span className="font-bold flex items-center gap-1">
-              <LightningIcon weight="fill" /> {players[currentUserRank - 1]?.points || 0}
+              <LightningIcon weight="fill" /> {profile?.points || 0}
             </span>
           </div>
         )}

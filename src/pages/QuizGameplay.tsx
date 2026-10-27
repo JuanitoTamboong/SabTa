@@ -4,7 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   ClockIcon, CheckIcon, XIcon, LightningIcon, 
-  ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon
+  ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon,
+  CoinsIcon 
 } from '@phosphor-icons/react'
 
 // --- SOUND EFFECTS HELPER ---
@@ -62,14 +63,18 @@ export default function QuizGameplay() {
   // Review & Hint State
   const [responses, setResponses] = useState<any[]>([])
   const [showHint, setShowHint] = useState(false)
-  const [hintPenalty, setHintPenalty] = useState(0)
+  const [showHintModal, setShowHintModal] = useState(false) // ✅ NEW: Choice Modal
+  const [pointsSpentOnHints, setPointsSpentOnHints] = useState(0) // ✅ NEW: Track DB penalty
   
   // App State
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showQuitModal, setShowQuitModal] = useState(false)
   
-  // NEW: Results State (Replaces the separate /results page)
+  // User Profile Data
+  const [profile, setProfile] = useState<any>(null)
+
+  // Results State
   const [isFinished, setIsFinished] = useState(false)
   const [showReview, setShowReview] = useState(false)
 
@@ -78,13 +83,22 @@ export default function QuizGameplay() {
 
   useEffect(() => {
     const initGame = async () => {
-      if (isFinished) return // Don't reload if the quiz is already done
+      if (isFinished) return
 
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Check if user already completed THIS quiz
+        // 1. Fetch User Profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
+        
+        if (profileData) setProfile(profileData)
+
+        // 2. Check if already completed
         const { data: existingAttempt } = await supabase
           .from('quiz_attempts')
           .select('id')
@@ -98,7 +112,7 @@ export default function QuizGameplay() {
           return
         }
 
-        // 2. Fetch Quiz & Questions
+        // 3. Fetch Questions
         const { data: qData, error: qErr } = await supabase
           .from('questions')
           .select('*')
@@ -121,7 +135,7 @@ export default function QuizGameplay() {
   }, [navigate, quizId, isFinished])
 
   useEffect(() => {
-    if (loading || error || isAnswerRevealed || !currentQuestion || showQuitModal || isFinished) return
+    if (loading || error || isAnswerRevealed || !currentQuestion || showQuitModal || showHintModal || isFinished) return
     
     if (timeLeft === 0) return handleTimeOut()
     
@@ -131,7 +145,7 @@ export default function QuizGameplay() {
 
     timerRef.current = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [timeLeft, isAnswerRevealed, loading, error, currentQuestion, showQuitModal, isFinished])
+  }, [timeLeft, isAnswerRevealed, loading, error, currentQuestion, showQuitModal, showHintModal, isFinished])
 
   const handleTimeOut = () => {
     playSound('wrong')
@@ -151,9 +165,18 @@ export default function QuizGameplay() {
     
     if (isCorrect) {
       playSound('correct')
-      const points = Math.max(0, (currentQuestion.points || 10) - hintPenalty)
-      setScore((prev) => prev + points)
+      
+      const pointsEarned = currentQuestion.points || 10
+      const coinsEarned = 150 // ✅ Match the database logic
+      
+      setScore((prev) => prev + pointsEarned)
       setCorrectCount((prev) => prev + 1)
+      
+      // ✅ Update UI immediately so coins pop up in top right
+      setProfile((prev: any) => ({ 
+        ...prev, 
+        coins: (prev?.coins || 0) + coinsEarned 
+      }))
     } else {
       playSound('wrong')
     }
@@ -171,10 +194,21 @@ export default function QuizGameplay() {
     }])
   }
 
-  const handleUseHint = () => {
+  // ✅ Handle Hint Choice (Points or Coins)
+  const handleUseHint = (payWith: 'points' | 'coins') => {
     if (showHint || isAnswerRevealed) return
+    
+    if (payWith === 'points') {
+      if (score < 5) return alert("Not enough points!")
+      setScore(prev => Math.max(0, prev - 5))
+      setPointsSpentOnHints(prev => prev + 5)
+    } else {
+      if ((profile?.coins || 0) < 5) return alert("Not enough coins!")
+      setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 5) }))
+    }
+
+    setShowHintModal(false)
     setShowHint(true)
-    setHintPenalty(5) 
   }
 
   const nextQuestion = () => {
@@ -183,7 +217,6 @@ export default function QuizGameplay() {
       setSelectedAnswer(null)
       setIsAnswerRevealed(false)
       setShowHint(false)
-      setHintPenalty(0)
       setTimeLeft(15)
     } else {
       finishQuiz()
@@ -193,14 +226,26 @@ export default function QuizGameplay() {
   const finishQuiz = async () => {
     setIsFinished(true)
 
-    // Save the score safely to database
+    // ✅ Save score and pass point penalties to DB
     await supabase.rpc('submit_quiz_attempt', {
       p_quiz_id: quizId,
       p_correct: correctCount,
       p_incorrect: responses.filter(r => !r.is_correct && r.selected_answer !== null).length,
       p_unanswered: responses.filter(r => r.selected_answer === null).length,
-      p_time_taken: 0
+      p_time_taken: 0,
+      p_points_penalty: pointsSpentOnHints 
     })
+    
+    // ✅ Fetch fresh profile to sync UI perfectly with DB
+    const { data: freshProfile } = await supabase
+      .from('profiles')
+      .select('coins, points')
+      .eq('id', profile.id)
+      .single()
+      
+    if (freshProfile) {
+      setProfile((prev: any) => ({ ...prev, ...freshProfile }))
+    }
   }
 
   // --- RENDER STATES ---
@@ -222,7 +267,7 @@ export default function QuizGameplay() {
     )
   }
 
-  // --- RESULTS SCREEN (Combined instead of separate page) ---
+  // --- RESULTS SCREEN ---
   if (isFinished) {
     const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0
     const isPerfect = correctCount === questions.length && questions.length > 0
@@ -243,21 +288,38 @@ export default function QuizGameplay() {
               {isPerfect ? 'You got every single question right. Amazing!' : 'Great effort! Here is your breakdown.'}
             </p>
 
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              {/* Points Card */}
+              <div className="bg-black/40 border border-[#00f0ff]/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
-                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Score</p>
-                <p className="text-lg md:text-xl font-bold text-[#00f0ff]">{score}</p>
+                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Points Earned</p>
+                <p className="text-2xl font-bold text-[#00f0ff]">{score}</p>
               </div>
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
-                <StarIcon weight="duotone" className="text-[#ff00a0] w-6 h-6 mb-2" />
-                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Accuracy</p>
-                <p className="text-lg md:text-xl font-bold text-[#ff00a0]">{accuracy}%</p>
+              
+              {/* Coins Card */}
+              <div className="bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
+                <CoinsIcon weight="fill" className="text-[#ff00a0] w-6 h-6 mb-2" />
+                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Coins Earned</p>
+                <p className="text-2xl font-bold text-[#ff00a0]">+{correctCount * 150}</p>
               </div>
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
-                <CheckIcon weight="duotone" className="text-[#ccff00] w-6 h-6 mb-2" />
-                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Correct</p>
-                <p className="text-lg md:text-xl font-bold text-[#ccff00]">{correctCount}/{questions.length}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-3 flex items-center justify-center gap-3">
+                <StarIcon weight="fill" className="text-yellow-300 w-5 h-5" />
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold text-left">Accuracy</p>
+                  <p className="text-sm font-bold">{accuracy}%</p>
+                </div>
+              </div>
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-3 flex items-center justify-center gap-3">
+                <CheckIcon weight="fill" className="text-green-400 w-5 h-5" />
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold text-left">Correct</p>
+                  <p className="text-sm font-bold">{correctCount}/{questions.length}</p>
+                </div>
               </div>
             </div>
 
@@ -321,19 +383,26 @@ export default function QuizGameplay() {
 
   // --- ACTIVE GAMEPLAY ---
   if (!currentQuestion) return null
-  const canAffordHint = score >= 5
+  const canAffordHintPoints = score >= 5
+  const canAffordHintCoins = (profile?.coins || 0) >= 5
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative">
       
-      {/* BACK BUTTON */}
-      <div className="w-full max-w-3xl flex justify-start mb-4">
+      {/* HEADER BAR */}
+      <div className="w-full max-w-3xl flex justify-between items-center mb-4">
         <button 
           onClick={() => setShowQuitModal(true)} 
           className="flex items-center gap-2 text-gray-400 hover:text-red-400 transition bg-white/5 px-4 py-2 rounded-xl text-sm font-bold"
         >
           <ArrowLeftIcon weight="bold" /> Quit Quiz
         </button>
+
+        {/* Coin Balance Display (Updates Live) */}
+        <div className="flex items-center gap-2 bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
+          <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
+          <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
+        </div>
       </div>
 
       <div className="w-full max-w-3xl relative z-10">
@@ -353,22 +422,16 @@ export default function QuizGameplay() {
         {!isAnswerRevealed && (
           <div className="flex justify-center mb-6">
             <button 
-              onClick={handleUseHint} 
-              disabled={showHint || !canAffordHint} 
+              onClick={() => setShowHintModal(true)} 
+              disabled={showHint} 
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition ${
                 showHint 
                   ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/50 cursor-not-allowed' 
-                  : !canAffordHint 
-                    ? 'bg-red-500/10 border-red-500/20 text-red-500/50 cursor-not-allowed'
-                    : 'bg-transparent border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'
+                  : 'bg-transparent border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'
               }`}
             >
               <LightbulbIcon weight="fill" /> 
-              {showHint 
-                ? 'Hint Revealed (-5 PTS)' 
-                : !canAffordHint 
-                  ? 'Not enough points for Hint' 
-                  : 'Use Hint (-5 PTS)'}
+              {showHint ? 'Hint Revealed' : 'Use Hint'}
             </button>
           </div>
         )}
@@ -405,9 +468,47 @@ export default function QuizGameplay() {
         </div>
 
         <div className="mt-12 flex justify-between items-center text-gray-500 text-sm">
-          <div className="flex items-center gap-2"><LightningIcon weight="fill" className="text-[#ccff00]" /> Score: <span className="font-bold text-white">{score}</span></div>
+          <div className="flex items-center gap-2"><TargetIcon weight="fill" className="text-[#00f0ff]" /> Points: <span className="font-bold text-white">{score}</span></div>
         </div>
       </div>
+
+      {/* ✅ HINT CHOICE MODAL */}
+      {showHintModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full text-center relative shadow-2xl">
+            <LightbulbIcon weight="fill" className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Need a Hint?</h2>
+            <p className="text-gray-400 text-sm mb-6">Choose how you want to pay.</p>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={() => handleUseHint('points')}
+                disabled={!canAffordHintPoints}
+                className="w-full py-4 bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:bg-[#00f0ff]/20 text-[#00f0ff] rounded-xl font-bold flex items-center justify-between px-6 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Pay with Points</span>
+                <span className="flex items-center gap-1"><TargetIcon /> -5</span>
+              </button>
+              
+              <button 
+                onClick={() => handleUseHint('coins')}
+                disabled={!canAffordHintCoins}
+                className="w-full py-4 bg-[#ff00a0]/10 border border-[#ff00a0]/30 hover:bg-[#ff00a0]/20 text-[#ff00a0] rounded-xl font-bold flex items-center justify-between px-6 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Pay with Coins</span>
+                <span className="flex items-center gap-1"><CoinsIcon weight="fill" /> -5</span>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setShowHintModal(false)} 
+              className="mt-6 text-gray-500 hover:text-white text-sm font-bold transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* QUIT CONFIRMATION MODAL */}
       {showQuitModal && (

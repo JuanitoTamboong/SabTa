@@ -1,8 +1,9 @@
+// src/pages/RewardsShop.tsx
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  LightningIcon,
+  CoinsIcon,
   SignOutIcon,
   HouseIcon,
   GameControllerIcon,
@@ -27,38 +28,20 @@ export default function RewardsShop() {
   // Purchase State
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [purchasing, setPurchasing] = useState(false)
-  const [activeTab, setActiveTab] = useState('all') // 'all', 'background', 'theme', 'border'
+  const [activeTab, setActiveTab] = useState('all')
 
   useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
-      // 1. Fetch Profile (for points)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (profileData) setProfile(profileData)
 
-      // 2. Fetch User Inventory (what they already own)
-      const { data: inventoryData } = await supabase
-        .from('user_inventory')
-        .select('cosmetic_item_id')
-        .eq('user_id', user.id)
-      
-      if (inventoryData) {
-        setInventory(inventoryData.map(i => i.cosmetic_item_id))
-      }
+      const { data: inventoryData } = await supabase.from('user_inventory').select('cosmetic_item_id').eq('user_id', user.id)
+      if (inventoryData) setInventory(inventoryData.map(i => i.cosmetic_item_id))
 
-      // 3. Fetch Available Items
-      const { data: itemsData } = await supabase
-        .from('cosmetic_items')
-        .select('*')
-        .eq('status', 'published')
-        .order('price', { ascending: true })
-
+      const { data: itemsData } = await supabase.from('cosmetic_items').select('*').eq('status', 'published').order('price', { ascending: true })
       if (itemsData) setItems(itemsData)
 
       setLoading(false)
@@ -75,8 +58,9 @@ export default function RewardsShop() {
   const handlePurchase = async () => {
     if (!selectedItem || purchasing) return
     
-    if (profile.points < selectedItem.price) {
-      alert("You don't have enough points for this item!")
+    // Check if they have enough COINS, not points
+    if (profile.coins < selectedItem.price) {
+      alert("You don't have enough coins for this item!")
       return
     }
 
@@ -85,10 +69,10 @@ export default function RewardsShop() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Not authenticated")
 
-      // 1. Deduct Points from Profile
+      // 1. Deduct COINS from Profile (points remain untouched)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ points: profile.points - selectedItem.price })
+        .update({ coins: profile.coins - selectedItem.price })
         .eq('id', user.id)
 
       if (profileError) throw profileError
@@ -96,16 +80,12 @@ export default function RewardsShop() {
       // 2. Add Item to User Inventory
       const { error: inventoryError } = await supabase
         .from('user_inventory')
-        .insert({
-          user_id: user.id,
-          cosmetic_item_id: selectedItem.id,
-          is_equipped: false
-        })
+        .insert({ user_id: user.id, cosmetic_item_id: selectedItem.id, is_equipped: false })
 
       if (inventoryError) throw inventoryError
 
-      // 3. Update Local State (to reflect instantly)
-      setProfile({ ...profile, points: profile.points - selectedItem.price })
+      // 3. Update Local State
+      setProfile({ ...profile, coins: profile.coins - selectedItem.price })
       setInventory([...inventory, selectedItem.id])
       setSelectedItem(null)
 
@@ -117,10 +97,7 @@ export default function RewardsShop() {
     }
   }
 
-  // Filter items based on active tab
-  const filteredItems = items.filter(item => 
-    activeTab === 'all' ? true : item.cosmetic_type === activeTab
-  )
+  const filteredItems = items.filter(item => activeTab === 'all' ? true : item.cosmetic_type === activeTab)
 
   if (loading) {
     return (
@@ -169,17 +146,17 @@ export default function RewardsShop() {
       <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
 
-        {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">Rewards Shop</h1>
-            <p className="text-gray-400 text-xs md:text-sm">Spend your points on exclusive cosmetics.</p>
+            <p className="text-gray-400 text-xs md:text-sm">Spend your coins on exclusive cosmetics.</p>
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <div className="bg-[#0f1014] border border-[#ccff00]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(204,255,0,0.1)]">
-              <LightningIcon weight="fill" className="text-[#ccff00] w-5 h-5" />
-              <span className="font-bold text-[#ccff00] text-lg">{profile?.points || 0} PTS</span>
+            {/* Show COINS with the Coins Icon */}
+            <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(255,0,160,0.1)]">
+              <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
+              <span className="font-bold text-[#ff00a0] text-lg">{profile?.coins || 0} COINS</span>
             </div>
             <button onClick={handleLogout} className="md:hidden bg-red-500/10 text-red-400 p-2.5 rounded-xl border border-red-500/20">
               <SignOutIcon weight="bold" className="w-5 h-5" />
@@ -221,11 +198,11 @@ export default function RewardsShop() {
           ) : (
             filteredItems.map(item => {
               const isOwned = inventory.includes(item.id)
-              const canAfford = profile.points >= item.price
+              // Check coins here
+              const canAfford = (profile?.coins || 0) >= item.price
 
               return (
                 <div key={item.id} className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col">
-                  {/* Preview Image Area */}
                   <div className="h-40 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5">
                     {item.preview_url ? (
                       <img src={item.preview_url} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -236,7 +213,6 @@ export default function RewardsShop() {
                       </div>
                     )}
                     
-                    {/* Rarity Badge */}
                     <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10">
                       <span className={`${
                         item.rarity === 'legendary' ? 'text-[#ff00a0]' :
@@ -247,7 +223,6 @@ export default function RewardsShop() {
                     </div>
                   </div>
 
-                  {/* Info Area */}
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="mb-4">
                       <h3 className="text-lg font-bold text-white mb-1">{item.name}</h3>
@@ -261,8 +236,8 @@ export default function RewardsShop() {
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-1 font-bold text-[#ccff00]">
-                            <LightningIcon weight="fill" /> {item.price}
+                          <div className="flex items-center gap-1 font-bold text-[#ff00a0]">
+                            <CoinsIcon weight="fill" /> {item.price}
                           </div>
                           <button
                             onClick={() => setSelectedItem(item)}
@@ -295,8 +270,8 @@ export default function RewardsShop() {
             
             <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-6">
               <p className="font-bold text-white mb-1">{selectedItem.name}</p>
-              <div className="flex items-center justify-center gap-1 text-[#ccff00] font-bold text-xl">
-                <LightningIcon weight="fill" /> {selectedItem.price} PTS
+              <div className="flex items-center justify-center gap-1 text-[#ff00a0] font-bold text-xl">
+                <CoinsIcon weight="fill" /> {selectedItem.price} COINS
               </div>
             </div>
 
