@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   TrophyIcon,
-  LightningIcon,
   TargetIcon,
   ArrowRightIcon,
   HouseIcon,
@@ -11,7 +10,6 @@ import {
   ShoppingBagIcon,
   UserIcon,
   CheckCircleIcon,
-  XCircleIcon,
   StarIcon,
   SignOutIcon,
 } from '@phosphor-icons/react'
@@ -25,7 +23,6 @@ export default function QuizResults() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
   
   // Calculated stats
   const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
@@ -43,14 +40,12 @@ export default function QuizResults() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Fetch Profile
+        // 1. Fetch Profile (To get current points)
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single()
-
-        if (profileData) setProfile(profileData)
 
         // 2. Save Quiz Attempt to Database
         setSaving(true)

@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { PlantIcon, RocketIcon, BrainIcon, CheckCircleIcon, ArrowRightIcon } from '@phosphor-icons/react'
 
 export default function AgeSelection() {
-  const navigate = useNavigate()
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
