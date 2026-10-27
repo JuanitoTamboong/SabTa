@@ -1,17 +1,15 @@
+// src/pages/QuizGameplay.tsx
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  ClockIcon,
-  CheckIcon,
-  XIcon,
-  LightningIcon,
-  SparkleIcon,
-  ArrowLeftIcon,
+  ClockIcon, CheckIcon, XIcon, LightningIcon, 
+  ArrowLeftIcon, LightbulbIcon, XCircleIcon
 } from '@phosphor-icons/react'
 
 export default function QuizGameplay() {
   const navigate = useNavigate()
+  const { quizId } = useParams()
   
   // Game State
   const [questions, setQuestions] = useState<any[]>([])
@@ -22,110 +20,105 @@ export default function QuizGameplay() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
   
+  // Review & Hint State
+  const [responses, setResponses] = useState<any[]>([])
+  const [showHint, setShowHint] = useState(false)
+  const [hintPenalty, setHintPenalty] = useState(0)
+  
   // App State
   const [loading, setLoading] = useState(true)
-  const [emptyState, setEmptyState] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [showQuitModal, setShowQuitModal] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const currentQuestion = questions[currentQIndex]
 
-  // 1. Fetch User and Quiz on Mount
   useEffect(() => {
     const initGame = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
+        // 1. Check if user already completed THIS quiz
+        // FIXED: Changed .single() to .maybeSingle() to prevent 406 error crash
+        const { data: existingAttempt } = await supabase
+          .from('quiz_attempts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('quiz_id', quizId)
+          .maybeSingle()
 
-        if (!profileData || !profileData.age_category) {
-          return navigate('/onboarding')
-        }
-        setProfile(profileData)
-
-        // Fetch a real quiz from the database
-        const { data: quizData, error: quizError } = await supabase
-          .from('quizzes')
-          .select('id, title')
-          .eq('age_category', profileData.age_category)
-          .eq('status', 'published')
-          .limit(1)
-          .single()
-
-        if (quizError || !quizData) {
-          setEmptyState(true)
+        if (existingAttempt) {
+          setError("You have already completed this quiz! Please choose another one.")
           setLoading(false)
           return
         }
 
-        const { data: questionsData, error: qError } = await supabase
+        // 2. Fetch Quiz & Questions
+        const { data: qData, error: qErr } = await supabase
           .from('questions')
           .select('*')
-          .eq('quiz_id', quizData.id)
+          .eq('quiz_id', quizId)
 
-        if (qError || !questionsData || questionsData.length === 0) {
-          setEmptyState(true)
+        if (qErr || !qData || qData.length === 0) {
+          setError("Questions not found for this quiz.")
           setLoading(false)
           return
         }
 
-        const shuffled = questionsData.sort(() => 0.5 - Math.random())
-        setQuestions(shuffled)
+        setQuestions(qData.sort(() => 0.5 - Math.random()))
         setLoading(false)
-      } catch (err: any) {
-        console.error(err)
-        setEmptyState(true)
+      } catch (err) {
+        setError("An error occurred loading the quiz.")
         setLoading(false)
       }
     }
-
     initGame()
-  }, [navigate])
+  }, [navigate, quizId])
 
-  // 2. Timer Logic
   useEffect(() => {
-    if (loading || emptyState || isAnswerRevealed || !currentQuestion) return
-
-    if (timeLeft === 0) {
-      handleTimeOut()
-      return
-    }
-
-    timerRef.current = setTimeout(() => {
-      setTimeLeft((prev) => prev - 1)
-    }, 1000)
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
-  }, [timeLeft, isAnswerRevealed, loading, emptyState, currentQuestion])
+    if (loading || error || isAnswerRevealed || !currentQuestion || showQuitModal) return
+    if (timeLeft === 0) return handleTimeOut()
+    timerRef.current = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [timeLeft, isAnswerRevealed, loading, error, currentQuestion, showQuitModal])
 
   const handleTimeOut = () => {
     setIsAnswerRevealed(true)
     setSelectedAnswer(null)
+    recordResponse(null)
     setTimeout(nextQuestion, 2000)
   }
 
   const handleSelectAnswer = (answer: string) => {
     if (isAnswerRevealed) return
-
     setSelectedAnswer(answer)
     setIsAnswerRevealed(true)
     if (timerRef.current) clearTimeout(timerRef.current)
 
     const isCorrect = answer === currentQuestion.correct_answer
-    
     if (isCorrect) {
-      setScore((prev) => prev + (currentQuestion.points || 10))
+      const points = Math.max(0, (currentQuestion.points || 10) - hintPenalty)
+      setScore((prev) => prev + points)
       setCorrectCount((prev) => prev + 1)
     }
-
+    recordResponse(answer)
     setTimeout(nextQuestion, 1500)
+  }
+
+  const recordResponse = (answer: string | null) => {
+    setResponses(prev => [...prev, {
+      question_text: currentQuestion.question_text,
+      selected_answer: answer,
+      correct_answer: currentQuestion.correct_answer,
+      is_correct: answer === currentQuestion.correct_answer,
+    }])
+  }
+
+  const handleUseHint = () => {
+    if (showHint || isAnswerRevealed) return
+    setShowHint(true)
+    setHintPenalty(5) 
   }
 
   const nextQuestion = () => {
@@ -133,54 +126,40 @@ export default function QuizGameplay() {
       setCurrentQIndex((prev) => prev + 1)
       setSelectedAnswer(null)
       setIsAnswerRevealed(false)
+      setShowHint(false)
+      setHintPenalty(0)
       setTimeLeft(15)
     } else {
       finishQuiz()
     }
   }
 
-  const finishQuiz = () => {
+  const finishQuiz = async () => {
+    await supabase.rpc('submit_quiz_attempt', {
+      p_quiz_id: quizId,
+      p_correct: correctCount,
+      p_incorrect: responses.filter(r => !r.is_correct && r.selected_answer !== null).length,
+      p_unanswered: responses.filter(r => r.selected_answer === null).length,
+      p_time_taken: 0
+    })
+
+    // Navigate to results, replacing the current history entry so "Back" doesn't go back to the quiz
     navigate('/results', {
-      state: {
-        score: score,
-        correctCount: correctCount,
-        totalQuestions: questions.length,
-        quizId: questions[0]?.quiz_id || null
-      }
+      replace: true,
+      state: { score, correctCount, totalQuestions: questions.length, quizId, responses }
     })
   }
 
-  // --- RENDER STATES ---
+  if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING...</div>
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono text-xl">
-        LOADING ARENA...
-      </div>
-    )
-  }
-
-  // PROFESSIONAL EMPTY STATE (No Demo)
-  if (emptyState) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-[#ccff00]/5 rounded-full blur-[120px] pointer-events-none" />
-        
-        <div className="relative z-10 bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 md:p-12 max-w-lg w-full text-center shadow-2xl">
-          <div className="mx-auto w-20 h-20 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-6">
-            <SparkleIcon weight="duotone" className="w-10 h-10 text-[#ccff00]" />
-          </div>
-          
-          <h1 className="text-3xl font-bold mb-3">The Arena is Preparing...</h1>
-          <p className="text-gray-400 text-sm md:text-base mb-8">
-            There are no published quizzes for the <span className="text-white font-bold uppercase">{profile?.age_category}</span> tier yet. 
-            Please check back later or contact an administrator to publish new challenges.
-          </p>
-
-          <button 
-            onClick={() => navigate('/dashboard')} 
-            className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-bold hover:bg-white transition flex items-center justify-center gap-2"
-          >
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
+        <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 text-center max-w-lg w-full">
+          <XCircleIcon weight="fill" className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Quiz Unavailable</h1>
+          <p className="text-gray-400 mb-8">{error}</p>
+          <button onClick={() => navigate('/dashboard')} className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2">
             <ArrowLeftIcon weight="bold" /> Back to Dashboard
           </button>
         </div>
@@ -190,65 +169,79 @@ export default function QuizGameplay() {
 
   if (!currentQuestion) return null
 
-  // --- ACTIVE GAMEPLAY ---
+  // Check if the player can afford a hint based on current quiz score
+  const canAffordHint = score >= 5
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative">
+      
+      {/* BACK BUTTON */}
+      <div className="w-full max-w-3xl flex justify-start mb-4">
+        <button 
+          onClick={() => setShowQuitModal(true)} 
+          className="flex items-center gap-2 text-gray-400 hover:text-red-400 transition bg-white/5 px-4 py-2 rounded-xl text-sm font-bold"
+        >
+          <ArrowLeftIcon weight="bold" /> Quit Quiz
+        </button>
+      </div>
 
       <div className="w-full max-w-3xl relative z-10">
-        
-        {/* Top Bar */}
         <div className="flex justify-between items-center mb-6">
-          <div className="text-gray-400 font-mono text-sm">
-            QUESTION {currentQIndex + 1} / {questions.length}
-          </div>
-          <div className={`flex items-center gap-2 text-xl font-bold px-4 py-2 rounded-xl border ${
-            timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/10 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'
-          }`}>
+          <div className="text-gray-400 font-mono text-sm">QUESTION {currentQIndex + 1} / {questions.length}</div>
+          <div className={`flex items-center gap-2 text-xl font-bold px-4 py-2 rounded-xl border ${timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/10 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
             <ClockIcon weight="bold" /> 00:{timeLeft.toString().padStart(2, '0')}
           </div>
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full h-2 bg-[#0f1014] rounded-full mb-12 overflow-hidden border border-white/5">
-          <div 
-            className="h-full bg-[#ccff00] transition-all duration-300"
-            style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }}
-          />
+          <div className="h-full bg-[#ccff00] transition-all duration-300" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
-        {/* Question Area */}
-        <h2 className="text-2xl md:text-3xl font-bold mb-10 text-center leading-snug">
-          {currentQuestion.question_text}
-        </h2>
+        <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center leading-snug">{currentQuestion.question_text}</h2>
         
+        {!isAnswerRevealed && (
+          <div className="flex justify-center mb-6">
+            <button 
+              onClick={handleUseHint} 
+              disabled={showHint || !canAffordHint} 
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition ${
+                showHint 
+                  ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/50 cursor-not-allowed' 
+                  : !canAffordHint 
+                    ? 'bg-red-500/10 border-red-500/20 text-red-500/50 cursor-not-allowed'
+                    : 'bg-transparent border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'
+              }`}
+            >
+              <LightbulbIcon weight="fill" /> 
+              {showHint 
+                ? 'Hint Revealed (-5 PTS)' 
+                : !canAffordHint 
+                  ? 'Not enough points for Hint' 
+                  : 'Use Hint (-5 PTS)'}
+            </button>
+          </div>
+        )}
+
+        {showHint && (
+          <div className="bg-[#ff00a0]/10 border border-[#ff00a0]/20 rounded-xl p-4 mb-6 text-center text-sm text-[#ff00a0]">
+            {currentQuestion.hint || "Think carefully about the question."}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {currentQuestion.options.map((option: string, idx: number) => {
             const isCorrect = option === currentQuestion.correct_answer
             const isSelected = option === selectedAnswer
-            
             let btnClass = "bg-[#0f1014] border border-white/10 hover:border-white/30 hover:bg-white/5"
-            
             if (isAnswerRevealed) {
               if (isCorrect) btnClass = "bg-green-500/20 border-green-500 text-green-400"
               else if (isSelected && !isCorrect) btnClass = "bg-red-500/20 border-red-500 text-red-400"
               else btnClass = "bg-[#0f1014] border-white/5 opacity-50"
             }
-
             return (
-              <button
-                key={idx}
-                onClick={() => handleSelectAnswer(option)}
-                disabled={isAnswerRevealed}
-                className={`p-6 rounded-2xl text-left text-lg font-semibold transition-all duration-200 flex justify-between items-center ${btnClass}`}
-              >
+              <button key={idx} onClick={() => handleSelectAnswer(option)} disabled={isAnswerRevealed} className={`p-6 rounded-2xl text-left text-lg font-semibold transition-all flex justify-between items-center ${btnClass}`}>
                 <span className="flex gap-4 items-center">
-                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-mono ${
-                    isAnswerRevealed && isCorrect ? 'bg-green-500 text-black' : 
-                    isAnswerRevealed && isSelected && !isCorrect ? 'bg-red-500 text-white' : 
-                    'bg-white/10 text-gray-400'
-                  }`}>
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-mono ${isAnswerRevealed && isCorrect ? 'bg-green-500 text-black' : isAnswerRevealed && isSelected && !isCorrect ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400'}`}>
                     {String.fromCharCode(65 + idx)}
                   </span>
                   {option}
@@ -260,18 +253,38 @@ export default function QuizGameplay() {
           })}
         </div>
 
-        {/* Bottom Status */}
         <div className="mt-12 flex justify-between items-center text-gray-500 text-sm">
-          <div className="flex items-center gap-2">
-            <LightningIcon weight="fill" className="text-[#ccff00]" />
-            Score: <span className="font-bold text-white">{score}</span>
-          </div>
-          <div>
-            Difficulty: <span className="text-[#00f0ff] uppercase">Normal</span>
+          <div className="flex items-center gap-2"><LightningIcon weight="fill" className="text-[#ccff00]" /> Score: <span className="font-bold text-white">{score}</span></div>
+        </div>
+      </div>
+
+      {/* QUIT CONFIRMATION MODAL */}
+      {showQuitModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full text-center relative shadow-2xl">
+            <XCircleIcon weight="fill" className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Quit Quiz?</h2>
+            <p className="text-gray-400 text-sm mb-8">
+              If you leave now, your progress will be lost and no points will be saved. Are you sure?
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowQuitModal(false)} 
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition"
+              >
+                Resume Quiz
+              </button>
+              <button 
+                onClick={() => navigate('/dashboard')} 
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition"
+              >
+                Quit
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-      </div>
     </div>
   )
 }

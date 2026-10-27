@@ -1,221 +1,240 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+// src/pages/QuizGameplay.tsx
+import { useEffect, useState, useRef } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
-  TrophyIcon,
-  TargetIcon,
-  ArrowRightIcon,
-  HouseIcon,
-  GameControllerIcon,
-  ShoppingBagIcon,
-  UserIcon,
-  CheckCircleIcon,
-  StarIcon,
-  SignOutIcon,
+  ClockIcon, CheckIcon, XIcon, LightningIcon, 
+  SparkleIcon, ArrowLeftIcon, LightbulbIcon
 } from '@phosphor-icons/react'
 
-export default function QuizResults() {
+export default function QuizGameplay() {
   const navigate = useNavigate()
-  const location = useLocation()
+  const { quizId } = useParams() // Get the specific quiz ID from the URL
   
-  // We pass the quiz data through the router state
-  const { score, correctCount, totalQuestions, quizId } = location.state || {}
-
+  // Game State
+  const [questions, setQuestions] = useState<any[]>([])
+  const [currentQIndex, setCurrentQIndex] = useState(0)
+  const [score, setScore] = useState(0)
+  const [correctCount, setCorrectCount] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(15)
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
+  const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
+  
+  // Review & Hint State
+  const [responses, setResponses] = useState<any[]>([])
+  const [showHint, setShowHint] = useState(false)
+  const [hintPenalty, setHintPenalty] = useState(0)
+  
+  // App State
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  
-  // Calculated stats
-  const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
-  const isPerfect = correctCount === totalQuestions && totalQuestions > 0
+  const [error, setError] = useState<string | null>(null)
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const currentQuestion = questions[currentQIndex]
 
   useEffect(() => {
-    const saveResults = async () => {
-      // If someone tries to access this page directly without playing, kick them out
-      if (!location.state) {
-        navigate('/dashboard')
-        return
-      }
-
+    const initGame = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Fetch Profile (To get current points)
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
+        // 1. Check if user already completed THIS quiz
+        const { data: existingAttempt } = await supabase
+          .from('quiz_attempts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('quiz_id', quizId)
           .single()
 
-        // 2. Save Quiz Attempt to Database
-        setSaving(true)
-        const { error: attemptError } = await supabase
-          .from('quiz_attempts')
-          .insert({
-            user_id: user.id,
-            quiz_id: quizId,
-            score: score,
-            accuracy: accuracy,
-          })
+        if (existingAttempt) {
+          setError("You have already completed this quiz! Please choose another one.")
+          setLoading(false)
+          return
+        }
 
-        if (attemptError) throw attemptError
+        // 2. Fetch Quiz & Questions
+        const { data: qData, error: qErr } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('quiz_id', quizId)
 
-        // 3. Update User Points
-        const { error: pointsError } = await supabase
-          .from('profiles')
-          .update({ points: (profileData?.points || 0) + score })
-          .eq('id', user.id)
+        if (qErr || !qData || qData.length === 0) {
+          setError("Questions not found for this quiz.")
+          setLoading(false)
+          return
+        }
 
-        if (pointsError) throw pointsError
-
+        setQuestions(qData.sort(() => 0.5 - Math.random()))
+        setLoading(false)
       } catch (err) {
-        console.error("Failed to save results:", err)
-      } finally {
-        setSaving(false)
+        setError("An error occurred loading the quiz.")
         setLoading(false)
       }
     }
+    initGame()
+  }, [navigate, quizId])
 
-    saveResults()
-  }, [navigate, location.state, quizId, score, accuracy])
+  useEffect(() => {
+    if (loading || error || isAnswerRevealed || !currentQuestion) return
+    if (timeLeft === 0) return handleTimeOut()
+    timerRef.current = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [timeLeft, isAnswerRevealed, loading, error, currentQuestion])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/')
+  const handleTimeOut = () => {
+    setIsAnswerRevealed(true)
+    setSelectedAnswer(null)
+    recordResponse(null)
+    setTimeout(nextQuestion, 2000)
   }
 
-  if (loading || saving) {
+  const handleSelectAnswer = (answer: string) => {
+    if (isAnswerRevealed) return
+    setSelectedAnswer(answer)
+    setIsAnswerRevealed(true)
+    if (timerRef.current) clearTimeout(timerRef.current)
+
+    const isCorrect = answer === currentQuestion.correct_answer
+    if (isCorrect) {
+      const points = Math.max(0, (currentQuestion.points || 10) - hintPenalty)
+      setScore((prev) => prev + points)
+      setCorrectCount((prev) => prev + 1)
+    }
+    recordResponse(answer)
+    setTimeout(nextQuestion, 1500)
+  }
+
+  const recordResponse = (answer: string | null) => {
+    setResponses(prev => [...prev, {
+      question_text: currentQuestion.question_text,
+      selected_answer: answer,
+      correct_answer: currentQuestion.correct_answer,
+      is_correct: answer === currentQuestion.correct_answer,
+    }])
+  }
+
+  const handleUseHint = () => {
+    if (showHint || isAnswerRevealed) return
+    setShowHint(true)
+    setHintPenalty(5) 
+  }
+
+  const nextQuestion = () => {
+    if (currentQIndex < questions.length - 1) {
+      setCurrentQIndex((prev) => prev + 1)
+      setSelectedAnswer(null)
+      setIsAnswerRevealed(false)
+      setShowHint(false)
+      setHintPenalty(0)
+      setTimeLeft(15)
+    } else {
+      finishQuiz()
+    }
+  }
+
+  const finishQuiz = async () => {
+    // 1. Save attempt securely to DB (The unique constraint prevents double score)
+    await supabase.rpc('submit_quiz_attempt', {
+      p_quiz_id: quizId,
+      p_correct: correctCount,
+      p_incorrect: responses.filter(r => !r.is_correct && r.selected_answer !== null).length,
+      p_unanswered: responses.filter(r => r.selected_answer === null).length,
+      p_time_taken: 0
+    })
+
+    // 2. Go to results screen
+    navigate('/results', {
+      state: { score, correctCount, totalQuestions: questions.length, quizId, responses }
+    })
+  }
+
+  if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING...</div>
+
+  if (error) {
     return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        {saving ? 'SAVING RESULTS...' : 'LOADING...'}
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
+        <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 text-center max-w-lg w-full">
+          <XIcon weight="bold" className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+          <p className="text-gray-400 mb-8">{error}</p>
+          <button onClick={() => navigate('/dashboard')} className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2">
+            <ArrowLeftIcon weight="bold" /> Back to Dashboard
+          </button>
+        </div>
       </div>
     )
   }
 
+  if (!currentQuestion) return null
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 relative">
       
-      {/* DESKTOP SIDEBAR */}
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
-        <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
-          <div className="w-10 h-10 bg-[#ccff00] rounded-xl flex items-center justify-center text-black font-bold text-xl">S</div>
-          <span className="text-2xl font-bold tracking-tighter">SAB<span className="text-[#ccff00]">TA</span></span>
-        </div>
-        <nav className="flex flex-col w-full gap-2">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <HouseIcon weight="fill" className="w-6 h-6" /> Home
-          </button>
-          <button onClick={() => navigate('/play/new')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
-          </button>
-          <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
-          </button>
-          <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop
-          </button>
-          <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <UserIcon weight="fill" className="w-6 h-6" /> My Profile
-          </button>
-        </nav>
-        <div className="mt-auto w-full">
-          <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
-            <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
-          </button>
-        </div>
-      </aside>
+      {/* BACK BUTTON */}
+      <div className="absolute top-6 left-6 z-20">
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 hover:text-white transition bg-white/5 px-4 py-2 rounded-xl">
+          <ArrowLeftIcon weight="bold" /> Quit Quiz
+        </button>
+      </div>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden flex flex-col items-center justify-center min-h-screen">
+      <div className="w-full max-w-3xl relative z-10">
+        <div className="flex justify-between items-center mb-6">
+          <div className="text-gray-400 font-mono text-sm">QUESTION {currentQIndex + 1} / {questions.length}</div>
+          <div className={`flex items-center gap-2 text-xl font-bold px-4 py-2 rounded-xl border ${timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/10 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
+            <ClockIcon weight="bold" /> 00:{timeLeft.toString().padStart(2, '0')}
+          </div>
+        </div>
+
+        <div className="w-full h-2 bg-[#0f1014] rounded-full mb-12 overflow-hidden border border-white/5">
+          <div className="h-full bg-[#ccff00] transition-all duration-300" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
+        </div>
+
+        <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center leading-snug">{currentQuestion.question_text}</h2>
         
-        {/* Background Glows */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-[#ccff00]/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
-
-        {/* Header Logout for Mobile */}
-        <div className="lg:hidden absolute top-6 right-6 z-20">
-          <button onClick={handleLogout} className="bg-red-500/10 text-red-400 p-2.5 rounded-xl border border-red-500/20">
-            <SignOutIcon weight="bold" className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="relative z-10 bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-12 max-w-lg w-full text-center shadow-2xl">
-          
-          {/* Top Icon */}
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#ccff00] to-green-400 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(204,255,0,0.3)]">
-            <TrophyIcon weight="fill" className="w-10 h-10 text-black" />
-          </div>
-
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            {isPerfect ? 'Flawless Victory!' : 'Quiz Completed!'}
-          </h1>
-          <p className="text-gray-400 text-sm md:text-base mb-8">
-            {isPerfect ? 'You got every single question right. Amazing!' : 'Great effort! Here is your breakdown.'}
-          </p>
-
-          {/* Score Grid */}
-          <div className="grid grid-cols-3 gap-2 md:gap-4 mb-8">
-            <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
-              <TargetIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Score</p>
-              <p className="text-lg md:text-xl font-bold text-[#00f0ff]">{score}</p>
-            </div>
-            
-            <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
-              <StarIcon weight="duotone" className="text-[#ff00a0] w-6 h-6 mb-2" />
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Accuracy</p>
-              <p className="text-lg md:text-xl font-bold text-[#ff00a0]">{accuracy}%</p>
-            </div>
-
-            <div className="bg-black/40 border border-white/5 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center">
-              <CheckCircleIcon weight="duotone" className="text-[#ccff00] w-6 h-6 mb-2" />
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Correct</p>
-              <p className="text-lg md:text-xl font-bold text-[#ccff00]">{correctCount}/{totalQuestions}</p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            <button 
-              onClick={() => navigate('/dashboard')} 
-              className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-bold hover:bg-white transition flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(204,255,0,0.2)]"
-            >
-              Return to Dashboard <ArrowRightIcon weight="bold" />
-            </button>
-            <button 
-              onClick={() => navigate('/play/new')} 
-              className="w-full bg-white/5 text-white py-4 rounded-xl font-bold hover:bg-white/10 transition border border-white/5"
-            >
-              Play Another Quiz
+        {!isAnswerRevealed && (
+          <div className="flex justify-center mb-6">
+            <button onClick={handleUseHint} disabled={showHint} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition ${showHint ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/50 cursor-not-allowed' : 'bg-transparent border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'}`}>
+              <LightbulbIcon weight="fill" /> 
+              {showHint ? 'Hint Revealed (-5 PTS)' : 'Use Hint (-5 PTS)'}
             </button>
           </div>
-          
-        </div>
-      </main>
+        )}
 
-      {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
-        <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <HouseIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Home</span>
-        </button>
-        <button onClick={() => navigate('/play/new')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <GameControllerIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Play</span>
-        </button>
-        <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <TrophyIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Ranks</span>
-        </button>
-        <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <ShoppingBagIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Shop</span>
-        </button>
-        <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <UserIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Profile</span>
-        </button>
-      </nav>
+        {showHint && (
+          <div className="bg-[#ff00a0]/10 border border-[#ff00a0]/20 rounded-xl p-4 mb-6 text-center text-sm text-[#ff00a0]">
+            {currentQuestion.hint || "Think carefully about the question."}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {currentQuestion.options.map((option: string, idx: number) => {
+            const isCorrect = option === currentQuestion.correct_answer
+            const isSelected = option === selectedAnswer
+            let btnClass = "bg-[#0f1014] border border-white/10 hover:border-white/30 hover:bg-white/5"
+            if (isAnswerRevealed) {
+              if (isCorrect) btnClass = "bg-green-500/20 border-green-500 text-green-400"
+              else if (isSelected && !isCorrect) btnClass = "bg-red-500/20 border-red-500 text-red-400"
+              else btnClass = "bg-[#0f1014] border-white/5 opacity-50"
+            }
+            return (
+              <button key={idx} onClick={() => handleSelectAnswer(option)} disabled={isAnswerRevealed} className={`p-6 rounded-2xl text-left text-lg font-semibold transition-all flex justify-between items-center ${btnClass}`}>
+                <span className="flex gap-4 items-center">
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-mono ${isAnswerRevealed && isCorrect ? 'bg-green-500 text-black' : isAnswerRevealed && isSelected && !isCorrect ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400'}`}>
+                    {String.fromCharCode(65 + idx)}
+                  </span>
+                  {option}
+                </span>
+                {isAnswerRevealed && isCorrect && <CheckIcon weight="bold" className="w-6 h-6" />}
+                {isAnswerRevealed && isSelected && !isCorrect && <XIcon weight="bold" className="w-6 h-6" />}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-12 flex justify-between items-center text-gray-500 text-sm">
+          <div className="flex items-center gap-2"><LightningIcon weight="fill" className="text-[#ccff00]" /> Score: <span className="font-bold text-white">{score}</span></div>
+        </div>
+      </div>
     </div>
   )
 }

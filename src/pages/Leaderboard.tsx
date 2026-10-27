@@ -1,3 +1,4 @@
+// src/pages/Leaderboard.tsx
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -34,51 +35,85 @@ export default function Leaderboard() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
       
       if (profileData) {
         setProfile(profileData)
       }
 
-      // 2. Fetch Quiz Attempts for this Age Category & Difficulty
-      // We join the profiles table to get the player's name
+      if (!profileData?.age_category) {
+        setLoading(false)
+        return
+      }
+
+      // 2. Fetch all Quiz Attempts for this Age Category
+      // We fetch the raw attempts first to avoid complex nested query errors
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
         .select(`
           score,
-          profiles!inner (id, display_name, age_category),
-          quizzes!inner (difficulty, age_category)
+          user_id,
+          quiz_id
         `)
-        .eq('quizzes.age_category', profileData?.age_category)
-        .eq('quizzes.difficulty', activeDifficulty)
-        .order('score', { ascending: false })
 
       if (!error && attempts) {
-        // 3. Process the data: Keep only the best score per player
+        // 3. Filter and process the data manually
         const bestScores = new Map()
+        
+        // We need to fetch all the quizzes to know their difficulty and age_category
+        const { data: quizzesData } = await supabase.from('quizzes').select('id, difficulty, age_category')
+        const quizMap = new Map(quizzesData?.map(q => [q.id, q]))
 
         attempts.forEach((attempt: any) => {
-          const p = attempt.profiles
-          // If this player isn't in the map yet, or this score is higher than their previous best
-          if (p && (!bestScores.has(p.id) || attempt.score > bestScores.get(p.id).points)) {
-            bestScores.set(p.id, {
-              id: p.id,
-              display_name: p.display_name,
-              points: attempt.score
-            })
+          const quizInfo: any = quizMap.get(attempt.quiz_id)
+          
+          // Only process attempts where the quiz matches the user's age category AND the active difficulty
+          if (quizInfo && quizInfo.age_category === profileData.age_category && quizInfo.difficulty === activeDifficulty) {
+            
+            // If this user isn't in the map yet, or this score is higher than their previous best
+            if (!bestScores.has(attempt.user_id) || attempt.score > bestScores.get(attempt.user_id).points) {
+              bestScores.set(attempt.user_id, {
+                id: attempt.user_id,
+                points: attempt.score
+              })
+            }
           }
         })
 
-        // Convert map to array and sort descending
-        const sortedPlayers = Array.from(bestScores.values()).sort((a, b) => b.points - a.points)
-        setPlayers(sortedPlayers)
+        // 4. Fetch the Profiles for the users who made it onto the leaderboard
+        const userIds = Array.from(bestScores.keys())
+        
+        if (userIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, display_name, avatar_url')
+            .in('id', userIds)
+
+          const profileMap = new Map(profilesData?.map(p => [p.id, p]))
+
+          // Merge the profile data into the scores
+          const finalLeaderboard = Array.from(bestScores.values()).map(score => {
+            const pInfo: any = profileMap.get(score.id)
+            return {
+              ...score,
+              display_name: pInfo?.display_name || 'Unknown Player',
+              avatar_url: pInfo?.avatar_url
+            }
+          })
+
+          // Sort descending
+          finalLeaderboard.sort((a, b) => b.points - a.points)
+          setPlayers(finalLeaderboard)
+        } else {
+          setPlayers([])
+        }
       }
 
       setLoading(false)
     }
 
     fetchLeaderboard()
-  }, [navigate, activeDifficulty]) // Re-runs when difficulty tabs change
+  }, [navigate, activeDifficulty])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -176,8 +211,12 @@ export default function Leaderboard() {
           {/* 2nd Place */}
           {players[1] && (
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-300 border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2">
-                {players[1].display_name?.charAt(0)}
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-300 border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
+                {players[1].avatar_url ? (
+                  <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  players[1].display_name?.charAt(0)
+                )}
               </div>
               <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                 <MedalIcon weight="fill" className="text-gray-300 w-6 h-6 mx-auto mb-1" />
@@ -191,8 +230,12 @@ export default function Leaderboard() {
           {players[0] && (
             <div className="flex flex-col items-center">
               <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 mb-1 animate-bounce" />
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ccff00] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] mb-2 z-10">
-                {players[0].display_name?.charAt(0)}
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#ccff00] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] mb-2 z-10 overflow-hidden">
+                {players[0].avatar_url ? (
+                  <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  players[0].display_name?.charAt(0)
+                )}
               </div>
               <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-8 md:pb-12 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-t from-[#ccff00]/10 to-transparent" />
@@ -206,8 +249,12 @@ export default function Leaderboard() {
           {/* 3rd Place */}
           {players[2] && (
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#cd7f32] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2">
-                {players[2].display_name?.charAt(0)}
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#cd7f32] border-4 border-[#0f1014] flex items-center justify-center text-black font-bold text-xl uppercase shadow-lg mb-2 overflow-hidden">
+                {players[2].avatar_url ? (
+                  <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  players[2].display_name?.charAt(0)
+                )}
               </div>
               <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                 <MedalIcon weight="fill" className="text-[#cd7f32] w-6 h-6 mx-auto mb-1" />
@@ -237,8 +284,12 @@ export default function Leaderboard() {
                     #{rank}
                   </span>
                   <div className="flex-1 ml-2 md:ml-4 flex items-center gap-3 md:gap-4">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
-                      {player.display_name?.charAt(0)}
+                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
+                      {player.avatar_url ? (
+                        <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        player.display_name?.charAt(0)
+                      )}
                     </div>
                     <span className={`font-bold text-sm md:text-base truncate ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
                       {player.display_name} {isMe && '(You)'}
@@ -267,8 +318,12 @@ export default function Leaderboard() {
           <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-12 bg-[#ccff00] text-black p-4 rounded-2xl shadow-[0_10px_30px_rgba(204,255,0,0.3)] flex items-center justify-between z-40">
             <div className="flex items-center gap-3">
               <span className="font-bold font-mono text-lg">#{currentUserRank}</span>
-              <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase">
-                {profile?.display_name?.charAt(0)}
+              <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  profile?.display_name?.charAt(0)
+                )}
               </div>
               <span className="font-bold">{profile?.display_name} (You)</span>
             </div>
