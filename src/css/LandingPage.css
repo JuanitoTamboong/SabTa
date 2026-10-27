@@ -16,6 +16,29 @@ html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--sabta-bg); }
 button, a { -webkit-tap-highlight-color: transparent; }
 
+/* --- CUSTOM SYSTEM SCROLLBAR --- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #030608; 
+  border-left: 1px solid rgba(0, 240, 255, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: #1a2a36;
+  border: 2px solid #030608;
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sabta-cyan);
+  box-shadow: 0 0 10px var(--sabta-cyan);
+}
+::-webkit-scrollbar-corner {
+  background: #030608;
+}
+/* ---------------------------------- */
+
 .sabta-page {
   position: relative;
   min-height: 100vh;
@@ -139,7 +162,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sabta-quiz-reward strong { color: var(--sabta-lime); font-size: 13px; }
 .sabta-quiz-reward > span { display: grid; place-items: center; width: 33px; height: 33px; border: 1px solid rgba(204,255,0,.35); background: rgba(204,255,0,.08); color: var(--sabta-lime); }
 
-/* FIXED SIDE TABS */
+/* --- UPGRADED SIDE TABS --- */
 .sabta-side-tab { 
   position: absolute; 
   z-index: 10; 
@@ -148,52 +171,82 @@ button, a { -webkit-tap-highlight-color: transparent; }
   display: flex; 
   flex-direction: column; 
   align-items: center; 
-  gap: 13px; 
-  padding: 20px 10px; 
-  border: 1px solid rgba(116,147,166,.35); 
-  background: rgba(4,10,14,.9); 
+  gap: 16px; 
+  padding: 24px 12px; 
+  background: linear-gradient(180deg, rgba(10, 18, 26, 0.95) 0%, rgba(4, 8, 12, 0.98) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.25);
   color: #aab7c5; 
   font-size: 10px; 
-  font-weight: 600; 
-  letter-spacing: .09em; 
+  font-weight: 700; 
+  letter-spacing: 0.15em; 
+  cursor: pointer;
+  transition: all 0.3s ease;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
 }
 
-.sabta-side-tab span:not(.sabta-side-chevron) {
+.sabta-side-tab:hover {
+  border-color: var(--sabta-lime);
+  box-shadow: 0 0 20px rgba(204, 255, 0, 0.15);
+  color: var(--sabta-lime);
+}
+
+.sabta-side-tab__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 4px;
+  color: var(--sabta-lime);
+  transition: all 0.3s ease;
+}
+
+.sabta-side-tab:hover .sabta-side-tab__icon {
+  background: rgba(204, 255, 0, 0.1);
+  border-color: var(--sabta-lime);
+  box-shadow: 0 0 10px rgba(204, 255, 0, 0.3);
+}
+
+.sabta-side-tab__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sabta-side-tab__text {
   writing-mode: vertical-rl;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
-.sabta-side-tab svg { 
-  width: 17px; 
-  height: 17px; 
-  color: var(--sabta-lime); 
+.sabta-side-tab__chevron {
+  color: var(--sabta-cyan);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  transition: color 0.3s ease;
 }
 
-/* Left Tab */
+.sabta-side-tab:hover .sabta-side-tab__chevron {
+  color: var(--sabta-lime);
+}
+
 .sabta-side-tab--left { 
   left: 0; 
-  border-radius: 0 7px 7px 0; 
   border-left: none;
+  padding-right: 16px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 15px 100%, 0 calc(100% - 15px));
   transform: translateY(-50%) rotate(180deg);
 }
-.sabta-side-tab--left span:not(.sabta-side-chevron) {
-  writing-mode: vertical-rl;
+.sabta-side-tab--left .sabta-side-tab__text {
   transform: rotate(180deg); 
 }
 
-/* Right Tab */
 .sabta-side-tab--right { 
   right: 0; 
-  border-radius: 7px 0 0 7px; 
   border-right: none;
-}
-.sabta-side-tab--right span:not(.sabta-side-chevron) {
-  writing-mode: vertical-rl;
-}
-
-.sabta-side-chevron { 
-  color: var(--sabta-lime); 
-  font-size: 18px; 
-  font-weight: 700;
+  padding-left: 16px;
 }
 
 .sabta-feature-strip { position: relative; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 0; padding: 18px 16px 24px; border: 1px solid rgba(0,240,255,.4); border-radius: 14px; background: rgba(3,10,14,.88); }
