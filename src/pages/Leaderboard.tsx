@@ -263,13 +263,14 @@ export default function Leaderboard() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-12 relative z-10 items-end">
+            {/* ✅ REDESIGNED TOP 3 PODIUM */}
+            <div className="grid grid-cols-3 gap-2 md:gap-6 mb-12 relative z-10 items-end max-w-3xl mx-auto mt-8">
               
               {/* 2nd Place */}
               {players[1] ? (
-                <div className="flex flex-col items-center">
-                  <div className="relative mb-2 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center">
-                    <div className="absolute inset-[15%] rounded-full bg-gray-300 overflow-hidden flex items-center justify-center text-black font-bold text-lg sm:text-xl uppercase shadow-lg z-10">
+                <div className="flex flex-col items-center group">
+                  <div className="relative mb-3 sm:mb-4 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center transition-transform hover:scale-105">
+                    <div className="w-[70%] h-[70%] rounded-full bg-[#1a1c23] overflow-hidden flex items-center justify-center text-gray-300 font-bold text-lg sm:text-xl uppercase shadow-lg z-10 border border-white/10">
                       {players[1].avatar_url ? (
                         <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -277,24 +278,25 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[1].border_url && (
-                      <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
+                      <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 drop-shadow-md" />
                     )}
+                    <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-gray-400 text-gray-300 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#2</div>
                   </div>
-                  <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-4 sm:pb-6 md:pb-8">
-                    <MedalIcon weight="fill" className="text-gray-300 w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-1" />
-                    <p className="text-[10px] sm:text-xs md:text-sm font-bold truncate">{players[1].display_name}</p>
-                    {activeTab === 'global' && <p className="text-[7px] sm:text-[8px] text-gray-500 uppercase font-bold">{players[1].age_category}</p>}
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-bold">{players[1].points} PTS</p>
+                  <div className="bg-gradient-to-t from-[#1a1c23] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)]">
+                    <MedalIcon weight="fill" className="text-gray-400 w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
+                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[1].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[1].age_category}</p>}
+                    <p className="text-[10px] sm:text-xs text-gray-300 font-black mt-1 sm:mt-2">{players[1].points} PTS</p>
                   </div>
                 </div>
               ) : <div />}
 
               {/* 1st Place */}
               {players[0] && (
-                <div className="flex flex-col items-center">
-                  <CrownIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mb-1 animate-bounce" />
-                  <div className="relative mb-2 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center">
-                    <div className="absolute inset-[15%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-xl sm:text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] z-10">
+                <div className="flex flex-col items-center group">
+                  <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 sm:w-10 sm:h-10 mb-2 animate-bounce drop-shadow-[0_0_15px_rgba(204,255,0,0.5)] z-30" />
+                  <div className="relative mb-3 sm:mb-4 w-24 h-24 sm:w-32 sm:h-32 md:w-36 md:h-36 flex items-center justify-center transition-transform hover:scale-105">
+                    <div className="w-[70%] h-[70%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-xl sm:text-3xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.3)] z-10 border-2 border-[#ccff00]">
                       {players[0].avatar_url ? (
                         <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -302,24 +304,25 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[0].border_url && (
-                      <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
+                      <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 drop-shadow-[0_0_15px_rgba(204,255,0,0.2)]" />
                     )}
+                    <div className="absolute -bottom-2 -right-2 bg-[#ccff00] text-black w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-sm sm:text-lg z-30 shadow-[0_0_15px_rgba(204,255,0,0.4)] border-2 border-[#0f1014]">#1</div>
                   </div>
-                  <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-6 sm:pb-8 md:pb-12 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#ccff00]/10 to-transparent" />
-                    <StarIcon weight="fill" className="text-[#ccff00] w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-1 relative z-10" />
-                    <p className="text-[11px] sm:text-sm md:text-base font-bold truncate relative z-10">{players[0].display_name}</p>
-                    {activeTab === 'global' && <p className="text-[7px] sm:text-[8px] text-[#ccff00]/70 uppercase font-bold relative z-10">{players[0].age_category}</p>}
-                    <p className="text-[10px] sm:text-xs md:text-sm text-[#ccff00] font-bold relative z-10">{players[0].points} PTS</p>
+                  <div className="bg-gradient-to-t from-[#1a2210] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)]">
+                    <div className="absolute inset-0 bg-[#ccff00]/5 pointer-events-none" />
+                    <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 relative z-10 drop-shadow-md" />
+                    <p className="text-xs sm:text-base font-black truncate text-white relative z-10">{players[0].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[8px] sm:text-[10px] text-[#ccff00]/80 uppercase font-bold tracking-widest relative z-10 mt-0.5">{players[0].age_category}</p>}
+                    <p className="text-[11px] sm:text-sm text-[#ccff00] font-black relative z-10 mt-1 sm:mt-2">{players[0].points} PTS</p>
                   </div>
                 </div>
               )}
 
               {/* 3rd Place */}
               {players[2] ? (
-                <div className="flex flex-col items-center">
-                  <div className="relative mb-2 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center">
-                    <div className="absolute inset-[15%] rounded-full bg-[#cd7f32] overflow-hidden flex items-center justify-center text-black font-bold text-lg sm:text-xl uppercase shadow-lg z-10">
+                <div className="flex flex-col items-center group">
+                  <div className="relative mb-3 sm:mb-4 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center transition-transform hover:scale-105">
+                    <div className="w-[70%] h-[70%] rounded-full bg-[#1c1512] overflow-hidden flex items-center justify-center text-[#cd7f32] font-bold text-lg sm:text-xl uppercase shadow-lg z-10 border border-white/10">
                       {players[2].avatar_url ? (
                         <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -327,14 +330,15 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[2].border_url && (
-                      <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
+                      <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 drop-shadow-md" />
                     )}
+                    <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-[#cd7f32] text-[#cd7f32] w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#3</div>
                   </div>
-                  <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-4 sm:pb-6 md:pb-8">
-                    <MedalIcon weight="fill" className="text-[#cd7f32] w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-1" />
-                    <p className="text-[10px] sm:text-xs md:text-sm font-bold truncate">{players[2].display_name}</p>
-                    {activeTab === 'global' && <p className="text-[7px] sm:text-[8px] text-gray-500 uppercase font-bold">{players[2].age_category}</p>}
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-400 font-bold">{players[2].points} PTS</p>
+                  <div className="bg-gradient-to-t from-[#1c1512] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)]">
+                    <MedalIcon weight="fill" className="text-[#cd7f32] w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
+                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[2].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[2].age_category}</p>}
+                    <p className="text-[10px] sm:text-xs text-[#cd7f32] font-black mt-1 sm:mt-2">{players[2].points} PTS</p>
                   </div>
                 </div>
               ) : <div />}
@@ -383,7 +387,6 @@ export default function Leaderboard() {
                       </div>
                       
                       <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
-                        {/* ✅ FIX: Changed 'hidden sm:flex' to 'flex' so timer shows on mobile */}
                         <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1 sm:gap-1.5 bg-white/5 px-1.5 sm:px-2.5 py-1 rounded-lg border border-white/10">
                           <TimerIcon size={12} className={`sm:w-[14px] sm:h-[14px] ${formatTime(player.bestTime) ? "text-[#ccff00]" : "text-gray-600"}`} /> 
                           {formatTime(player.bestTime) || '-'}
