@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, XIcon, CoinsIcon,
-  GiftIcon
+  GiftIcon, CalendarCheckIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -27,7 +27,6 @@ export default function UserDashboard() {
     accuracy: 0,
     level: 1,
     quizzesToday: 0,
-    coinsEarnedToday: 0,
   })
 
   const [recentActivity, setRecentActivity] = useState<any[]>([])
@@ -106,7 +105,6 @@ export default function UserDashboard() {
           .eq('is_equipped', true)
         
         if (invData) {
-          // ✅ FIXED: Strictly looking for 'avatar_border'
           const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'avatar_border')
           if (border?.cosmetic_items?.preview_url) {
             setEquippedBorder(border.cosmetic_items.preview_url)
@@ -127,15 +125,19 @@ export default function UserDashboard() {
 
           const totalQuizzes = attempts.length
           const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
-          const avgAccuracy = totalQuizzes > 0 ? attempts.reduce((acc, curr) => acc + (curr.accuracy || 0), 0) / totalQuizzes : 0
+          
+          // ✅ FIXED: Calculate true accuracy dynamically
+          const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
+          const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
+          const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
+          
           const currentPoints = profileData?.points || 0
           const level = Math.floor(currentPoints / 100) + 1
           const today = new Date().toISOString().split('T')[0]
           const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
           const quizzesToday = todayAttempts.length
-          const coinsEarnedToday = todayAttempts.reduce((sum, a) => sum + (a.correct_answers * 150), 0)
 
-          setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday, coinsEarnedToday })
+          setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday })
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
@@ -156,7 +158,6 @@ export default function UserDashboard() {
 
           if (topProfiles) {
             const mappedPlayers = topProfiles.map((p: any) => {
-              // ✅ FIXED: Strictly looking for 'avatar_border'
               const border = p.user_inventory?.find((inv: any) => 
                 inv.is_equipped && 
                 inv.cosmetic_items?.cosmetic_type === 'avatar_border'
@@ -301,6 +302,12 @@ export default function UserDashboard() {
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
             <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
           </div>
+          {/* TODAY'S QUIZZES CARD */}
+          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><CalendarCheckIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Today</p></div>
+            <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.quizzesToday} <span className="text-[10px] sm:text-xs text-gray-500">quizzes</span></p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
@@ -320,21 +327,27 @@ export default function UserDashboard() {
               <div className="text-gray-500 text-xs text-center py-6 bg-black/20 rounded-2xl border border-white/5">No recent quizzes played.</div>
             ) : (
               <div className="space-y-2">
-                {recentActivity.map((attempt) => (
-                  <div key={attempt.id} className="flex items-center justify-between p-2.5 sm:p-3 bg-black/40 border border-white/5 rounded-2xl">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0"><CheckCircleIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
-                      <div>
-                        <p className="font-bold text-[11px] sm:text-xs">{attempt.quizzes?.category || 'General Knowledge'}</p>
-                        <p className="text-[9px] sm:text-[10px] text-gray-500">{new Date(attempt.created_at).toLocaleDateString()} • {attempt.accuracy}%</p>
+                {recentActivity.map((attempt) => {
+                  // Calculate attempt accuracy dynamically for display
+                  const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
+                  const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
+
+                  return (
+                    <div key={attempt.id} className="flex items-center justify-between p-2.5 sm:p-3 bg-black/40 border border-white/5 rounded-2xl">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0"><CheckCircleIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
+                        <div>
+                          <p className="font-bold text-[11px] sm:text-xs">{attempt.quizzes?.category || 'General Knowledge'}</p>
+                          <p className="text-[9px] sm:text-[10px] text-gray-500">{new Date(attempt.created_at).toLocaleDateString()} • {acc}%</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex items-center gap-1.5 sm:gap-2">
+                        <span className="font-bold text-[#ccff00] text-[10px] sm:text-xs">+{attempt.score} pts</span>
+                        <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5 sm:w-3 sm:h-3" />+{attempt.correct_answers * 150}</span>
                       </div>
                     </div>
-                    <div className="text-right flex items-center gap-1.5 sm:gap-2">
-                      <span className="font-bold text-[#ccff00] text-[10px] sm:text-xs">+{attempt.score} pts</span>
-                      <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5 sm:w-3 sm:h-3" />+{attempt.correct_answers * 150}</span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -350,7 +363,6 @@ export default function UserDashboard() {
             </div>
             <p className="text-[9px] sm:text-[10px] text-right text-gray-400 font-bold relative z-10">
               {stats.quizzesToday} / 3 Completed
-              {stats.coinsEarnedToday > 0 && (<span className="ml-2 text-[#ff00a0]">• +{stats.coinsEarnedToday} coins today</span>)}
             </p>
           </div>
 
