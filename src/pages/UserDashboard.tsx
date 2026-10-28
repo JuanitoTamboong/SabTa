@@ -58,11 +58,9 @@ export default function UserDashboard() {
         
         // ✅ DAILY STREAK LOGIC USING SECURE RPC
         if (profileData) {
-          // Call the database function. It checks the date internally to prevent timezone bugs.
           const { data: streakResult } = await supabase.rpc('claim_daily_streak')
 
           if (streakResult && streakResult.status === 'success') {
-            // Only show the modal if the database actually awarded a new streak
             setStreakReward({ 
               coins: streakResult.coins, 
               newStreak: streakResult.streak 
@@ -95,8 +93,32 @@ export default function UserDashboard() {
           }
         }
 
-        // 4. Fetch Attempts
+        // 4. Fetch Attempts & Check Daily Challenge via Secure RPC
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+
+        // ✅ Call the secure function to check and award the challenge
+        const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
+        
+        let quizzesToday = 0
+        if (challengeResult) {
+          quizzesToday = challengeResult.quizzes_today
+          
+          if (challengeResult.claimed) {
+            // If the function just awarded the reward, trigger the modal
+            // But we only want to show the modal if it wasn't claimed BEFORE this load.
+            const today = new Date().toISOString().split('T')[0]
+            if (profileData?.last_challenge_date !== today) {
+               setShowDailyBonusModal(true)
+               
+               // Refresh local profile data to reflect the new points/coins
+               const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+               if (updatedProfile) {
+                 setProfile(updatedProfile)
+                 profileData = updatedProfile // update local var for the rest of the function
+               }
+            }
+          }
+        }
 
         if (attempts && attempts.length > 0) {
           const quizIds = attempts.map(a => a.quiz_id)
@@ -114,44 +136,15 @@ export default function UserDashboard() {
           const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
           const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
           
-          // ✅ FIXED: Daily Challenge uses the database to track the date
-          const today = new Date().toISOString().split('T')[0]
-          const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
-          const quizzesToday = todayAttempts.length
-
-          let finalProfileState = profileData 
-          const lastChallengeDate = profileData?.last_challenge_date
-
-          // If the user finished 3 quizzes today, but hasn't claimed the reward for today yet
-          if (quizzesToday >= 3 && lastChallengeDate !== today) {
-            const { data: updatedProfile } = await supabase
-              .from('profiles')
-              .update({ 
-                points: (profileData?.points || 0) + 25,
-                coins: (profileData?.coins || 0) + 50,
-                last_challenge_date: today // Save today's date to prevent double claiming
-              })
-              .eq('id', user.id)
-              .select()
-              .single()
-
-            if (updatedProfile) {
-              finalProfileState = updatedProfile
-              setProfile(updatedProfile)
-              setShowDailyBonusModal(true) 
-            }
-          }
-
-          const currentPoints = finalProfileState?.points || 0
+          const currentPoints = profileData?.points || 0
           const level = Math.floor(currentPoints / 100) + 1
 
-          // The UI will automatically reset to 0/3 at midnight because the date changes
           setStats({ 
             totalQuizzes, 
             bestScore, 
             accuracy: Math.round(avgAccuracy), 
             level, 
-            quizzesToday 
+            quizzesToday // ✅ Now comes directly from the database function
           })
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
@@ -269,7 +262,6 @@ export default function UserDashboard() {
             </h1>
             <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5 mt-1">
               <FireIcon weight="fill" className="text-[#ff00a0]" /> 
-              {/* ✅ FIXED: Removed || 1 so it accurately shows 0 if not claimed */}
               <span className="font-bold text-white">{profile?.current_streak || 0} Day Streak</span> 
               <span>•</span> Level {stats.level} 
               <span>•</span> {profile?.age_category?.toUpperCase()} Tier
