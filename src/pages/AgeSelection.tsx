@@ -5,9 +5,9 @@ import {
   PlantIcon, 
   RocketIcon, 
   BrainIcon, 
-  CheckCircleIcon, 
+  CheckIcon, 
   ArrowRightIcon,
-  SparkleIcon
+  LightningIcon
 } from '@phosphor-icons/react'
 
 export default function AgeSelection() {
@@ -16,14 +16,43 @@ export default function AgeSelection() {
   const [error, setError] = useState<string | null>(null)
 
   const ageGroups = [
-    { id: 'kids', icon: PlantIcon, title: 'Kids', ages: '6–12', color: 'green', desc: 'Fun and colorful questions designed just for young minds.' },
-    { id: 'teens', icon: RocketIcon, title: 'Teens', ages: '13–17', color: 'cyan', desc: 'Challenging questions across science, history, and pop culture.' },
-    { id: 'adults', icon: BrainIcon, title: 'Adults', ages: '18+', color: 'pink', desc: 'Advanced trivia and complex problems for experienced players.' },
+    { 
+      id: 'kids', 
+      icon: PlantIcon, 
+      title: 'Kids', 
+      ages: '6–12', 
+      color: 'green', 
+      desc: 'Fun and colorful questions designed just for young minds.',
+      gradient: 'from-green-500/20 via-green-500/5 to-transparent',
+      border: 'border-green-500/50',
+      glow: 'sm:shadow-[0_0_40px_rgba(34,197,94,0.2)]'
+    },
+    { 
+      id: 'teens', 
+      icon: RocketIcon, 
+      title: 'Teens', 
+      ages: '13–17', 
+      color: 'cyan', 
+      desc: 'Challenging questions across science, history, and pop culture.',
+      gradient: 'from-[#00f0ff]/20 via-[#00f0ff]/5 to-transparent',
+      border: 'border-[#00f0ff]/50',
+      glow: 'sm:shadow-[0_0_40px_rgba(0,240,255,0.2)]'
+    },
+    { 
+      id: 'adults', 
+      icon: BrainIcon, 
+      title: 'Adults', 
+      ages: '18+', 
+      color: 'pink', 
+      desc: 'Advanced trivia and complex problems for experienced players.',
+      gradient: 'from-[#ff00a0]/20 via-[#ff00a0]/5 to-transparent',
+      border: 'border-[#ff00a0]/50',
+      glow: 'sm:shadow-[0_0_40px_rgba(255,0,160,0.2)]'
+    },
   ]
 
   const handleConfirm = async () => {
     if (!selected) return
-
     setLoading(true)
     setError(null)
 
@@ -37,9 +66,7 @@ export default function AgeSelection() {
         .eq('id', user.id)
 
       if (updateError) throw updateError
-      
       window.location.href = '/dashboard' 
-      
     } catch (err: any) {
       console.error("Error saving age:", err)
       setError(err.message || 'Something went wrong. Please try again.')
@@ -48,30 +75,25 @@ export default function AgeSelection() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-4 sm:p-6 relative overflow-y-auto pb-28">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-4 sm:p-6 relative overflow-y-auto pb-32">
       
-      {/* Background Glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] rounded-full bg-[#00f0ff]/10 blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] rounded-full bg-[#ccff00]/10 blur-[100px] pointer-events-none" />
+      {/* Background Grid Pattern */}
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
 
-      <div className="relative z-10 max-w-4xl w-full mt-6 sm:mt-12 flex flex-col items-center">
+      <div className="relative z-10 max-w-6xl w-full mt-4 sm:mt-10">
         
         {/* Header */}
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-1.5 rounded-full text-xs font-bold text-[#ccff00] uppercase tracking-wider mb-4 sm:mb-6">
-            <SparkleIcon weight="fill" />
-            Step 1 of 1
-          </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-3">
-            Select Your <span className="text-[#ccff00]">Age Group</span>
+        <div className="text-center mb-8 sm:mb-10">
+          <h1 className="text-3xl sm:text-5xl font-black mb-2 sm:mb-3 tracking-tight">
+            CHOOSE YOUR <span className="text-[#ccff00]">TIER</span>
           </h1>
-          <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-            This helps us customize your quiz difficulty, UI themes, and leaderboard tiers.
+          <p className="text-gray-400 text-xs sm:text-base">
+            Select your age group to tailor your quiz experience.
           </p>
         </div>
 
-        {/* Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 w-full mb-8 sm:mb-12">
+        {/* Split Panels / List */}
+        <div className="flex flex-col sm:grid sm:grid-cols-3 gap-4 sm:gap-6 mb-10">
           {ageGroups.map((group) => {
             const Icon = group.icon
             const isSelected = selected === group.id
@@ -80,40 +102,51 @@ export default function AgeSelection() {
               <button
                 key={group.id}
                 onClick={() => setSelected(group.id)}
-                className={`relative flex flex-row sm:flex-col items-center sm:items-start p-4 sm:p-6 rounded-2xl sm:rounded-3xl border text-left transition-all duration-300 w-full group ${
+                className={`relative overflow-hidden rounded-2xl sm:rounded-[2rem] border transition-all duration-300 group text-left flex flex-row sm:flex-col items-center sm:items-start p-4 sm:p-8 sm:min-h-[350px] ${
                   isSelected 
-                    ? 'border-[#ccff00] bg-[#ccff00]/5 shadow-[0_0_30px_rgba(204,255,0,0.15)] ring-1 ring-[#ccff00]' 
-                    : 'border-white/10 bg-[#0f1014] hover:border-white/30 hover:bg-white/5'
+                    ? `${group.border} ${group.glow} sm:scale-[1.02] bg-[#0f1014]` 
+                    : 'border-white/10 hover:border-white/30 bg-[#0f1014]'
                 }`}
               >
-                {/* Selection Checkmark */}
+                {/* ✅ Background Gradient (Top glow on mobile, Bottom glow on desktop) */}
+                <div className={`absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-t ${group.gradient} opacity-0 transition-opacity duration-500 ${
+                  isSelected ? 'opacity-100' : 'sm:group-hover:opacity-50'
+                }`} />
+                
+                {/* ✅ Giant Background Icon (Scaled down on mobile to act as a subtle watermark) */}
+                <Icon 
+                  weight="duotone" 
+                  className={`absolute -right-4 -bottom-4 w-32 h-32 sm:-right-6 sm:-bottom-6 sm:w-48 sm:h-48 opacity-5 transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-12 pointer-events-none ${
+                    isSelected ? 'opacity-15 sm:opacity-20 text-white' : ''
+                  }`} 
+                />
+
+                {/* Selected Checkmark Badge */}
                 {isSelected && (
-                  <div className="absolute top-1/2 -translate-y-1/2 right-4 sm:top-5 sm:-translate-y-0 sm:right-5 text-[#ccff00] animate-in zoom-in duration-200">
-                    <CheckCircleIcon weight="fill" className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <div className="absolute top-1/2 -translate-y-1/2 right-4 sm:top-6 sm:-translate-y-0 sm:right-6 w-7 h-7 sm:w-8 sm:h-8 bg-[#ccff00] rounded-full flex items-center justify-center text-black animate-in zoom-in shrink-0 shadow-lg z-20">
+                    <CheckIcon weight="bold" size={16} className="sm:w-[18px] sm:h-[18px]" />
                   </div>
                 )}
-                
+
                 {/* Icon */}
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 mr-4 sm:mr-0 sm:mb-6 transition-all duration-300 ${
-                  isSelected ? 'bg-[#ccff00] text-black scale-110 shadow-[0_0_20px_rgba(204,255,0,0.4)]' :
-                  group.color === 'green' ? 'bg-green-500/10 text-green-400 group-hover:scale-110' :
-                  group.color === 'cyan' ? 'bg-[#00f0ff]/10 text-[#00f0ff] group-hover:scale-110' :
-                  'bg-[#ff00a0]/10 text-[#ff00a0] group-hover:scale-110'
+                <div className={`relative z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-xl shrink-0 sm:mb-4 flex items-center justify-center backdrop-blur-md border transition-colors mr-4 sm:mr-0 ${
+                  isSelected ? 'bg-white/20 border-white/30 text-white' : 
+                  group.color === 'green' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                  group.color === 'cyan' ? 'bg-[#00f0ff]/10 border-[#00f0ff]/20 text-[#00f0ff]' :
+                  'bg-[#ff00a0]/10 border-[#ff00a0]/20 text-[#ff00a0]'
                 }`}>
-                  <Icon weight={isSelected ? "fill" : "duotone"} className="w-7 h-7 sm:w-8 sm:h-8" />
+                  <Icon weight="fill" size={24} />
                 </div>
 
-                {/* Text Content */}
-                <div className="flex-1 pr-8 sm:pr-0">
-                  <div className="flex flex-row sm:flex-col items-baseline sm:items-start gap-2 sm:gap-0 mb-1 sm:mb-0">
-                    <h3 className={`text-lg sm:text-xl font-bold transition-colors ${isSelected ? 'text-[#ccff00]' : 'text-white'}`}>
-                      {group.title}
-                    </h3>
-                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 bg-white/5 px-2 py-0.5 rounded-md sm:mb-3">
-                      Ages {group.ages}
-                    </span>
-                  </div>
-                  <p className="text-[11px] sm:text-sm text-gray-400 leading-snug sm:leading-relaxed hidden sm:block">
+                {/* Content */}
+                <div className="relative z-10 flex-1 pr-8 sm:pr-0">
+                  <h3 className="text-lg sm:text-2xl font-black text-white mb-0.5 sm:mb-1">{group.title}</h3>
+                  <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest sm:mb-3">Ages {group.ages}</p>
+                  
+                  {/* Description hidden on mobile to save space, but shown on sm+ */}
+                  <p className={`hidden sm:block text-sm transition-all duration-300 ${
+                    isSelected ? 'text-gray-200' : 'text-gray-500 group-hover:text-gray-300'
+                  }`}>
                     {group.desc}
                   </p>
                 </div>
@@ -124,34 +157,34 @@ export default function AgeSelection() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-center text-sm w-full max-w-md animate-in slide-in-from-bottom-2">
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-center text-sm max-w-md mx-auto">
             {error}
           </div>
         )}
 
-        {/* Confirm Button */}
-        <div className="w-full max-w-md">
-          <button
-            onClick={handleConfirm}
-            disabled={!selected || loading}
-            className={`flex items-center justify-center gap-3 w-full px-8 py-4 rounded-xl sm:rounded-2xl font-bold uppercase tracking-wider transition-all duration-300 ${
-              selected 
-                ? 'bg-[#ccff00] text-black hover:bg-white hover:scale-[1.02] shadow-[0_0_25px_rgba(204,255,0,0.3)]' 
-                : 'bg-[#0f1014] text-gray-600 cursor-not-allowed border border-white/5'
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2 animate-pulse">
-                Saving Profile...
-              </span>
-            ) : (
-              <>
-                Confirm & Continue
-                <ArrowRightIcon weight="bold" />
-              </>
-            )}
-          </button>
+        {/* Action Bar (Fixed at bottom on Mobile) */}
+        <div className="fixed bottom-0 left-0 right-0 sm:relative sm:bottom-auto p-4 sm:p-0 bg-[#050505]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none border-t border-white/10 sm:border-none z-50">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl max-w-2xl mx-auto sm:backdrop-blur-xl shadow-2xl">
+            <div className="hidden sm:flex items-center gap-3 text-sm text-gray-400 font-medium px-2">
+              <LightningIcon weight="fill" className="text-[#ccff00]" />
+              {selected ? 'Ready to enter the arena!' : 'Select a tier to continue'}
+            </div>
+            
+            <button
+              onClick={handleConfirm}
+              disabled={!selected || loading}
+              className={`flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3.5 rounded-xl sm:rounded-2xl font-black uppercase tracking-wider transition-all duration-300 ${
+                selected 
+                  ? 'bg-[#ccff00] text-black hover:bg-white sm:hover:scale-105 shadow-[0_0_20px_rgba(204,255,0,0.4)]' 
+                  : 'bg-white/5 text-gray-600 cursor-not-allowed'
+              }`}
+            >
+              {loading ? 'Saving...' : 'Confirm'}
+              {!loading && <ArrowRightIcon weight="bold" />}
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   )
