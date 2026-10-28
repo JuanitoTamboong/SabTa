@@ -21,6 +21,9 @@ export default function UserDashboard() {
   const [showStreakModal, setShowStreakModal] = useState(false)
   const [streakReward, setStreakReward] = useState({ coins: 0, newStreak: 0 })
 
+  // Daily Challenge Bonus State
+  const [showDailyBonusModal, setShowDailyBonusModal] = useState(false)
+
   const [stats, setStats] = useState({
     totalQuizzes: 0,
     bestScore: 0,
@@ -93,7 +96,7 @@ export default function UserDashboard() {
           setProfile(profileData)
         }
 
-        // 2. SET AVATAR URL (Priority: Uploaded > Google > None)
+        // 2. SET AVATAR URL
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
@@ -126,18 +129,51 @@ export default function UserDashboard() {
           const totalQuizzes = attempts.length
           const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
           
-          // ✅ FIXED: Calculate true accuracy dynamically
+          // Calculate true accuracy dynamically
           const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
           const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
           const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
           
-          const currentPoints = profileData?.points || 0
-          const level = Math.floor(currentPoints / 100) + 1
           const today = new Date().toISOString().split('T')[0]
           const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
           const quizzesToday = todayAttempts.length
 
-          setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday })
+          // Check if Daily Challenge is completed and hasn't been claimed
+          const dailyChallengeClaimed = localStorage.getItem(`daily_challenge_${today}_${user.id}`)
+          
+          // We use a separate variable to track the latest profile state in this loop
+          let finalProfileState = profileData 
+
+          if (quizzesToday >= 3 && !dailyChallengeClaimed) {
+            // Award the bonus
+            const { data: updatedProfile } = await supabase
+              .from('profiles')
+              .update({ 
+                points: (profileData?.points || 0) + 50,
+                coins: (profileData?.coins || 0) + 50
+              })
+              .eq('id', user.id)
+              .select()
+              .single()
+
+            if (updatedProfile) {
+              finalProfileState = updatedProfile
+              setProfile(updatedProfile)
+              localStorage.setItem(`daily_challenge_${today}_${user.id}`, 'true')
+              setShowDailyBonusModal(true) // Trigger Popup
+            }
+          }
+
+          const currentPoints = finalProfileState?.points || 0
+          const level = Math.floor(currentPoints / 100) + 1
+
+          setStats({ 
+            totalQuizzes, 
+            bestScore, 
+            accuracy: Math.round(avgAccuracy), 
+            level, 
+            quizzesToday 
+          })
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
@@ -328,9 +364,11 @@ export default function UserDashboard() {
             ) : (
               <div className="space-y-2">
                 {recentActivity.map((attempt) => {
-                  // Calculate attempt accuracy dynamically for display
                   const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
                   const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
+                  
+                  // ✅ FIXED: Use the actual saved score for coins, not just the correct answers
+                  const coinsEarned = attempt.score * 15 
 
                   return (
                     <div key={attempt.id} className="flex items-center justify-between p-2.5 sm:p-3 bg-black/40 border border-white/5 rounded-2xl">
@@ -343,7 +381,7 @@ export default function UserDashboard() {
                       </div>
                       <div className="text-right flex items-center gap-1.5 sm:gap-2">
                         <span className="font-bold text-[#ccff00] text-[10px] sm:text-xs">+{attempt.score} pts</span>
-                        <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5 sm:w-3 sm:h-3" />+{attempt.correct_answers * 150}</span>
+                        <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5 sm:w-3 sm:h-3" />+{coinsEarned}</span>
                       </div>
                     </div>
                   )
@@ -444,6 +482,44 @@ export default function UserDashboard() {
               className="w-full bg-[#ccff00] text-black py-3 sm:py-4 rounded-xl font-black text-base sm:text-lg hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)]"
             >
               Claim & Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* DAILY CHALLENGE REWARD MODAL */}
+      {showDailyBonusModal && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)]">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ccff00] to-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(204,255,0,0.4)] animate-bounce">
+              <TargetIcon weight="fill" className="w-10 h-10 sm:w-12 sm:h-12 text-black" />
+            </div>
+            
+            <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">Daily Challenge!</h2>
+            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
+              You completed 3 quizzes today! Here is your bonus reward.
+            </p>
+
+            <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-2xl p-3 sm:p-4 flex items-center justify-between mb-6 sm:mb-8">
+              <div className="flex items-center gap-2">
+                <GiftIcon weight="fill" className="text-[#ccff00] w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="font-bold text-white text-xs sm:text-sm">Challenge Reward</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="font-bold text-[#ccff00] flex items-center gap-1 text-sm sm:text-base">
+                  <LightningIcon weight="fill" /> +50
+                </span>
+                <span className="font-bold text-[#ff00a0] flex items-center gap-1 text-sm sm:text-base">
+                  <CoinsIcon weight="fill" /> +50
+                </span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowDailyBonusModal(false)} 
+              className="w-full bg-[#ccff00] text-black py-3 sm:py-4 rounded-xl font-black text-base sm:text-lg hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)]"
+            >
+              Claim Rewards
             </button>
           </div>
         </div>
