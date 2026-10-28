@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
   ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
-  ImageIcon, XCircleIcon, XIcon // Added XIcon for the modal
+  ImageIcon, XCircleIcon, XIcon, EyeIcon 
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -16,13 +16,15 @@ export default function RewardsShop() {
   const [inventory, setInventory] = useState<string[]>([])
   const [items, setItems] = useState<any[]>([])
   
-  // Purchase State
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  // Modals State
+  const [selectedItem, setSelectedItem] = useState<any>(null) // For Full Details
+  const [purchaseItem, setPurchaseItem] = useState<any>(null) // For Buy Confirmation
+  
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  // Play Menu State (Added from Profile)
+  // Play Menu State
   const [showPlayMenu, setShowPlayMenu] = useState(false)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [loadingQuizzes, setLoadingQuizzes] = useState(false)
@@ -54,7 +56,6 @@ export default function RewardsShop() {
     return () => clearTimeout(t)
   }, [toast])
 
-  // --- ADDED: Play Menu Logic from Profile ---
   const openPlayMenu = async () => {
     setShowPlayMenu(true)
     setLoadingQuizzes(true)
@@ -88,7 +89,6 @@ export default function RewardsShop() {
       setLoadingQuizzes(false)
     }
   }
-  // ------------------------------------------
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -96,9 +96,9 @@ export default function RewardsShop() {
   }
 
   const handlePurchase = async () => {
-    if (!selectedItem || purchasing) return
+    if (!purchaseItem || purchasing) return
     
-    if ((profile?.coins || 0) < selectedItem.price) {
+    if ((profile?.coins || 0) < purchaseItem.price) {
       setToast({ type: 'error', msg: "You don't have enough coins for this item!" })
       return
     }
@@ -110,7 +110,7 @@ export default function RewardsShop() {
 
       const { data: updatedProfile, error: profileError } = await supabase
         .from('profiles')
-        .update({ coins: (profile?.coins || 0) - selectedItem.price })
+        .update({ coins: (profile?.coins || 0) - purchaseItem.price })
         .eq('id', user.id)
         .select('coins')
         .single()
@@ -119,13 +119,14 @@ export default function RewardsShop() {
 
       const { error: inventoryError } = await supabase
         .from('user_inventory')
-        .insert({ user_id: user.id, cosmetic_item_id: selectedItem.id, is_equipped: false })
+        .insert({ user_id: user.id, cosmetic_item_id: purchaseItem.id, is_equipped: false })
 
       if (inventoryError) throw inventoryError
 
       setProfile((prev: any) => ({ ...prev, coins: updatedProfile.coins }))
-      setInventory((prev) => [...prev, selectedItem.id])
-      setSelectedItem(null)
+      setInventory((prev) => [...prev, purchaseItem.id])
+      setPurchaseItem(null)
+      setSelectedItem(null) 
       setToast({ type: 'success', msg: "Item purchased successfully!" })
 
     } catch (err: any) {
@@ -136,7 +137,21 @@ export default function RewardsShop() {
     }
   }
 
-  const filteredItems = items.filter(item => activeTab === 'all' ? true : item.cosmetic_type === activeTab)
+  // ✅ FIXED: Sort items by Rarity (Legendary -> Epic -> Rare -> Common)
+  const rarityOrder: Record<string, number> = {
+    legendary: 1,
+    epic: 2,
+    rare: 3,
+    common: 4
+  }
+
+  const filteredItems = items
+    .filter(item => activeTab === 'all' ? true : item.cosmetic_type === activeTab)
+    .sort((a, b) => {
+      const aRarity = rarityOrder[a.rarity?.toLowerCase()] || 5;
+      const bRarity = rarityOrder[b.rarity?.toLowerCase()] || 5;
+      return aRarity - bRarity; // Sort ascending based on custom order
+    })
 
   if (loading) {
     return (
@@ -161,7 +176,6 @@ export default function RewardsShop() {
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <HouseIcon weight="fill" className="w-6 h-6" /> Home
           </button>
-          {/* ✅ FIXED: Replaced /play/new with openPlayMenu */}
           <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
           </button>
@@ -215,8 +229,8 @@ export default function RewardsShop() {
           {[
             { id: 'all', label: 'All Items', icon: ShoppingBagIcon },
             { id: 'background', label: 'Backgrounds', icon: ImageIcon },
-            { id: 'quiz_theme', label: 'Quiz Themes', icon: PaletteIcon },      // ✅ FIXED: changed 'theme' to 'quiz_theme'
-            { id: 'avatar_border', label: 'Borders', icon: StarIcon },           // ✅ FIXED: changed 'border' to 'avatar_border'
+            { id: 'quiz_theme', label: 'Quiz Themes', icon: PaletteIcon },
+            { id: 'avatar_border', label: 'Borders', icon: StarIcon },
           ].map(tab => (
             <button
               key={tab.id}
@@ -234,7 +248,7 @@ export default function RewardsShop() {
         </div>
 
         {/* Items Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 relative z-10">
           {filteredItems.length === 0 ? (
             <div className="col-span-full text-center py-20 bg-[#0f1014] rounded-3xl border border-white/10">
               <ShoppingBagIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -247,18 +261,23 @@ export default function RewardsShop() {
               const canAfford = (profile?.coins || 0) >= item.price
 
               return (
-                <div key={item.id} className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col">
-                  <div className="h-32 md:h-48 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-4">
+                <div key={item.id} className="bg-[#0f1014] border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col">
+                  
+                  {/* Small Preview Box */}
+                  <div 
+                    className="h-24 md:h-40 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-2 md:p-4 cursor-pointer"
+                    onClick={() => setSelectedItem(item)}
+                  >
                     {item.preview_url ? (
-                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
+                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-scale-down group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="text-gray-600 flex flex-col items-center">
-                        <ImageIcon weight="duotone" className="w-8 h-8 mb-1" />
-                        <span className="text-xs">No Preview</span>
+                        <ImageIcon weight="duotone" className="w-6 h-6 mb-1" />
+                        <span className="text-[10px]">No Preview</span>
                       </div>
                     )}
                     
-                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10">
+                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider border border-white/10 pointer-events-none">
                       <span className={`${
                         item.rarity === 'legendary' ? 'text-[#ff00a0]' :
                         item.rarity === 'epic' ? 'text-[#ccff00]' :
@@ -268,33 +287,45 @@ export default function RewardsShop() {
                     </div>
                   </div>
 
-                  <div className="p-4 md:p-5 flex-1 flex flex-col">
-                    <div className="mb-4">
-                      <h3 className="text-base md:text-lg font-bold text-white mb-1">{item.name}</h3>
-                      <p className="text-xs md:text-sm text-gray-400 line-clamp-2">{item.description}</p>
+                  {/* Compact Details */}
+                  <div className="p-3 md:p-5 flex-1 flex flex-col">
+                    <div className="mb-2 md:mb-4 cursor-pointer" onClick={() => setSelectedItem(item)}>
+                      <h3 className="text-sm md:text-lg font-bold text-white mb-1 hover:text-[#ccff00] transition line-clamp-1">{item.name}</h3>
+                      <p className="hidden md:block text-xs md:text-sm text-gray-400 line-clamp-2">{item.description}</p>
                     </div>
 
-                    <div className="mt-auto flex items-center justify-between pt-4 border-t border-white/5">
+                    <div className="mt-auto flex flex-col md:flex-row items-center justify-between pt-2 md:pt-4 border-t border-white/5 gap-2">
                       {isOwned ? (
-                        <div className="flex items-center gap-1.5 text-green-400 font-bold text-xs md:text-sm bg-green-500/10 px-3 py-1.5 rounded-lg w-full justify-center">
-                          <CheckCircleIcon weight="fill" /> Already Owned
+                        <div className="flex items-center gap-1 md:gap-1.5 text-green-400 font-bold text-[10px] md:text-sm bg-green-500/10 px-2 md:px-3 py-1.5 rounded-lg w-full justify-center">
+                          <CheckCircleIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> Owned
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-sm md:text-base">
-                            <CoinsIcon weight="fill" /> {item.price}
+                          <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-xs md:text-base shrink-0 w-full md:w-auto justify-start md:justify-center">
+                            <CoinsIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> {item.price}
                           </div>
-                          <button
-                            onClick={() => setSelectedItem(item)}
-                            disabled={!canAfford}
-                            className={`px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition ${
-                              canAfford 
-                                ? 'bg-white text-black hover:bg-[#ccff00]' 
-                                : 'bg-white/5 text-gray-500 cursor-not-allowed'
-                            }`}
-                          >
-                            {canAfford ? 'Buy' : 'Locked'}
-                          </button>
+                          
+                          <div className="flex items-center gap-1.5 w-full md:w-auto">
+                            <button
+                              onClick={() => setSelectedItem(item)}
+                              className="flex-1 md:flex-none flex items-center justify-center p-1.5 md:p-2.5 rounded-lg md:rounded-xl font-bold transition bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
+                              title="View Details"
+                            >
+                              <EyeIcon weight="bold" className="w-4 h-4 md:w-5 md:h-5" />
+                            </button>
+
+                            <button
+                              onClick={() => setPurchaseItem(item)}
+                              disabled={!canAfford}
+                              className={`flex-1 md:flex-none px-2 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-bold text-[10px] md:text-sm transition ${
+                                canAfford 
+                                  ? 'bg-white text-black hover:bg-[#ccff00]' 
+                                  : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                              }`}
+                            >
+                              {canAfford ? 'Buy' : 'Locked'}
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
@@ -306,23 +337,82 @@ export default function RewardsShop() {
         </div>
       </main>
 
-      {/* PURCHASE CONFIRMATION MODAL */}
-      {selectedItem && (
+      {/* FULL DETAILS MODAL */}
+      {selectedItem && !purchaseItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl overflow-hidden">
+            <button 
+              onClick={() => setSelectedItem(null)} 
+              className="absolute top-4 right-4 bg-white/5 hover:bg-white/10 p-2 rounded-full transition z-10"
+            >
+              <XIcon weight="bold" className="w-5 h-5" />
+            </button>
+
+            <div className="w-full h-56 md:h-64 bg-black/40 rounded-2xl mb-6 flex items-center justify-center p-6 border border-white/5">
+              {selectedItem.preview_url ? (
+                <img src={selectedItem.preview_url} alt={selectedItem.name} className="w-full h-full object-contain" />
+              ) : (
+                <ImageIcon weight="duotone" className="w-16 h-16 text-gray-600" />
+              )}
+            </div>
+
+            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10 mb-4 ${
+              selectedItem.rarity === 'legendary' ? 'text-[#ff00a0]' :
+              selectedItem.rarity === 'epic' ? 'text-[#ccff00]' :
+              selectedItem.rarity === 'rare' ? 'text-[#00f0ff]' :
+              'text-gray-300'
+            }`}>
+              {selectedItem.rarity || 'Common'}
+            </span>
+
+            <h2 className="text-2xl font-bold text-white mb-2">{selectedItem.name}</h2>
+            <p className="text-gray-400 text-sm mb-6">{selectedItem.description}</p>
+
+            <div className="flex items-center justify-between bg-black/50 border border-white/5 rounded-xl p-4 mb-6">
+              <span className="text-sm font-semibold text-gray-300">Price</span>
+              <div className="flex items-center gap-1.5 text-[#ff00a0] font-bold text-xl">
+                <CoinsIcon weight="fill" /> {selectedItem.price}
+              </div>
+            </div>
+
+            {inventory.includes(selectedItem.id) ? (
+              <div className="py-3 bg-green-500/10 text-green-400 rounded-xl font-bold flex items-center justify-center gap-2">
+                <CheckCircleIcon weight="fill" /> Already Owned
+              </div>
+            ) : (
+              <button 
+                onClick={() => setPurchaseItem(selectedItem)}
+                disabled={(profile?.coins || 0) < selectedItem.price}
+                className={`w-full py-3 rounded-xl font-bold transition ${
+                  (profile?.coins || 0) >= selectedItem.price 
+                    ? 'bg-[#ccff00] text-black hover:bg-white' 
+                    : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {(profile?.coins || 0) >= selectedItem.price ? 'Buy Now' : 'Not Enough Coins'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PURCHASE CONFIRMATION MODAL */}
+      {purchaseItem && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full text-center relative shadow-2xl">
             <h2 className="text-2xl font-bold mb-2">Confirm Purchase</h2>
             <p className="text-gray-400 text-sm mb-6">Are you sure you want to buy this item?</p>
             
             <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-6">
-              <p className="font-bold text-white mb-1">{selectedItem.name}</p>
-              <div className="flex items-center justify-center gap-1 text-[#ff00a0] font-bold text-xl">
-                <CoinsIcon weight="fill" /> {selectedItem.price} COINS
+              <p className="font-bold text-white mb-1">{purchaseItem.name}</p>
+              <div className="flex items-center justify-center gap-1 text-[#ff00a0] font-bold text-xl mt-2">
+                <CoinsIcon weight="fill" /> {purchaseItem.price} COINS
               </div>
             </div>
 
             <div className="flex gap-3">
               <button 
-                onClick={() => setSelectedItem(null)} 
+                onClick={() => setPurchaseItem(null)} 
                 disabled={purchasing}
                 className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition disabled:opacity-50"
               >
@@ -356,7 +446,6 @@ export default function RewardsShop() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        {/* ✅ FIXED: Replaced /play/new with openPlayMenu */}
         <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
@@ -375,7 +464,7 @@ export default function RewardsShop() {
         </button>
       </nav>
 
-      {/* ✅ ADDED: CHOOSE A CHALLENGE MODAL from Profile */}
+      {/* CHOOSE A CHALLENGE MODAL */}
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
