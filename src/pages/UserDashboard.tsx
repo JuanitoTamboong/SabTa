@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, XIcon, CoinsIcon,
-  GiftIcon, CalendarCheckIcon
+  GiftIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -141,7 +141,6 @@ export default function UserDashboard() {
           // Check if Daily Challenge is completed and hasn't been claimed
           const dailyChallengeClaimed = localStorage.getItem(`daily_challenge_${today}_${user.id}`)
           
-          // We use a separate variable to track the latest profile state in this loop
           let finalProfileState = profileData 
 
           if (quizzesToday >= 3 && !dailyChallengeClaimed) {
@@ -320,6 +319,7 @@ export default function UserDashboard() {
           </div>
         </header>
 
+        {/* STATS GRID - "Today" card removed */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
           <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
@@ -337,12 +337,6 @@ export default function UserDashboard() {
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
             <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
-          </div>
-          {/* TODAY'S QUIZZES CARD */}
-          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><CalendarCheckIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Today</p></div>
-            <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.quizzesToday} <span className="text-[10px] sm:text-xs text-gray-500">quizzes</span></p>
           </div>
         </div>
 
@@ -367,7 +361,7 @@ export default function UserDashboard() {
                   const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
                   const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
                   
-                  // ✅ FIXED: Use the actual saved score for coins, not just the correct answers
+                  // Use the actual saved score for coins, not just the correct answers
                   const coinsEarned = attempt.score * 15 
 
                   return (
