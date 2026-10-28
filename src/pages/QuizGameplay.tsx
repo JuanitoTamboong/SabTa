@@ -357,7 +357,7 @@ export default function QuizGameplay() {
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Points</p>
                 <p className="text-xl sm:text-2xl font-bold text-[#00f0ff]">
-                  {(dbResults?.points ?? 0) - pointsSpentRef.current}
+                  {dbResults?.points ?? 0}
                 </p>
               </div>
               
@@ -366,8 +366,8 @@ export default function QuizGameplay() {
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Coins</p>
                 <p className="text-xl sm:text-2xl font-bold text-[#ff00a0]">
-                  {((dbResults?.coins ?? 0) - coinsSpentRef.current) > 0 ? '+' : ''}
-                  {(dbResults?.coins ?? 0) - coinsSpentRef.current}
+                  {(dbResults?.coins ?? 0) > 0 ? '+' : ''}
+                  {dbResults?.coins ?? 0}
                 </p>
               </div>
             </div>

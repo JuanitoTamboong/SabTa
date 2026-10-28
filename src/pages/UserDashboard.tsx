@@ -144,11 +144,11 @@ export default function UserDashboard() {
           let finalProfileState = profileData 
 
           if (quizzesToday >= 3 && !dailyChallengeClaimed) {
-            // Award the bonus
+            // Award the bonus: 25 Points and 50 Coins
             const { data: updatedProfile } = await supabase
               .from('profiles')
               .update({ 
-                points: (profileData?.points || 0) + 50,
+                points: (profileData?.points || 0) + 25, // Changed to 25
                 coins: (profileData?.coins || 0) + 50
               })
               .eq('id', user.id)
@@ -388,7 +388,7 @@ export default function UserDashboard() {
             <div className="absolute top-0 right-0 w-20 h-20 bg-[#ff00a0]/10 rounded-bl-full" />
             <div className="flex justify-between items-center mb-3 relative z-10"><h3 className="text-xs sm:text-sm font-bold">Daily Challenge</h3><TargetIcon className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /></div>
             <p className="text-[11px] sm:text-xs text-gray-400 mb-3 relative z-10 flex flex-wrap items-center gap-1.5">
-              Complete 3 quizzes today for <span className="font-bold text-[#ccff00] flex items-center gap-0.5">+50 PTS</span> <span className="text-gray-500">&</span> <span className="font-bold text-[#ff00a0] flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+50</span>
+              Complete 3 quizzes today for <span className="font-bold text-[#ccff00] flex items-center gap-0.5">+25 PTS</span> <span className="text-gray-500">&</span> <span className="font-bold text-[#ff00a0] flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+50</span>
             </p>
             <div className="w-full bg-white/5 rounded-full h-1.5 mb-1.5 relative z-10">
               <div className="bg-[#ff00a0] h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min((stats.quizzesToday / 3) * 100, 100)}%` }} />
@@ -500,8 +500,9 @@ export default function UserDashboard() {
                 <span className="font-bold text-white text-xs sm:text-sm">Challenge Reward</span>
               </div>
               <div className="flex gap-3">
+                {/* UPDATED: Shows +25 for points now */}
                 <span className="font-bold text-[#ccff00] flex items-center gap-1 text-sm sm:text-base">
-                  <LightningIcon weight="fill" /> +50
+                  <LightningIcon weight="fill" /> +25
                 </span>
                 <span className="font-bold text-[#ff00a0] flex items-center gap-1 text-sm sm:text-base">
                   <CoinsIcon weight="fill" /> +50
