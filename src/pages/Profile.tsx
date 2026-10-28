@@ -26,7 +26,7 @@ export default function Profile() {
   const [inventory, setInventory] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'history' | 'inventory'>('history')
   
-  // ✅ NEW: Play Menu State (Exactly like Dashboard)
+  // Play Menu State
   const [showPlayMenu, setShowPlayMenu] = useState(false)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [loadingQuizzes, setLoadingQuizzes] = useState(false)
@@ -81,7 +81,6 @@ export default function Profile() {
     fetchProfileData()
   }, [navigate])
 
-  // ✅ NEW: Fetch available quizzes for the popup modal
   const openPlayMenu = async () => {
     setShowPlayMenu(true)
     setLoadingQuizzes(true)
@@ -178,7 +177,6 @@ export default function Profile() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          {/* ✅ FIXED: Opens the Play Menu instead of navigating to /play/new */}
           <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
@@ -402,41 +400,46 @@ export default function Profile() {
       {/* MOBILE NAVIGATION */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
-        {/* ✅ FIXED: Opens Play Menu */}
         <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* ✅ NEW: CHOOSE A CHALLENGE MODAL */}
+      {/* ✅ FIXED: CHOOSE A CHALLENGE MODAL (Responsive) */}
       {showPlayMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full shadow-2xl relative">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-6 right-6 text-gray-400 hover:text-white transition"><XIcon weight="bold" size={24} /></button>
-            <h2 className="text-2xl font-bold mb-1">Choose a Challenge</h2>
-            <p className="text-gray-400 text-sm mb-6">Select a quiz to play & earn coins.</p>
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-4 py-2">
-              <span className="text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" /><span className="font-bold text-[#ff00a0] text-sm">{profile?.coins || 0}</span></div>
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
+            
+            <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
+            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
+            
+            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
+              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
+              <div className="flex items-center gap-1.5">
+                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
+                <span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span>
+              </div>
             </div>
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+            
+            <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (
-                <p className="text-center text-[#ccff00] font-mono text-sm py-4 animate-pulse">LOADING...</p>
+                <p className="text-center text-[#ccff00] font-mono text-xs sm:text-sm py-4 animate-pulse">LOADING...</p>
               ) : availableQuizzes.length === 0 ? (
-                <div className="text-center py-8 bg-black/20 rounded-2xl border border-white/5">
-                  <TrophyIcon weight="duotone" className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm font-bold">All caught up!</p>
-                  <p className="text-gray-500 text-xs mt-1">You've completed all available quizzes for your tier.</p>
+                <div className="text-center py-6 sm:py-8 bg-black/20 rounded-2xl border border-white/5">
+                  <TrophyIcon weight="duotone" className="w-10 h-10 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
+                  <p className="text-gray-400 text-xs sm:text-sm font-bold">All caught up!</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-1">You've completed all available quizzes for your tier.</p>
                 </div>
               ) : (
                 availableQuizzes.map((q) => (
-                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-2xl p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-sm text-white group-hover:text-[#ccff00] transition">{q.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{q.category}</p>
+                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
+                    <div className="pr-2">
+                      <p className="font-bold text-xs sm:text-sm text-white group-hover:text-[#ccff00] transition line-clamp-1">{q.title}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{q.category}</p>
                     </div>
-                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg border ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
+                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-1 rounded-lg border shrink-0 ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
                   </button>
                 ))
               )}

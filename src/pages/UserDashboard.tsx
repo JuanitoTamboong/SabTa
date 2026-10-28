@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, XIcon, CoinsIcon,
-  GiftIcon // ✅ Added GiftIcon for the streak modal
+  GiftIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -17,7 +17,7 @@ export default function UserDashboard() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
 
-  // ✅ NEW: Daily Streak State
+  // Daily Streak State
   const [showStreakModal, setShowStreakModal] = useState(false)
   const [streakReward, setStreakReward] = useState({ coins: 0, newStreak: 0 })
 
@@ -57,33 +57,31 @@ export default function UserDashboard() {
 
         let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         
-        // ✅ DAILY STREAK LOGIC
+        // DAILY STREAK LOGIC
         if (profileData) {
           const todayStr = new Date().toISOString().split('T')[0]
           const lastActiveStr = new Date(profileData.updated_at).toISOString().split('T')[0]
           
           if (todayStr !== lastActiveStr) {
-            // Get yesterday's date string
             const yesterday = new Date()
             yesterday.setDate(yesterday.getDate() - 1)
             const yesterdayStr = yesterday.toISOString().split('T')[0]
 
             let newStreak = profileData.current_streak || 0
             if (lastActiveStr === yesterdayStr) {
-              newStreak += 1 // They logged in yesterday, increase streak
+              newStreak += 1
             } else {
-              newStreak = 1 // Missed a day, reset to 1
+              newStreak = 1
             }
 
-            const rewardCoins = 50 // Daily reward
+            const rewardCoins = 50
 
-            // Update Database
             const { data: updatedProfile } = await supabase
               .from('profiles')
               .update({ 
                 current_streak: newStreak, 
                 coins: (profileData.coins || 0) + rewardCoins,
-                updated_at: new Date().toISOString() // Force update
+                updated_at: new Date().toISOString()
               })
               .eq('id', user.id)
               .select()
@@ -242,92 +240,98 @@ export default function UserDashboard() {
         <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
 
-        <header className="flex justify-between items-center mb-6 relative z-10">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 relative z-10 gap-4">
           <div>
             <h1 className="text-xl md:text-3xl font-bold mb-1 leading-tight">
-              {getGreeting()}, <br className="md:hidden" />
+              {getGreeting()}, <br className="hidden sm:block" />
               <span className="text-[#ccff00]">{profile?.display_name?.split(' ')[0] || 'Player'}</span>!
             </h1>
-            <p className="text-gray-400 text-xs flex items-center gap-2 mt-1">
+            <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5 mt-1">
               <FireIcon weight="fill" className="text-[#ff00a0]" /> 
-              <span className="font-bold text-white">{profile?.current_streak || 1} Day Streak</span> • Level {stats.level} • {profile?.age_category?.toUpperCase()} Tier
+              <span className="font-bold text-white">{profile?.current_streak || 1} Day Streak</span> 
+              <span>•</span> Level {stats.level} 
+              <span>•</span> {profile?.age_category?.toUpperCase()} Tier
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-              <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
-              <span className="font-bold text-xs text-[#ff00a0]">{profile?.coins || 0}</span>
-            </div>
-            <div className="bg-[#0f1014] border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-              <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
-              <span className="font-bold text-xs">{profile?.points || 0} PTS</span>
+          
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2">
+              <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
+                <span className="font-bold text-xs text-[#ff00a0]">{profile?.coins || 0}</span>
+              </div>
+              <div className="bg-[#0f1014] border border-white/10 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
+                <span className="font-bold text-xs">{profile?.points || 0} PTS</span>
+              </div>
             </div>
             
-            <div className="relative w-9 h-9">
-              <div className="absolute inset-[15%] rounded-full bg-gradient-to-br from-[#00f0ff] to-blue-600 flex items-center justify-center font-bold text-black uppercase overflow-hidden z-10">
-                {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : profile?.display_name?.charAt(0) || 'P'}
+            <div className="flex items-center gap-2">
+              <div className="relative w-9 h-9">
+                <div className="absolute inset-[15%] rounded-full bg-gradient-to-br from-[#00f0ff] to-blue-600 flex items-center justify-center font-bold text-black uppercase overflow-hidden z-10">
+                  {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : profile?.display_name?.charAt(0) || 'P'}
+                </div>
+                {equippedBorder && <img src={equippedBorder} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />}
               </div>
-              {equippedBorder && <img src={equippedBorder} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />}
+              <button onClick={handleLogout} className="md:hidden bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20"><SignOutIcon weight="bold" className="w-4 h-4" /></button>
             </div>
-
-            <button onClick={handleLogout} className="md:hidden bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20"><SignOutIcon weight="bold" className="w-4 h-4" /></button>
           </div>
         </header>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6 relative z-10">
-          <div className="bg-[#0f1014] border border-white/10 p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-5 h-5" /><p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
-            <p className="text-2xl font-bold">{stats.totalQuizzes}</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
+          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
+            <p className="text-xl sm:text-2xl font-bold">{stats.totalQuizzes}</p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1"><TrophyIcon weight="duotone" className="text-[#ff00a0] w-5 h-5" /><p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Best Score</p></div>
-            <p className="text-2xl font-bold">{stats.bestScore} <span className="text-xs text-gray-500">pts</span></p>
+          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TrophyIcon weight="duotone" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Best Score</p></div>
+            <p className="text-xl sm:text-2xl font-bold">{stats.bestScore} <span className="text-[10px] sm:text-xs text-gray-500">pts</span></p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-1"><TargetIcon weight="duotone" className="text-[#ccff00] w-5 h-5" /><p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Accuracy</p></div>
-            <p className="text-2xl font-bold">{stats.accuracy}%</p>
+          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TargetIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Accuracy</p></div>
+            <p className="text-xl sm:text-2xl font-bold">{stats.accuracy}%</p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
+          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
-            <div className="flex items-center gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-5 h-5" /><p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
-            <p className="text-2xl font-bold relative z-10">{stats.level}</p>
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
+            <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
           </div>
-          <div className="bg-[#0f1014] border border-[#ff00a0]/20 p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
+          <div className="bg-[#0f1014] border border-[#ff00a0]/20 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
-            <div className="flex items-center gap-2 mb-1 relative z-10"><CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" /><p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Coins</p></div>
-            <p className="text-2xl font-bold relative z-10 text-[#ff00a0]">{profile?.coins || 0}</p>
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Coins</p></div>
+            <p className="text-xl sm:text-2xl font-bold relative z-10 text-[#ff00a0]">{profile?.coins || 0}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 relative z-10">
-          <div className="relative bg-gradient-to-r from-[#111] to-[#1a1a1a] border border-white/10 p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
+          <div className="relative bg-gradient-to-r from-[#111] to-[#1a1a1a] border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
             <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
             <div className="relative z-10 flex flex-col items-start">
               <div className="bg-[#ccff00]/20 text-[#ccff00] px-3 py-1 rounded-full text-[10px] font-bold mb-3 uppercase tracking-wider">{profile?.age_category || 'General'} Tier</div>
-              <h2 className="text-lg font-bold mb-1">Ready to test your knowledge?</h2>
+              <h2 className="text-base sm:text-lg font-bold mb-1">Ready to test your knowledge?</h2>
               <p className="text-gray-400 text-xs mb-4 max-w-[250px]">Jump straight into a quick quiz and earn points & coins to unlock new themes.</p>
-              <button className="bg-[#ccff00] text-black px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)] text-sm">Select Quiz <CaretRightIcon weight="bold" /></button>
+              <button className="bg-[#ccff00] text-black px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)] text-xs sm:text-sm">Select Quiz <CaretRightIcon weight="bold" /></button>
             </div>
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-4">
-            <div className="flex justify-between items-center mb-3"><h3 className="text-sm font-bold">Recent Activity</h3><ClockIcon className="text-gray-500 w-4 h-4" /></div>
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4">
+            <div className="flex justify-between items-center mb-3"><h3 className="text-xs sm:text-sm font-bold">Recent Activity</h3><ClockIcon className="text-gray-500 w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             {recentActivity.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-6 bg-black/20 rounded-2xl border border-white/5">No recent quizzes played.</div>
             ) : (
               <div className="space-y-2">
                 {recentActivity.map((attempt) => (
-                  <div key={attempt.id} className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"><CheckCircleIcon weight="fill" className="text-[#ccff00] w-4 h-4" /></div>
+                  <div key={attempt.id} className="flex items-center justify-between p-2.5 sm:p-3 bg-black/40 border border-white/5 rounded-2xl">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0"><CheckCircleIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
                       <div>
-                        <p className="font-bold text-xs">{attempt.quizzes?.category || 'General Knowledge'}</p>
-                        <p className="text-[10px] text-gray-500">{new Date(attempt.created_at).toLocaleDateString()} • {attempt.accuracy}%</p>
+                        <p className="font-bold text-[11px] sm:text-xs">{attempt.quizzes?.category || 'General Knowledge'}</p>
+                        <p className="text-[9px] sm:text-[10px] text-gray-500">{new Date(attempt.created_at).toLocaleDateString()} • {attempt.accuracy}%</p>
                       </div>
                     </div>
-                    <div className="text-right flex items-center gap-2">
-                      <span className="font-bold text-[#ccff00] text-xs">+{attempt.score} pts</span>
-                      <span className="font-bold text-[#ff00a0] text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+{attempt.correct_answers * 150}</span>
+                    <div className="text-right flex items-center gap-1.5 sm:gap-2">
+                      <span className="font-bold text-[#ccff00] text-[10px] sm:text-xs">+{attempt.score} pts</span>
+                      <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5 sm:w-3 sm:h-3" />+{attempt.correct_answers * 150}</span>
                     </div>
                   </div>
                 ))}
@@ -335,32 +339,32 @@ export default function UserDashboard() {
             )}
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-4 relative overflow-hidden">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-[#ff00a0]/10 rounded-bl-full" />
-            <div className="flex justify-between items-center mb-3 relative z-10"><h3 className="text-sm font-bold">Daily Challenge</h3><TargetIcon className="text-[#ff00a0] w-5 h-5" /></div>
-            <p className="text-xs text-gray-400 mb-3 relative z-10 flex items-center gap-1.5">
+            <div className="flex justify-between items-center mb-3 relative z-10"><h3 className="text-xs sm:text-sm font-bold">Daily Challenge</h3><TargetIcon className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /></div>
+            <p className="text-[11px] sm:text-xs text-gray-400 mb-3 relative z-10 flex flex-wrap items-center gap-1.5">
               Complete 3 quizzes today for <span className="font-bold text-[#ccff00] flex items-center gap-0.5">+50 PTS</span> <span className="text-gray-500">&</span> <span className="font-bold text-[#ff00a0] flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-3 h-3" />+50</span>
             </p>
             <div className="w-full bg-white/5 rounded-full h-1.5 mb-1.5 relative z-10">
               <div className="bg-[#ff00a0] h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min((stats.quizzesToday / 3) * 100, 100)}%` }} />
             </div>
-            <p className="text-[10px] text-right text-gray-400 font-bold relative z-10">
+            <p className="text-[9px] sm:text-[10px] text-right text-gray-400 font-bold relative z-10">
               {stats.quizzesToday} / 3 Completed
               {stats.coinsEarnedToday > 0 && (<span className="ml-2 text-[#ff00a0]">• +{stats.coinsEarnedToday} coins today</span>)}
             </p>
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-4">
-            <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold">Top {profile?.age_category || 'Players'}</h3><MedalIcon weight="fill" className="text-[#ccff00] w-4 h-4" /></div>
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4">
+            <div className="flex justify-between items-center mb-4"><h3 className="text-xs sm:text-sm font-bold">Top {profile?.age_category || 'Players'}</h3><MedalIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             <div className="space-y-3">
               {topPlayers.length === 0 ? (
                 <div className="text-gray-500 text-xs text-center py-2">No players yet.</div>
               ) : (
                 topPlayers.map((player, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <span className={`text-xs font-bold w-4 ${idx === 0 ? 'text-[#ccff00]' : idx === 1 ? 'text-gray-300' : 'text-[#cd7f32]'}`}>#{idx + 1}</span>
-                    <div className="relative w-8 h-8 shrink-0">
-                      <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold uppercase overflow-hidden z-10">
+                  <div key={idx} className="flex items-center gap-2 sm:gap-3">
+                    <span className={`text-[10px] sm:text-xs font-bold w-3 sm:w-4 ${idx === 0 ? 'text-[#ccff00]' : idx === 1 ? 'text-gray-300' : 'text-[#cd7f32]'}`}>#{idx + 1}</span>
+                    <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0">
+                      <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[9px] sm:text-[10px] font-bold uppercase overflow-hidden z-10">
                         {player.avatar_url ? (
                           <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -371,16 +375,16 @@ export default function UserDashboard() {
                         <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                       )}
                     </div>
-                    <div className="flex-1"><p className="text-xs font-bold truncate">{player.display_name}</p></div>
+                    <div className="flex-1"><p className="text-[11px] sm:text-xs font-bold truncate">{player.display_name}</p></div>
                     <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[10px] font-bold text-[#ccff00]">{player.points} pts</span>
-                      <span className="text-[9px] font-bold text-[#ff00a0] flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2.5 h-2.5" />{player.coins || 0}</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-[#ccff00]">{player.points} pts</span>
+                      <span className="text-[8px] sm:text-[9px] font-bold text-[#ff00a0] flex items-center gap-0.5"><CoinsIcon weight="fill" className="w-2 h-2 sm:w-2.5 sm:h-2.5" />{player.coins || 0}</span>
                     </div>
                   </div>
                 ))
               )}
             </div>
-            <button onClick={() => navigate('/leaderboard')} className="w-full mt-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold transition">View Leaderboard</button>
+            <button onClick={() => navigate('/leaderboard')} className="w-full mt-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-[11px] sm:text-xs font-bold transition">View Leaderboard</button>
           </div>
         </div>
       </main>
@@ -393,39 +397,39 @@ export default function UserDashboard() {
         <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* ✅ NEW: DAILY STREAK REWARD MODAL */}
+      {/* DAILY STREAK REWARD MODAL */}
       {showStreakModal && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-[2rem] p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)]">
-            <div className="w-24 h-24 bg-gradient-to-br from-[#ff00a0] to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(255,0,160,0.4)] animate-bounce">
-              <FireIcon weight="fill" className="w-12 h-12 text-black" />
+          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)]">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ff00a0] to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(255,0,160,0.4)] animate-bounce">
+              <FireIcon weight="fill" className="w-10 h-10 sm:w-12 sm:h-12 text-black" />
             </div>
             
-            <h2 className="text-3xl font-black text-white mb-2">Daily Streak!</h2>
-            <p className="text-gray-400 text-sm mb-6">
+            <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">Daily Streak!</h2>
+            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
               You logged in today! Keep it up to earn bigger rewards.
             </p>
 
-            <div className="bg-black/40 border border-white/10 rounded-2xl p-4 mb-6">
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Current Streak</p>
-              <p className="text-4xl font-bold text-[#ff00a0] flex items-center justify-center gap-2">
-                {streakReward.newStreak} <span className="text-lg text-white">Days</span>
+            <div className="bg-black/40 border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">Current Streak</p>
+              <p className="text-3xl sm:text-4xl font-bold text-[#ff00a0] flex items-center justify-center gap-2">
+                {streakReward.newStreak} <span className="text-base sm:text-lg text-white">Days</span>
               </p>
             </div>
 
-            <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-2xl p-4 flex items-center justify-between mb-8">
+            <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-2xl p-3 sm:p-4 flex items-center justify-between mb-6 sm:mb-8">
               <div className="flex items-center gap-2">
-                <GiftIcon weight="fill" className="text-[#ccff00] w-6 h-6" />
-                <span className="font-bold text-white text-sm">Daily Reward</span>
+                <GiftIcon weight="fill" className="text-[#ccff00] w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="font-bold text-white text-xs sm:text-sm">Daily Reward</span>
               </div>
-              <span className="font-bold text-[#ff00a0] flex items-center gap-1">
+              <span className="font-bold text-[#ff00a0] flex items-center gap-1 text-sm sm:text-base">
                 <CoinsIcon weight="fill" /> +{streakReward.coins}
               </span>
             </div>
 
             <button 
               onClick={() => setShowStreakModal(false)} 
-              className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-black text-lg hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)]"
+              className="w-full bg-[#ccff00] text-black py-3 sm:py-4 rounded-xl font-black text-base sm:text-lg hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)]"
             >
               Claim & Continue
             </button>
@@ -433,33 +437,36 @@ export default function UserDashboard() {
         </div>
       )}
 
+      {/* PLAY MENU MODAL */}
       {showPlayMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full shadow-2xl relative">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-6 right-6 text-gray-400 hover:text-white transition"><XIcon weight="bold" size={24} /></button>
-            <h2 className="text-2xl font-bold mb-1">Choose a Challenge</h2>
-            <p className="text-gray-400 text-sm mb-6">Select a quiz to play & earn coins.</p>
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-4 py-2">
-              <span className="text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" /><span className="font-bold text-[#ff00a0] text-sm">{profile?.coins || 0}</span></div>
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
+            <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
+            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
+            
+            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
+              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
+              <div className="flex items-center gap-1.5"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" /><span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span></div>
             </div>
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+            
+            <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (
-                <p className="text-center text-[#ccff00] font-mono text-sm py-4 animate-pulse">LOADING...</p>
+                <p className="text-center text-[#ccff00] font-mono text-xs sm:text-sm py-4 animate-pulse">LOADING...</p>
               ) : availableQuizzes.length === 0 ? (
-                <div className="text-center py-8 bg-black/20 rounded-2xl border border-white/5">
-                  <TrophyIcon weight="duotone" className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm font-bold">All caught up!</p>
-                  <p className="text-gray-500 text-xs mt-1">You've completed all available quizzes for your tier.</p>
+                <div className="text-center py-6 sm:py-8 bg-black/20 rounded-2xl border border-white/5">
+                  <TrophyIcon weight="duotone" className="w-10 h-10 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
+                  <p className="text-gray-400 text-xs sm:text-sm font-bold">All caught up!</p>
+                  <p className="text-gray-500 text-[10px] sm:text-xs mt-1">You've completed all available quizzes for your tier.</p>
                 </div>
               ) : (
                 availableQuizzes.map((q) => (
-                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-2xl p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-sm text-white group-hover:text-[#ccff00] transition">{q.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{q.category}</p>
+                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
+                    <div className="pr-2">
+                      <p className="font-bold text-xs sm:text-sm text-white group-hover:text-[#ccff00] transition line-clamp-1">{q.title}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{q.category}</p>
                     </div>
-                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg border ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
+                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-1 rounded-lg border shrink-0 ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
                   </button>
                 ))
               )}
