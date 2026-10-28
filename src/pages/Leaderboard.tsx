@@ -69,7 +69,6 @@ export default function Leaderboard() {
           const difficulty = attempt.quizzes.difficulty
           const attemptTime = attempt.time_taken_seconds || 99999 
 
-          // ✅ FIXED: Strictly looking for 'avatar_border' since the DB is now clean
           const equippedBorder = attempt.profiles.user_inventory?.find(
             (inv: any) => 
               inv.is_equipped && 
@@ -383,9 +382,10 @@ export default function Leaderboard() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                        <span className="text-[10px] sm:text-xs text-gray-400 hidden sm:flex items-center gap-1.5 bg-white/5 px-2 sm:px-2.5 py-1 rounded-lg border border-white/10">
-                          <TimerIcon size={14} className={formatTime(player.bestTime) ? "text-[#ccff00]" : "text-gray-600"} /> 
+                      <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
+                        {/* ✅ FIX: Changed 'hidden sm:flex' to 'flex' so timer shows on mobile */}
+                        <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1 sm:gap-1.5 bg-white/5 px-1.5 sm:px-2.5 py-1 rounded-lg border border-white/10">
+                          <TimerIcon size={12} className={`sm:w-[14px] sm:h-[14px] ${formatTime(player.bestTime) ? "text-[#ccff00]" : "text-gray-600"}`} /> 
                           {formatTime(player.bestTime) || '-'}
                         </span>
                         
