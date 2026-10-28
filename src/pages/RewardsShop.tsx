@@ -189,13 +189,7 @@ export default function RewardsShop() {
             <UserIcon weight="fill" className="w-6 h-6" /> My Profile
           </button>
         </nav>
-        <div className="w-full mt-4 p-3 bg-gradient-to-br from-[#ff00a0]/10 to-transparent border border-[#ff00a0]/20 rounded-xl">
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Coin Balance</p>
-          <div className="flex items-center gap-2">
-            <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
-            <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
-          </div>
-        </div>
+        {/* REMOVED COIN BALANCE SIDEBAR BOX HERE */}
         <div className="mt-auto w-full">
           <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
             <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
@@ -337,10 +331,9 @@ export default function RewardsShop() {
         </div>
       </main>
 
-      {/* ✅ FIXED: FULL DETAILS MODAL FOR MOBILE */}
+      {/* FULL DETAILS MODAL FOR MOBILE */}
       {selectedItem && !purchaseItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          {/* Added max-h and overflow-y-auto so it scrolls on small screens */}
           <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 max-w-md w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
             <button 
               onClick={() => setSelectedItem(null)} 
@@ -474,13 +467,7 @@ export default function RewardsShop() {
             <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
             
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
-              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5">
-                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
-                <span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span>
-              </div>
-            </div>
+            {/* REMOVED YOUR BALANCE BOX HERE */}
             
             <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (
