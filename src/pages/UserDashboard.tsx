@@ -56,41 +56,22 @@ export default function UserDashboard() {
         // 1. Fetch Profile FIRST
         let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         
-        // DAILY STREAK LOGIC
+        // ✅ DAILY STREAK LOGIC USING SECURE RPC
         if (profileData) {
-          const todayStr = new Date().toISOString().split('T')[0]
-          const lastActiveStr = new Date(profileData.updated_at).toISOString().split('T')[0]
-          
-          if (todayStr !== lastActiveStr) {
-            const yesterday = new Date()
-            yesterday.setDate(yesterday.getDate() - 1)
-            const yesterdayStr = yesterday.toISOString().split('T')[0]
+          // Call the database function. It checks the date internally to prevent timezone bugs.
+          const { data: streakResult } = await supabase.rpc('claim_daily_streak')
 
-            let newStreak = profileData.current_streak || 0
-            if (lastActiveStr === yesterdayStr) {
-              newStreak += 1
-            } else {
-              newStreak = 1
-            }
-
-            const rewardCoins = 50
-
-            const { data: updatedProfile } = await supabase
-              .from('profiles')
-              .update({ 
-                current_streak: newStreak, 
-                coins: (profileData.coins || 0) + rewardCoins,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', user.id)
-              .select()
-              .single()
-
-            if (updatedProfile) {
-              profileData = updatedProfile
-              setStreakReward({ coins: rewardCoins, newStreak: newStreak })
-              setShowStreakModal(true)
-            }
+          if (streakResult && streakResult.status === 'success') {
+            // Only show the modal if the database actually awarded a new streak
+            setStreakReward({ 
+              coins: streakResult.coins, 
+              newStreak: streakResult.streak 
+            })
+            setShowStreakModal(true)
+            
+            // Update local state to reflect DB changes immediately
+            profileData.current_streak = streakResult.streak
+            profileData.coins = (profileData.coins || 0) + streakResult.coins
           }
           
           setProfile(profileData)
@@ -129,27 +110,26 @@ export default function UserDashboard() {
           const totalQuizzes = attempts.length
           const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
           
-          // Calculate true accuracy dynamically
           const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
           const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
           const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
           
+          // ✅ FIXED: Daily Challenge uses the database to track the date
           const today = new Date().toISOString().split('T')[0]
           const todayAttempts = attempts.filter(a => a.created_at.startsWith(today))
           const quizzesToday = todayAttempts.length
 
-          // Check if Daily Challenge is completed and hasn't been claimed
-          const dailyChallengeClaimed = localStorage.getItem(`daily_challenge_${today}_${user.id}`)
-          
           let finalProfileState = profileData 
+          const lastChallengeDate = profileData?.last_challenge_date
 
-          if (quizzesToday >= 3 && !dailyChallengeClaimed) {
-            // Award the bonus: 25 Points and 50 Coins
+          // If the user finished 3 quizzes today, but hasn't claimed the reward for today yet
+          if (quizzesToday >= 3 && lastChallengeDate !== today) {
             const { data: updatedProfile } = await supabase
               .from('profiles')
               .update({ 
-                points: (profileData?.points || 0) + 25, // Changed to 25
-                coins: (profileData?.coins || 0) + 50
+                points: (profileData?.points || 0) + 25,
+                coins: (profileData?.coins || 0) + 50,
+                last_challenge_date: today // Save today's date to prevent double claiming
               })
               .eq('id', user.id)
               .select()
@@ -158,14 +138,14 @@ export default function UserDashboard() {
             if (updatedProfile) {
               finalProfileState = updatedProfile
               setProfile(updatedProfile)
-              localStorage.setItem(`daily_challenge_${today}_${user.id}`, 'true')
-              setShowDailyBonusModal(true) // Trigger Popup
+              setShowDailyBonusModal(true) 
             }
           }
 
           const currentPoints = finalProfileState?.points || 0
           const level = Math.floor(currentPoints / 100) + 1
 
+          // The UI will automatically reset to 0/3 at midnight because the date changes
           setStats({ 
             totalQuizzes, 
             bestScore, 
@@ -289,7 +269,8 @@ export default function UserDashboard() {
             </h1>
             <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5 mt-1">
               <FireIcon weight="fill" className="text-[#ff00a0]" /> 
-              <span className="font-bold text-white">{profile?.current_streak || 1} Day Streak</span> 
+              {/* ✅ FIXED: Removed || 1 so it accurately shows 0 if not claimed */}
+              <span className="font-bold text-white">{profile?.current_streak || 0} Day Streak</span> 
               <span>•</span> Level {stats.level} 
               <span>•</span> {profile?.age_category?.toUpperCase()} Tier
             </p>
@@ -319,7 +300,7 @@ export default function UserDashboard() {
           </div>
         </header>
 
-        {/* STATS GRID - "Today" card removed */}
+        {/* STATS GRID */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
           <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
@@ -361,7 +342,6 @@ export default function UserDashboard() {
                   const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
                   const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
                   
-                  // Use the actual saved score for coins, not just the correct answers
                   const coinsEarned = attempt.score * 15 
 
                   return (
@@ -441,10 +421,10 @@ export default function UserDashboard() {
         <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* DAILY STREAK REWARD MODAL */}
+      {/* ✅ DAILY STREAK REWARD MODAL */}
       {showStreakModal && (
-        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)]">
+        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)] my-auto">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ff00a0] to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(255,0,160,0.4)] animate-bounce">
               <FireIcon weight="fill" className="w-10 h-10 sm:w-12 sm:h-12 text-black" />
             </div>
@@ -481,10 +461,10 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* DAILY CHALLENGE REWARD MODAL */}
+      {/* ✅ DAILY CHALLENGE REWARD MODAL */}
       {showDailyBonusModal && (
-        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)]">
+        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)] my-auto">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ccff00] to-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(204,255,0,0.4)] animate-bounce">
               <TargetIcon weight="fill" className="w-10 h-10 sm:w-12 sm:h-12 text-black" />
             </div>
@@ -500,7 +480,6 @@ export default function UserDashboard() {
                 <span className="font-bold text-white text-xs sm:text-sm">Challenge Reward</span>
               </div>
               <div className="flex gap-3">
-                {/* UPDATED: Shows +25 for points now */}
                 <span className="font-bold text-[#ccff00] flex items-center gap-1 text-sm sm:text-base">
                   <LightningIcon weight="fill" /> +25
                 </span>
@@ -520,11 +499,11 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* PLAY MENU MODAL */}
+      {/* ✅ PLAY MENU MODAL */}
       {showPlayMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
+        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative my-auto max-h-[90vh] flex flex-col">
+            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg z-10"><XIcon weight="bold" size={20} /></button>
             <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
             
