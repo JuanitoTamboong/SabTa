@@ -6,6 +6,7 @@ import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, XIcon, CoinsIcon,
+  GiftIcon // ✅ Added GiftIcon for the streak modal
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -15,6 +16,10 @@ export default function UserDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
+
+  // ✅ NEW: Daily Streak State
+  const [showStreakModal, setShowStreakModal] = useState(false)
+  const [streakReward, setStreakReward] = useState({ coins: 0, newStreak: 0 })
 
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -50,8 +55,49 @@ export default function UserDashboard() {
           setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
         }
 
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-        if (profileData) setProfile(profileData)
+        let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+        
+        // ✅ DAILY STREAK LOGIC
+        if (profileData) {
+          const todayStr = new Date().toISOString().split('T')[0]
+          const lastActiveStr = new Date(profileData.updated_at).toISOString().split('T')[0]
+          
+          if (todayStr !== lastActiveStr) {
+            // Get yesterday's date string
+            const yesterday = new Date()
+            yesterday.setDate(yesterday.getDate() - 1)
+            const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+            let newStreak = profileData.current_streak || 0
+            if (lastActiveStr === yesterdayStr) {
+              newStreak += 1 // They logged in yesterday, increase streak
+            } else {
+              newStreak = 1 // Missed a day, reset to 1
+            }
+
+            const rewardCoins = 50 // Daily reward
+
+            // Update Database
+            const { data: updatedProfile } = await supabase
+              .from('profiles')
+              .update({ 
+                current_streak: newStreak, 
+                coins: (profileData.coins || 0) + rewardCoins,
+                updated_at: new Date().toISOString() // Force update
+              })
+              .eq('id', user.id)
+              .select()
+              .single()
+
+            if (updatedProfile) {
+              profileData = updatedProfile
+              setStreakReward({ coins: rewardCoins, newStreak: newStreak })
+              setShowStreakModal(true)
+            }
+          }
+          
+          setProfile(profileData)
+        }
 
         const { data: invData } = await supabase
           .from('user_inventory')
@@ -131,7 +177,6 @@ export default function UserDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || !profile?.age_category) return
 
-      // 1. Get only COMPLETED quiz IDs. (If they quit, it's not here, so it will show up)
       const { data: completed } = await supabase
         .from('quiz_attempts')
         .select('quiz_id')
@@ -140,14 +185,12 @@ export default function UserDashboard() {
         
       const completedIds = completed?.map(c => c.quiz_id) || []
 
-      // 2. Fetch available quizzes
       let query = supabase
         .from('quizzes')
         .select('id, title, category, difficulty, questions(count)')
         .eq('age_category', profile.age_category)
         .eq('status', 'published')
 
-      // 3. Filter out completed quizzes
       if (completedIds.length > 0) {
         query = query.not('id', 'in', `(${completedIds.join(',')})`)
       }
@@ -205,7 +248,10 @@ export default function UserDashboard() {
               {getGreeting()}, <br className="md:hidden" />
               <span className="text-[#ccff00]">{profile?.display_name?.split(' ')[0] || 'Player'}</span>!
             </h1>
-            <p className="text-gray-400 text-xs flex items-center gap-2 mt-1"><FireIcon weight="fill" className="text-[#ff00a0]" /> Level {stats.level} • {profile?.age_category?.toUpperCase()} Tier</p>
+            <p className="text-gray-400 text-xs flex items-center gap-2 mt-1">
+              <FireIcon weight="fill" className="text-[#ff00a0]" /> 
+              <span className="font-bold text-white">{profile?.current_streak || 1} Day Streak</span> • Level {stats.level} • {profile?.age_category?.toUpperCase()} Tier
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
@@ -346,6 +392,46 @@ export default function UserDashboard() {
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
+
+      {/* ✅ NEW: DAILY STREAK REWARD MODAL */}
+      {showStreakModal && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-[2rem] p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)]">
+            <div className="w-24 h-24 bg-gradient-to-br from-[#ff00a0] to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(255,0,160,0.4)] animate-bounce">
+              <FireIcon weight="fill" className="w-12 h-12 text-black" />
+            </div>
+            
+            <h2 className="text-3xl font-black text-white mb-2">Daily Streak!</h2>
+            <p className="text-gray-400 text-sm mb-6">
+              You logged in today! Keep it up to earn bigger rewards.
+            </p>
+
+            <div className="bg-black/40 border border-white/10 rounded-2xl p-4 mb-6">
+              <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Current Streak</p>
+              <p className="text-4xl font-bold text-[#ff00a0] flex items-center justify-center gap-2">
+                {streakReward.newStreak} <span className="text-lg text-white">Days</span>
+              </p>
+            </div>
+
+            <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-2xl p-4 flex items-center justify-between mb-8">
+              <div className="flex items-center gap-2">
+                <GiftIcon weight="fill" className="text-[#ccff00] w-6 h-6" />
+                <span className="font-bold text-white text-sm">Daily Reward</span>
+              </div>
+              <span className="font-bold text-[#ff00a0] flex items-center gap-1">
+                <CoinsIcon weight="fill" /> +{streakReward.coins}
+              </span>
+            </div>
+
+            <button 
+              onClick={() => setShowStreakModal(false)} 
+              className="w-full bg-[#ccff00] text-black py-4 rounded-xl font-black text-lg hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)]"
+            >
+              Claim & Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

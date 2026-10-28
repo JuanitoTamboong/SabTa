@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
-  MedalIcon, CrownIcon, StarIcon, TimerIcon, XIcon // ✅ Added XIcon for the modal
+  MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon, XIcon 
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -14,12 +14,21 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [players, setPlayers] = useState<any[]>([])
-  const [activeDifficulty, setActiveDifficulty] = useState('normal')
+  const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
 
-  // ✅ NEW: Play Menu State
+  // Play Menu State
   const [showPlayMenu, setShowPlayMenu] = useState(false)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [loadingQuizzes, setLoadingQuizzes] = useState(false)
+
+  // ✅ Helper to format time (e.g. 90 -> "1m 30s" or 45 -> "45s")
+  const formatTime = (totalSeconds: number) => {
+    if (!totalSeconds || totalSeconds === 99999 || totalSeconds === 9999) return null
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    if (mins > 0) return `${mins}m ${secs}s`
+    return `${secs}s`
+  }
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -31,7 +40,7 @@ export default function Leaderboard() {
       if (profileData) setProfile(profileData)
       if (!profileData?.age_category) { setLoading(false); return }
 
-      const { data: attempts, error } = await supabase
+      let query = supabase
         .from('quiz_attempts')
         .select(`
           score,
@@ -45,7 +54,12 @@ export default function Leaderboard() {
           ),
           quizzes!inner ( difficulty )
         `)
-        .eq('profiles.age_category', profileData.age_category)
+
+      if (activeTab !== 'global') {
+        query = query.eq('profiles.age_category', profileData.age_category)
+      }
+
+      const { data: attempts, error } = await query
 
       if (!error && attempts) {
         const playerStats: Record<string, any> = {}
@@ -53,7 +67,7 @@ export default function Leaderboard() {
         attempts.forEach((attempt: any) => {
           const playerId = attempt.profiles.id
           const difficulty = attempt.quizzes.difficulty
-          const attemptTime = attempt.time_taken_seconds || 9999
+          const attemptTime = attempt.time_taken_seconds || 99999 
 
           const equippedBorder = attempt.profiles.user_inventory?.find(
             (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
@@ -64,6 +78,7 @@ export default function Leaderboard() {
               id: playerId,
               display_name: attempt.profiles.display_name,
               avatar_url: attempt.profiles.avatar_url,
+              age_category: attempt.profiles.age_category,
               border_url: equippedBorder?.cosmetic_items?.preview_url || null,
               scores: { normal: 0, intermediate: 0, hard: 0 },
               times: { normal: 99999, intermediate: 99999, hard: 99999 } 
@@ -80,12 +95,21 @@ export default function Leaderboard() {
         })
 
         const sortedPlayers = Object.values(playerStats)
-          .filter((p: any) => p.scores[activeDifficulty] > 0)
-          .map((p: any) => ({
-            ...p,
-            points: p.scores[activeDifficulty], 
-            bestTime: p.times[activeDifficulty] 
-          }))
+          .map((p: any) => {
+            let points = 0;
+            let bestTime = 99999;
+
+            if (activeTab === 'global') {
+              points = p.scores.normal + p.scores.intermediate + p.scores.hard
+              bestTime = Math.min(p.times.normal, p.times.intermediate, p.times.hard)
+            } else {
+              points = p.scores[activeTab]
+              bestTime = p.times[activeTab]
+            }
+
+            return { ...p, points, bestTime }
+          })
+          .filter((p: any) => p.points > 0)
           .sort((a, b) => {
             if (b.points !== a.points) {
               return b.points - a.points
@@ -100,9 +124,8 @@ export default function Leaderboard() {
     }
 
     fetchLeaderboard()
-  }, [navigate, activeDifficulty])
+  }, [navigate, activeTab])
 
-  // ✅ NEW: Fetch available quizzes for the popup modal
   const openPlayMenu = async () => {
     setShowPlayMenu(true)
     setLoadingQuizzes(true)
@@ -161,7 +184,6 @@ export default function Leaderboard() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          {/* ✅ FIXED: Opens the Play Menu instead of navigating to dashboard */}
           <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
@@ -177,9 +199,14 @@ export default function Leaderboard() {
 
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1">Global Rankings</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1">
+              {activeTab === 'global' ? 'Global Rankings' : 'Tier Rankings'}
+            </h1>
             <p className="text-gray-400 text-xs md:text-sm">
-              You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> tier leaderboard.
+              {activeTab === 'global' 
+                ? 'Comparing players across ALL age groups.'
+                : <>You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> tier leaderboard.</>
+              }
             </p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
@@ -193,13 +220,26 @@ export default function Leaderboard() {
           </div>
         </header>
 
-        <div className="flex gap-2 mb-8 relative z-10">
+        <div className="flex flex-wrap gap-2 mb-8 relative z-10">
+          <button
+            onClick={() => setActiveTab('global')}
+            className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-sm capitalize transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'global' 
+                ? 'bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)]' 
+                : 'bg-[#0f1014] text-gray-400 border border-white/5 hover:border-white/20'
+            }`}
+          >
+            <GlobeIcon weight="bold" size={18} /> Global
+          </button>
+          
+          <div className="w-px h-8 bg-white/10 mx-2 hidden md:block" />
+
           {['normal', 'intermediate', 'hard'].map(diff => (
             <button
               key={diff}
-              onClick={() => setActiveDifficulty(diff)}
+              onClick={() => setActiveTab(diff as any)}
               className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-sm capitalize transition-all ${
-                activeDifficulty === diff 
+                activeTab === diff 
                   ? 'bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)]' 
                   : 'bg-[#0f1014] text-gray-400 border border-white/5 hover:border-white/20'
               }`}
@@ -213,7 +253,7 @@ export default function Leaderboard() {
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-12 text-center relative z-10">
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
-            <p className="text-gray-500 text-sm">Be the first to complete a {activeDifficulty} quiz in this tier!</p>
+            <p className="text-gray-500 text-sm">Be the first to complete a quiz!</p>
             <button onClick={openPlayMenu} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
               Play Now
             </button>
@@ -240,6 +280,7 @@ export default function Leaderboard() {
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                     <MedalIcon weight="fill" className="text-gray-300 w-6 h-6 mx-auto mb-1" />
                     <p className="text-xs md:text-sm font-bold truncate">{players[1].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[8px] text-gray-500 uppercase font-bold">{players[1].age_category}</p>}
                     <p className="text-[10px] md:text-xs text-gray-400 font-bold">{players[1].points} PTS</p>
                   </div>
                 </div>
@@ -265,6 +306,7 @@ export default function Leaderboard() {
                     <div className="absolute inset-0 bg-gradient-to-t from-[#ccff00]/10 to-transparent" />
                     <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 mx-auto mb-1 relative z-10" />
                     <p className="text-sm md:text-base font-bold truncate relative z-10">{players[0].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[8px] text-[#ccff00]/70 uppercase font-bold relative z-10">{players[0].age_category}</p>}
                     <p className="text-xs md:text-sm text-[#ccff00] font-bold relative z-10">{players[0].points} PTS</p>
                   </div>
                 </div>
@@ -288,6 +330,7 @@ export default function Leaderboard() {
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-6 md:pb-8">
                     <MedalIcon weight="fill" className="text-[#cd7f32] w-6 h-6 mx-auto mb-1" />
                     <p className="text-xs md:text-sm font-bold truncate">{players[2].display_name}</p>
+                    {activeTab === 'global' && <p className="text-[8px] text-gray-500 uppercase font-bold">{players[2].age_category}</p>}
                     <p className="text-[10px] md:text-xs text-gray-400 font-bold">{players[2].points} PTS</p>
                   </div>
                 </div>
@@ -298,7 +341,7 @@ export default function Leaderboard() {
               <div className="flex items-center justify-between p-4 md:p-6 border-b border-white/5 bg-black/20 text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Rank</span>
                 <span className="flex-1 ml-4">Player</span>
-                <span className="capitalize">{activeDifficulty} PTS</span>
+                <span className="capitalize">{activeTab === 'global' ? 'Total' : activeTab} PTS</span>
               </div>
               
               <div className="divide-y divide-white/5">
@@ -326,15 +369,23 @@ export default function Leaderboard() {
                           )}
                         </div>
 
-                        <span className={`font-bold text-sm md:text-base truncate ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
-                          {player.display_name} {isMe && '(You)'}
-                        </span>
+                        <div>
+                          <span className={`font-bold text-sm md:text-base truncate block ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
+                            {player.display_name} {isMe && '(You)'}
+                          </span>
+                          {activeTab === 'global' && (
+                            <span className="text-[9px] uppercase font-bold text-gray-500">{player.age_category}</span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="flex items-center gap-4">
-                        <span className="text-xs text-gray-500 hidden md:flex items-center gap-1">
-                          <TimerIcon /> {player.bestTime !== 99999 ? `${player.bestTime}s` : '-'}
+                        {/* ✅ FIXED: Always show the badge, but show a dash if there is no recorded time */}
+                        <span className="text-xs text-gray-400 hidden md:flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                          <TimerIcon size={14} className={formatTime(player.bestTime) ? "text-[#ccff00]" : "text-gray-600"} /> 
+                          {formatTime(player.bestTime) || '-'}
                         </span>
+                        
                         <span className="font-bold text-sm md:text-base flex items-center gap-1">
                           <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
                           {player.points}
@@ -380,7 +431,6 @@ export default function Leaderboard() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        {/* ✅ FIXED: Opens Play Menu */}
         <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
@@ -399,7 +449,6 @@ export default function Leaderboard() {
         </button>
       </nav>
 
-      {/* ✅ NEW: CHOOSE A CHALLENGE MODAL */}
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full shadow-2xl relative">
