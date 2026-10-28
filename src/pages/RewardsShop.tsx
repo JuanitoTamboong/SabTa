@@ -137,7 +137,7 @@ export default function RewardsShop() {
     }
   }
 
-  // ✅ FIXED: Sort items by Rarity (Legendary -> Epic -> Rare -> Common)
+  // Sort items by Rarity (Legendary -> Epic -> Rare -> Common)
   const rarityOrder: Record<string, number> = {
     legendary: 1,
     epic: 2,
@@ -150,7 +150,7 @@ export default function RewardsShop() {
     .sort((a, b) => {
       const aRarity = rarityOrder[a.rarity?.toLowerCase()] || 5;
       const bRarity = rarityOrder[b.rarity?.toLowerCase()] || 5;
-      return aRarity - bRarity; // Sort ascending based on custom order
+      return aRarity - bRarity;
     })
 
   if (loading) {
@@ -337,10 +337,11 @@ export default function RewardsShop() {
         </div>
       </main>
 
-      {/* FULL DETAILS MODAL */}
+      {/* ✅ FIXED: FULL DETAILS MODAL FOR MOBILE */}
       {selectedItem && !purchaseItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl overflow-hidden">
+          {/* Added max-h and overflow-y-auto so it scrolls on small screens */}
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 max-w-md w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
             <button 
               onClick={() => setSelectedItem(null)} 
               className="absolute top-4 right-4 bg-white/5 hover:bg-white/10 p-2 rounded-full transition z-10"
@@ -348,7 +349,7 @@ export default function RewardsShop() {
               <XIcon weight="bold" className="w-5 h-5" />
             </button>
 
-            <div className="w-full h-56 md:h-64 bg-black/40 rounded-2xl mb-6 flex items-center justify-center p-6 border border-white/5">
+            <div className="w-full h-40 md:h-64 bg-black/40 rounded-2xl mb-4 md:mb-6 flex items-center justify-center p-4 md:p-6 border border-white/5">
               {selectedItem.preview_url ? (
                 <img src={selectedItem.preview_url} alt={selectedItem.name} className="w-full h-full object-contain" />
               ) : (
@@ -356,7 +357,7 @@ export default function RewardsShop() {
               )}
             </div>
 
-            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10 mb-4 ${
+            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10 mb-3 md:mb-4 ${
               selectedItem.rarity === 'legendary' ? 'text-[#ff00a0]' :
               selectedItem.rarity === 'epic' ? 'text-[#ccff00]' :
               selectedItem.rarity === 'rare' ? 'text-[#00f0ff]' :
@@ -365,12 +366,12 @@ export default function RewardsShop() {
               {selectedItem.rarity || 'Common'}
             </span>
 
-            <h2 className="text-2xl font-bold text-white mb-2">{selectedItem.name}</h2>
-            <p className="text-gray-400 text-sm mb-6">{selectedItem.description}</p>
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-2">{selectedItem.name}</h2>
+            <p className="text-gray-400 text-xs md:text-sm mb-4 md:mb-6">{selectedItem.description}</p>
 
-            <div className="flex items-center justify-between bg-black/50 border border-white/5 rounded-xl p-4 mb-6">
-              <span className="text-sm font-semibold text-gray-300">Price</span>
-              <div className="flex items-center gap-1.5 text-[#ff00a0] font-bold text-xl">
+            <div className="flex items-center justify-between bg-black/50 border border-white/5 rounded-xl p-3 md:p-4 mb-4 md:mb-6">
+              <span className="text-xs md:text-sm font-semibold text-gray-300">Price</span>
+              <div className="flex items-center gap-1.5 text-[#ff00a0] font-bold text-lg md:text-xl">
                 <CoinsIcon weight="fill" /> {selectedItem.price}
               </div>
             </div>
