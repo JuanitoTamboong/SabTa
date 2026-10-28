@@ -215,8 +215,8 @@ export default function RewardsShop() {
           {[
             { id: 'all', label: 'All Items', icon: ShoppingBagIcon },
             { id: 'background', label: 'Backgrounds', icon: ImageIcon },
-            { id: 'theme', label: 'Quiz Themes', icon: PaletteIcon },
-            { id: 'border', label: 'Borders', icon: StarIcon },
+            { id: 'quiz_theme', label: 'Quiz Themes', icon: PaletteIcon },      // ✅ FIXED: changed 'theme' to 'quiz_theme'
+            { id: 'avatar_border', label: 'Borders', icon: StarIcon },           // ✅ FIXED: changed 'border' to 'avatar_border'
           ].map(tab => (
             <button
               key={tab.id}
