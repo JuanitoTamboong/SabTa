@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
-  MedalIcon, CrownIcon, StarIcon, TimerIcon // ✅ Added TimerIcon
+  MedalIcon, CrownIcon, StarIcon, TimerIcon, XIcon // ✅ Added XIcon for the modal
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -15,6 +15,11 @@ export default function Leaderboard() {
   const [profile, setProfile] = useState<any>(null)
   const [players, setPlayers] = useState<any[]>([])
   const [activeDifficulty, setActiveDifficulty] = useState('normal')
+
+  // ✅ NEW: Play Menu State
+  const [showPlayMenu, setShowPlayMenu] = useState(false)
+  const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
+  const [loadingQuizzes, setLoadingQuizzes] = useState(false)
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -26,8 +31,6 @@ export default function Leaderboard() {
       if (profileData) setProfile(profileData)
       if (!profileData?.age_category) { setLoading(false); return }
 
-      // Fetch ALL attempts for this age category
-      // ✅ We added time_taken_seconds to the select query
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -47,11 +50,10 @@ export default function Leaderboard() {
       if (!error && attempts) {
         const playerStats: Record<string, any> = {}
 
-        // Loop through every attempt and group them by player AND difficulty
         attempts.forEach((attempt: any) => {
           const playerId = attempt.profiles.id
           const difficulty = attempt.quizzes.difficulty
-          const attemptTime = attempt.time_taken_seconds || 9999 // Fallback if time is missing
+          const attemptTime = attempt.time_taken_seconds || 9999
 
           const equippedBorder = attempt.profiles.user_inventory?.find(
             (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
@@ -64,36 +66,30 @@ export default function Leaderboard() {
               avatar_url: attempt.profiles.avatar_url,
               border_url: equippedBorder?.cosmetic_items?.preview_url || null,
               scores: { normal: 0, intermediate: 0, hard: 0 },
-              // ✅ Track the BEST (fastest) time for each difficulty
               times: { normal: 99999, intermediate: 99999, hard: 99999 } 
             }
           }
 
-          // Add the score to the specific difficulty pool
           if (playerStats[playerId].scores[difficulty] !== undefined) {
             playerStats[playerId].scores[difficulty] += attempt.score
           }
 
-          // ✅ Update the fastest time for this difficulty
           if (attemptTime < playerStats[playerId].times[difficulty]) {
             playerStats[playerId].times[difficulty] = attemptTime
           }
         })
 
-        // Convert object to array, filter out players with 0 points in the active difficulty, and sort
         const sortedPlayers = Object.values(playerStats)
           .filter((p: any) => p.scores[activeDifficulty] > 0)
           .map((p: any) => ({
             ...p,
             points: p.scores[activeDifficulty], 
-            bestTime: p.times[activeDifficulty] // ✅ Attach the time for sorting
+            bestTime: p.times[activeDifficulty] 
           }))
           .sort((a, b) => {
-            // ✅ FIRST: Sort by Highest Points
             if (b.points !== a.points) {
               return b.points - a.points
             }
-            // ✅ SECOND: If points are tied, the fastest time wins
             return a.bestTime - b.bestTime
           })
 
@@ -105,6 +101,41 @@ export default function Leaderboard() {
 
     fetchLeaderboard()
   }, [navigate, activeDifficulty])
+
+  // ✅ NEW: Fetch available quizzes for the popup modal
+  const openPlayMenu = async () => {
+    setShowPlayMenu(true)
+    setLoadingQuizzes(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !profile?.age_category) return
+
+      const { data: completed } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id')
+        .eq('user_id', user.id)
+        .eq('status', 'completed') 
+        
+      const completedIds = completed?.map(c => c.quiz_id) || []
+
+      let query = supabase
+        .from('quizzes')
+        .select('id, title, category, difficulty, questions(count)')
+        .eq('age_category', profile.age_category)
+        .eq('status', 'published')
+
+      if (completedIds.length > 0) {
+        query = query.not('id', 'in', `(${completedIds.join(',')})`)
+      }
+
+      const { data: quizzes } = await query
+      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingQuizzes(false)
+    }
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -130,7 +161,8 @@ export default function Leaderboard() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          {/* ✅ FIXED: Opens the Play Menu instead of navigating to dashboard */}
+          <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
@@ -182,7 +214,7 @@ export default function Leaderboard() {
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
             <p className="text-gray-500 text-sm">Be the first to complete a {activeDifficulty} quiz in this tier!</p>
-            <button onClick={() => navigate('/dashboard')} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
+            <button onClick={openPlayMenu} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
               Play Now
             </button>
           </div>
@@ -299,7 +331,6 @@ export default function Leaderboard() {
                         </span>
                       </div>
                       
-                      {/* ✅ Added a subtle display of their best time to break the tie visually */}
                       <div className="flex items-center gap-4">
                         <span className="text-xs text-gray-500 hidden md:flex items-center gap-1">
                           <TimerIcon /> {player.bestTime !== 99999 ? `${player.bestTime}s` : '-'}
@@ -349,7 +380,8 @@ export default function Leaderboard() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+        {/* ✅ FIXED: Opens Play Menu */}
+        <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
         </button>
@@ -366,6 +398,42 @@ export default function Leaderboard() {
           <span className="text-[9px] font-bold">Profile</span>
         </button>
       </nav>
+
+      {/* ✅ NEW: CHOOSE A CHALLENGE MODAL */}
+      {showPlayMenu && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-6 md:p-8 max-w-md w-full shadow-2xl relative">
+            <button onClick={() => setShowPlayMenu(false)} className="absolute top-6 right-6 text-gray-400 hover:text-white transition"><XIcon weight="bold" size={24} /></button>
+            <h2 className="text-2xl font-bold mb-1">Choose a Challenge</h2>
+            <p className="text-gray-400 text-sm mb-6">Select a quiz to play & earn coins.</p>
+            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-4 py-2">
+              <span className="text-xs text-gray-400 font-semibold">Your Balance</span>
+              <div className="flex items-center gap-1.5"><LightningIcon weight="fill" className="text-[#ff00a0] w-4 h-4" /><span className="font-bold text-[#ff00a0] text-sm">{profile?.coins || 0}</span></div>
+            </div>
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+              {loadingQuizzes ? (
+                <p className="text-center text-[#ccff00] font-mono text-sm py-4 animate-pulse">LOADING...</p>
+              ) : availableQuizzes.length === 0 ? (
+                <div className="text-center py-8 bg-black/20 rounded-2xl border border-white/5">
+                  <TrophyIcon weight="duotone" className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm font-bold">All caught up!</p>
+                  <p className="text-gray-500 text-xs mt-1">You've completed all available quizzes for your tier.</p>
+                </div>
+              ) : (
+                availableQuizzes.map((q) => (
+                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-2xl p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-sm text-white group-hover:text-[#ccff00] transition">{q.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{q.category}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg border ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
