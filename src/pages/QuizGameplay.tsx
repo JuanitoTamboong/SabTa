@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   ClockIcon, CheckIcon, XIcon, LightningIcon, 
   ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon,
-  CoinsIcon 
+  CoinsIcon, TimerIcon // ✅ Imported TimerIcon correctly
 } from '@phosphor-icons/react'
 
 // --- SOUND EFFECTS HELPER ---
@@ -80,14 +80,20 @@ export default function QuizGameplay() {
   const [isFinished, setIsFinished] = useState(false)
   const [showReview, setShowReview] = useState(false)
   
-  // Store the exact database numbers
+  // Store the exact database numbers and calculated time
   const [dbResults, setDbResults] = useState<{ points: number, coins: number, accuracy: number } | null>(null) 
+  const [finalTimeTaken, setFinalTimeTaken] = useState<number>(0)
+  const [liveElapsedTime, setLiveElapsedTime] = useState<number>(0)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stopwatchRef = useRef<ReturnType<typeof setInterval> | null>(null)
   
   // Use a Ref to track the correct count synchronously. 
   const correctCountRef = useRef(0)
   const pointsSpentRef = useRef(0)
+
+  // ✅ Track exactly when the quiz starts
+  const quizStartTimeRef = useRef<number>(0)
 
   const currentQuestion = questions[currentQIndex]
 
@@ -107,13 +113,12 @@ export default function QuizGameplay() {
         
         if (profileData) setProfile(profileData)
 
-        // Check if they ALREADY completed this quiz in the past
         const { data: existingAttempt } = await supabase
           .from('quiz_attempts')
           .select('id')
           .eq('user_id', user.id)
           .eq('quiz_id', quizId)
-          .eq('status', 'completed') // <--- IMPORTANT: Only lock if COMPLETED
+          .eq('status', 'completed')
           .maybeSingle()
 
         if (existingAttempt) {
@@ -146,6 +151,14 @@ export default function QuizGameplay() {
         }
 
         setQuestions(qData.sort(() => 0.5 - Math.random()))
+        
+        // ✅ Start the stopwatch exactly when questions finish loading
+        quizStartTimeRef.current = Date.now()
+        setLiveElapsedTime(0)
+        stopwatchRef.current = setInterval(() => {
+          setLiveElapsedTime(Math.floor((Date.now() - quizStartTimeRef.current) / 1000))
+        }, 1000)
+
         setLoading(false)
       } catch (err) {
         setError("An error occurred loading the quiz.")
@@ -153,6 +166,11 @@ export default function QuizGameplay() {
       }
     }
     initGame()
+    
+    // Cleanup stopwatch if component unmounts
+    return () => {
+      if (stopwatchRef.current) clearInterval(stopwatchRef.current)
+    }
   }, [navigate, quizId, isFinished])
 
   useEffect(() => {
@@ -246,15 +264,22 @@ export default function QuizGameplay() {
 
   const finishQuiz = async (finalCorrect: number, finalPenalty: number) => {
     try {
+      // Stop the live stopwatch
+      if (stopwatchRef.current) clearInterval(stopwatchRef.current)
+
       const totalQuestions = questions.length;
       const finalIncorrect = totalQuestions - finalCorrect; 
+
+      // ✅ Calculate the exact total time taken in seconds
+      const timeTakenSeconds = Math.floor((Date.now() - quizStartTimeRef.current) / 1000)
+      setFinalTimeTaken(timeTakenSeconds) 
 
       const { data, error } = await supabase.rpc('submit_quiz_attempt', {
         p_quiz_id: quizId,
         p_correct: finalCorrect,
         p_incorrect: finalIncorrect, 
         p_unanswered: 0, 
-        p_time_taken: 0,
+        p_time_taken: timeTakenSeconds, // ✅ Sends exact time to DB
         p_points_penalty: finalPenalty 
       })
 
@@ -273,6 +298,14 @@ export default function QuizGameplay() {
     } finally {
       setIsFinished(true)
     }
+  }
+
+  // Helper to format time beautifully (e.g., "1m 30s" or "45s")
+  const formatTime = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    if (mins > 0) return `${mins}m ${secs}s`
+    return `${secs}s`
   }
 
   if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING...</div>
@@ -311,7 +344,7 @@ export default function QuizGameplay() {
               {isPerfect ? 'You got every single question right. Amazing!' : 'Great effort! Here is your breakdown.'}
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-black/40 border border-[#00f0ff]/30 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
@@ -324,6 +357,16 @@ export default function QuizGameplay() {
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-6 h-6 mb-2" />
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Coins Earned</p>
                 <p className="text-2xl font-bold text-[#ff00a0]">+{dbResults?.coins ?? 0}</p>
+              </div>
+            </div>
+
+            {/* ✅ Time Taken Display Card */}
+            <div className="bg-black/40 border border-[#ccff00]/30 rounded-2xl p-4 flex items-center justify-center gap-4 mb-4 relative overflow-hidden">
+              {/* ✅ FIXED: Changed StopwatchIcon to TimerIcon */}
+              <TimerIcon weight="fill" className="text-[#ccff00] w-8 h-8" />
+              <div className="text-left">
+                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Time Taken</p>
+                <p className="text-xl font-bold text-[#ccff00]">{formatTime(finalTimeTaken)}</p>
               </div>
             </div>
 
@@ -416,9 +459,18 @@ export default function QuizGameplay() {
           <ArrowLeftIcon weight="bold" /> Quit Quiz
         </button>
 
-        <div className="flex items-center gap-2 bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
-          <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
-          <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
+        <div className="flex items-center gap-4">
+          {/* ✅ Live Stopwatch */}
+          <div className="flex items-center gap-2 bg-[#0f1014] border border-white/10 px-4 py-2 rounded-xl">
+            {/* ✅ FIXED: Changed StopwatchIcon to TimerIcon */}
+            <TimerIcon weight="fill" className="text-gray-400 w-5 h-5" />
+            <span className="font-bold text-gray-300 font-mono">{formatTime(liveElapsedTime)}</span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
+            <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
+            <span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span>
+          </div>
         </div>
       </div>
 

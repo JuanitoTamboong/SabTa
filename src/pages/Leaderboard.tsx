@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
-  MedalIcon, CrownIcon, StarIcon,
+  MedalIcon, CrownIcon, StarIcon, TimerIcon // ✅ Added TimerIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -27,10 +27,12 @@ export default function Leaderboard() {
       if (!profileData?.age_category) { setLoading(false); return }
 
       // Fetch ALL attempts for this age category
+      // ✅ We added time_taken_seconds to the select query
       const { data: attempts, error } = await supabase
         .from('quiz_attempts')
         .select(`
           score,
+          time_taken_seconds,
           profiles!inner (
             id, display_name, avatar_url, age_category,
             user_inventory (
@@ -49,6 +51,7 @@ export default function Leaderboard() {
         attempts.forEach((attempt: any) => {
           const playerId = attempt.profiles.id
           const difficulty = attempt.quizzes.difficulty
+          const attemptTime = attempt.time_taken_seconds || 9999 // Fallback if time is missing
 
           const equippedBorder = attempt.profiles.user_inventory?.find(
             (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
@@ -60,17 +63,20 @@ export default function Leaderboard() {
               display_name: attempt.profiles.display_name,
               avatar_url: attempt.profiles.avatar_url,
               border_url: equippedBorder?.cosmetic_items?.preview_url || null,
-              scores: {
-                normal: 0,
-                intermediate: 0,
-                hard: 0
-              }
+              scores: { normal: 0, intermediate: 0, hard: 0 },
+              // ✅ Track the BEST (fastest) time for each difficulty
+              times: { normal: 99999, intermediate: 99999, hard: 99999 } 
             }
           }
 
           // Add the score to the specific difficulty pool
           if (playerStats[playerId].scores[difficulty] !== undefined) {
             playerStats[playerId].scores[difficulty] += attempt.score
+          }
+
+          // ✅ Update the fastest time for this difficulty
+          if (attemptTime < playerStats[playerId].times[difficulty]) {
+            playerStats[playerId].times[difficulty] = attemptTime
           }
         })
 
@@ -79,9 +85,17 @@ export default function Leaderboard() {
           .filter((p: any) => p.scores[activeDifficulty] > 0)
           .map((p: any) => ({
             ...p,
-            points: p.scores[activeDifficulty] // Set their "points" to their specific difficulty score
+            points: p.scores[activeDifficulty], 
+            bestTime: p.times[activeDifficulty] // ✅ Attach the time for sorting
           }))
-          .sort((a, b) => b.points - a.points)
+          .sort((a, b) => {
+            // ✅ FIRST: Sort by Highest Points
+            if (b.points !== a.points) {
+              return b.points - a.points
+            }
+            // ✅ SECOND: If points are tied, the fastest time wins
+            return a.bestTime - b.bestTime
+          })
 
         setPlayers(sortedPlayers)
       }
@@ -284,10 +298,17 @@ export default function Leaderboard() {
                           {player.display_name} {isMe && '(You)'}
                         </span>
                       </div>
-                      <span className="font-bold text-sm md:text-base flex items-center gap-1">
-                        <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
-                        {player.points}
-                      </span>
+                      
+                      {/* ✅ Added a subtle display of their best time to break the tie visually */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs text-gray-500 hidden md:flex items-center gap-1">
+                          <TimerIcon /> {player.bestTime !== 99999 ? `${player.bestTime}s` : '-'}
+                        </span>
+                        <span className="font-bold text-sm md:text-base flex items-center gap-1">
+                          <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
+                          {player.points}
+                        </span>
+                      </div>
                     </div>
                   )
                 })}
