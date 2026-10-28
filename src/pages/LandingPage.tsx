@@ -105,16 +105,17 @@ export default function LandingPage() {
       </header>
 
       <section className="sabta-hero" aria-labelledby="sabta-hero-title">
-        {/* Side Tabs */}
-        <div className="sabta-side-tab sabta-side-tab--left" aria-hidden="true">
+        
+        {/* FIXED SIDE TABS */}
+        <div className="sabta-side-tab sabta-side-tab--left">
           <span className="sabta-side-chevron">»</span>
-          <TrophyIcon weight="fill" />
-          <span>FEATURED TOURNAMENTS</span>
+          <TrophyIcon weight="fill" className="sabta-side-icon" />
+          <span className="sabta-side-text">FEATURED TOURNAMENTS</span>
         </div>
-        <div className="sabta-side-tab sabta-side-tab--right" aria-hidden="true">
+        <div className="sabta-side-tab sabta-side-tab--right">
           <span className="sabta-side-chevron">«</span>
-          <TrophyIcon weight="fill" />
-          <span>GLOBAL RANKINGS LEADERBOARD</span>
+          <TrophyIcon weight="fill" className="sabta-side-icon" />
+          <span className="sabta-side-text">GLOBAL RANKINGS LEADERBOARD</span>
         </div>
 
         <div className="sabta-hero-copy">
@@ -302,7 +303,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ✅ Fixed Mission Section */}
       <section className="sabta-section sabta-mission" id="about">
         <div className="sabta-mission-panel flex flex-col items-center text-center">
           <div className="mb-6 flex items-center justify-center">

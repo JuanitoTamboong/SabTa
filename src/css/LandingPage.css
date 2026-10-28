@@ -17,26 +17,11 @@ body { margin: 0; background: var(--sabta-bg); }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 /* --- CUSTOM SYSTEM SCROLLBAR --- */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: #030608; 
-  border-left: 1px solid rgba(0, 240, 255, 0.1);
-}
-::-webkit-scrollbar-thumb {
-  background: #1a2a36;
-  border: 2px solid #030608;
-  border-radius: 0;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--sabta-cyan);
-  box-shadow: 0 0 10px var(--sabta-cyan);
-}
-::-webkit-scrollbar-corner {
-  background: #030608;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #030608; border-left: 1px solid rgba(0, 240, 255, 0.1); }
+::-webkit-scrollbar-thumb { background: #1a2a36; border: 2px solid #030608; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--sabta-cyan); box-shadow: 0 0 10px var(--sabta-cyan); }
+::-webkit-scrollbar-corner { background: #030608; }
 /* ---------------------------------- */
 
 .sabta-page {
@@ -162,12 +147,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sabta-quiz-reward strong { color: var(--sabta-lime); font-size: 13px; }
 .sabta-quiz-reward > span { display: grid; place-items: center; width: 33px; height: 33px; border: 1px solid rgba(204,255,0,.35); background: rgba(204,255,0,.08); color: var(--sabta-lime); }
 
-/* --- UPGRADED SIDE TABS --- */
+/* --- FIXED SIDE TABS --- */
 .sabta-side-tab { 
   position: absolute; 
-  z-index: 10; 
+  z-index: 50; 
   top: 50%; 
-  transform: translateY(-50%); 
   display: flex; 
   flex-direction: column; 
   align-items: center; 
@@ -190,64 +174,51 @@ button, a { -webkit-tap-highlight-color: transparent; }
   color: var(--sabta-lime);
 }
 
-.sabta-side-tab__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 4px;
-  color: var(--sabta-lime);
-  transition: all 0.3s ease;
+/* Fix rotations and positioning */
+.sabta-side-tab--left { 
+  left: 0; 
+  border-left: none;
+  padding-right: 16px;
+  border-radius: 0 12px 12px 0;
+  transform: translateY(-50%); /* Do not rotate the container, rotate text inside */
+}
+.sabta-side-tab--right { 
+  right: 0; 
+  border-right: none;
+  padding-left: 16px;
+  border-radius: 12px 0 0 12px;
+  transform: translateY(-50%);
 }
 
-.sabta-side-tab:hover .sabta-side-tab__icon {
-  background: rgba(204, 255, 0, 0.1);
-  border-color: var(--sabta-lime);
-  box-shadow: 0 0 10px rgba(204, 255, 0, 0.3);
-}
-
-.sabta-side-tab__icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.sabta-side-tab__text {
+/* Vertical Text styling */
+.sabta-side-text {
   writing-mode: vertical-rl;
   text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
-.sabta-side-tab__chevron {
+.sabta-side-tab--left .sabta-side-text {
+  transform: rotate(180deg); /* Flips left text to read bottom-to-top */
+}
+
+.sabta-side-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--sabta-lime);
+  flex-shrink: 0;
+}
+
+.sabta-side-chevron {
   color: var(--sabta-cyan);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1;
   transition: color 0.3s ease;
 }
 
-.sabta-side-tab:hover .sabta-side-tab__chevron {
+.sabta-side-tab:hover .sabta-side-chevron {
   color: var(--sabta-lime);
 }
-
-.sabta-side-tab--left { 
-  left: 0; 
-  border-left: none;
-  padding-right: 16px;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 15px 100%, 0 calc(100% - 15px));
-  transform: translateY(-50%) rotate(180deg);
-}
-.sabta-side-tab--left .sabta-side-tab__text {
-  transform: rotate(180deg); 
-}
-
-.sabta-side-tab--right { 
-  right: 0; 
-  border-right: none;
-  padding-left: 16px;
-}
+/* ------------------------ */
 
 .sabta-feature-strip { position: relative; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 0; padding: 18px 16px 24px; border: 1px solid rgba(0,240,255,.4); border-radius: 14px; background: rgba(3,10,14,.88); }
 .sabta-strip-item { display: flex; align-items: center; gap: 18px; padding: 5px 24px; border-right: 1px solid rgba(0,240,255,.18); }
@@ -341,7 +312,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 /* HIDE SIDE TABS ON SMALLER SCREENS */
-@media (max-width: 1400px) {
+@media (max-width: 1500px) {
   .sabta-side-tab { display: none; }
   .sabta-hero {
     padding-left: 24px;
