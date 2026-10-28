@@ -25,7 +25,7 @@ export default function AgeSelection() {
       desc: 'Fun and colorful questions designed just for young minds.',
       gradient: 'from-green-500/20 via-green-500/5 to-transparent',
       border: 'border-green-500/50',
-      glow: 'sm:shadow-[0_0_40px_rgba(34,197,94,0.2)]'
+      glow: 'shadow-[0_0_40px_rgba(34,197,94,0.2)]'
     },
     { 
       id: 'teens', 
@@ -36,7 +36,7 @@ export default function AgeSelection() {
       desc: 'Challenging questions across science, history, and pop culture.',
       gradient: 'from-[#00f0ff]/20 via-[#00f0ff]/5 to-transparent',
       border: 'border-[#00f0ff]/50',
-      glow: 'sm:shadow-[0_0_40px_rgba(0,240,255,0.2)]'
+      glow: 'shadow-[0_0_40px_rgba(0,240,255,0.2)]'
     },
     { 
       id: 'adults', 
@@ -47,7 +47,7 @@ export default function AgeSelection() {
       desc: 'Advanced trivia and complex problems for experienced players.',
       gradient: 'from-[#ff00a0]/20 via-[#ff00a0]/5 to-transparent',
       border: 'border-[#ff00a0]/50',
-      glow: 'sm:shadow-[0_0_40px_rgba(255,0,160,0.2)]'
+      glow: 'shadow-[0_0_40px_rgba(255,0,160,0.2)]'
     },
   ]
 
@@ -80,43 +80,55 @@ export default function AgeSelection() {
       {/* Background Grid Pattern */}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
 
-      <div className="relative z-10 max-w-6xl w-full mt-4 sm:mt-10">
+      <div className="relative z-10 max-w-5xl w-full mt-2 sm:mt-10">
         
         {/* Header */}
-        <div className="text-center mb-8 sm:mb-10">
-          <h1 className="text-3xl sm:text-5xl font-black mb-2 sm:mb-3 tracking-tight">
+        <div className="text-center mb-8 sm:mb-14">
+          <h1 className="text-3xl sm:text-5xl font-black mb-2 tracking-tight">
             CHOOSE YOUR <span className="text-[#ccff00]">TIER</span>
           </h1>
-          <p className="text-gray-400 text-xs sm:text-base">
+          <p className="text-gray-400 text-sm sm:text-base">
             Select your age group to tailor your quiz experience.
           </p>
         </div>
 
-        {/* Split Panels / List */}
-        <div className="flex flex-col sm:grid sm:grid-cols-3 gap-4 sm:gap-6 mb-10">
-          {ageGroups.map((group) => {
+        {/* Cards Layout */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-10">
+          {ageGroups.map((group, index) => {
             const Icon = group.icon
             const isSelected = selected === group.id
+            
+            // Desktop focus effect
+            let desktopEffect = 'sm:scale-100 sm:opacity-100'
+            if (index === 0 || index === 2) {
+              desktopEffect = 'sm:scale-[0.85] sm:opacity-60 hover:sm:opacity-100 hover:sm:scale-[0.9]'
+            }
+            if (index === 1) {
+              desktopEffect = 'sm:scale-[1.05] z-10'
+            }
+            if (isSelected && index !== 1) {
+              desktopEffect = 'sm:scale-100 sm:opacity-100'
+            }
 
             return (
               <button
                 key={group.id}
                 onClick={() => setSelected(group.id)}
-                className={`relative overflow-hidden rounded-2xl sm:rounded-[2rem] border transition-all duration-300 group text-left flex flex-row sm:flex-col items-center sm:items-start p-4 sm:p-8 sm:min-h-[350px] ${
+                className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border transition-all duration-500 ease-out group text-left flex flex-row sm:flex-col items-center sm:items-start p-4 sm:p-8 w-full sm:w-[300px] sm:min-h-[360px] ${desktopEffect} ${
                   isSelected 
-                    ? `${group.border} ${group.glow} sm:scale-[1.02] bg-[#0f1014]` 
+                    ? `${group.border} ${group.glow} bg-[#0f1014]` 
                     : 'border-white/10 hover:border-white/30 bg-[#0f1014]'
                 }`}
               >
-                {/* ✅ Background Gradient (Top glow on mobile, Bottom glow on desktop) */}
-                <div className={`absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-t ${group.gradient} opacity-0 transition-opacity duration-500 ${
+                {/* Background Gradient */}
+                <div className={`absolute inset-0 bg-gradient-to-r sm:bg-gradient-to-t ${group.gradient} opacity-0 transition-opacity duration-500 ${
                   isSelected ? 'opacity-100' : 'sm:group-hover:opacity-50'
                 }`} />
                 
-                {/* ✅ Giant Background Icon (Scaled down on mobile to act as a subtle watermark) */}
+                {/* Giant Background Icon */}
                 <Icon 
                   weight="duotone" 
-                  className={`absolute -right-4 -bottom-4 w-32 h-32 sm:-right-6 sm:-bottom-6 sm:w-48 sm:h-48 opacity-5 transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-12 pointer-events-none ${
+                  className={`absolute -right-4 -bottom-4 w-28 h-28 sm:-right-6 sm:-bottom-6 sm:w-56 sm:h-56 opacity-5 transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-12 pointer-events-none ${
                     isSelected ? 'opacity-15 sm:opacity-20 text-white' : ''
                   }`} 
                 />
@@ -129,13 +141,13 @@ export default function AgeSelection() {
                 )}
 
                 {/* Icon */}
-                <div className={`relative z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-xl shrink-0 sm:mb-4 flex items-center justify-center backdrop-blur-md border transition-colors mr-4 sm:mr-0 ${
+                <div className={`relative z-10 w-10 h-10 sm:w-16 sm:h-16 rounded-xl shrink-0 sm:mb-6 flex items-center justify-center backdrop-blur-md border transition-colors mr-4 sm:mr-0 ${
                   isSelected ? 'bg-white/20 border-white/30 text-white' : 
                   group.color === 'green' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
                   group.color === 'cyan' ? 'bg-[#00f0ff]/10 border-[#00f0ff]/20 text-[#00f0ff]' :
                   'bg-[#ff00a0]/10 border-[#ff00a0]/20 text-[#ff00a0]'
                 }`}>
-                  <Icon weight="fill" size={24} />
+                  <Icon weight="fill" size={22} className="sm:w-7 sm:h-7" />
                 </div>
 
                 {/* Content */}
@@ -143,7 +155,7 @@ export default function AgeSelection() {
                   <h3 className="text-lg sm:text-2xl font-black text-white mb-0.5 sm:mb-1">{group.title}</h3>
                   <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest sm:mb-3">Ages {group.ages}</p>
                   
-                  {/* Description hidden on mobile to save space, but shown on sm+ */}
+                  {/* Description hidden on mobile to save space, shown on desktop */}
                   <p className={`hidden sm:block text-sm transition-all duration-300 ${
                     isSelected ? 'text-gray-200' : 'text-gray-500 group-hover:text-gray-300'
                   }`}>
@@ -162,7 +174,7 @@ export default function AgeSelection() {
           </div>
         )}
 
-        {/* Action Bar (Fixed at bottom on Mobile) */}
+        {/* Action Bar */}
         <div className="fixed bottom-0 left-0 right-0 sm:relative sm:bottom-auto p-4 sm:p-0 bg-[#050505]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none border-t border-white/10 sm:border-none z-50">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl sm:rounded-3xl max-w-2xl mx-auto sm:backdrop-blur-xl shadow-2xl">
             <div className="hidden sm:flex items-center gap-3 text-sm text-gray-400 font-medium px-2">
