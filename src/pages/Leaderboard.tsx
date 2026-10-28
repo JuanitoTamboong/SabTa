@@ -40,86 +40,101 @@ export default function Leaderboard() {
       if (profileData) setProfile(profileData)
       if (!profileData?.age_category) { setLoading(false); return }
 
-      let query = supabase
-        .from('quiz_attempts')
+      // 1. Fetch all profiles (to get their total real points)
+      let profileQuery = supabase
+        .from('profiles')
         .select(`
-          score,
-          time_taken_seconds,
-          profiles!inner (
-            id, display_name, avatar_url, age_category,
-            user_inventory (
-              is_equipped,
-              cosmetic_items ( preview_url, cosmetic_type )
-            )
-          ),
-          quizzes!inner ( difficulty )
+          id, display_name, avatar_url, age_category, points,
+          user_inventory (
+            is_equipped,
+            cosmetic_items ( preview_url, cosmetic_type )
+          )
         `)
 
       if (activeTab !== 'global') {
-        query = query.eq('profiles.age_category', profileData.age_category)
+        profileQuery = profileQuery.eq('age_category', profileData.age_category)
       }
 
-      const { data: attempts, error } = await query
+      const { data: allProfiles, error: profileError } = await profileQuery
 
-      if (!error && attempts) {
-        const playerStats: Record<string, any> = {}
+      // 2. Fetch all attempts (to calculate difficulty breakdowns and times)
+      const { data: attempts } = await supabase
+        .from('quiz_attempts')
+        .select('user_id, score, time_taken_seconds, quizzes(difficulty)')
 
-        attempts.forEach((attempt: any) => {
-          const playerId = attempt.profiles.id
-          const difficulty = attempt.quizzes.difficulty
-          const attemptTime = attempt.time_taken_seconds || 99999 
-
-          const equippedBorder = attempt.profiles.user_inventory?.find(
-            (inv: any) => 
-              inv.is_equipped && 
-              inv.cosmetic_items?.cosmetic_type === 'avatar_border'
+      if (!profileError && allProfiles && attempts) {
+        
+        const playerStats = allProfiles.map((p: any) => {
+          const equippedBorder = p.user_inventory?.find(
+            (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
           )
 
-          if (!playerStats[playerId]) {
-            playerStats[playerId] = {
-              id: playerId,
-              display_name: attempt.profiles.display_name,
-              avatar_url: attempt.profiles.avatar_url,
-              age_category: attempt.profiles.age_category,
-              border_url: equippedBorder?.cosmetic_items?.preview_url || null,
-              scores: { normal: 0, intermediate: 0, hard: 0 },
-              times: { normal: 99999, intermediate: 99999, hard: 99999 } 
+          // Calculate quiz scores per difficulty
+          let quizNormal = 0, quizIntermediate = 0, quizHard = 0
+          let bestTimeNormal = 99999, bestTimeIntermediate = 99999, bestTimeHard = 99999
+
+          const pAttempts = attempts.filter(a => a.user_id === p.id)
+          
+          pAttempts.forEach((a: any) => {
+            const diff = a.quizzes?.difficulty
+            if (diff === 'normal') {
+              quizNormal += a.score
+              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeNormal) bestTimeNormal = a.time_taken_seconds
+            } else if (diff === 'intermediate') {
+              quizIntermediate += a.score
+              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeIntermediate) bestTimeIntermediate = a.time_taken_seconds
+            } else if (diff === 'hard') {
+              quizHard += a.score
+              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeHard) bestTimeHard = a.time_taken_seconds
             }
+          })
+
+          const totalQuizPoints = quizNormal + quizIntermediate + quizHard
+          
+          // ✅ THE MAGIC FIX: 
+          // The profile points include bonuses. 
+          // We find the bonus by subtracting the quiz points from the profile total.
+          // If they somehow have less profile points than quiz points (due to penalties), we default bonus to 0.
+          const bonusPoints = Math.max(0, (p.points || 0) - totalQuizPoints)
+
+          let displayPoints = 0
+          let displayTime = 99999
+
+          if (activeTab === 'global') {
+            // Global = All Quiz points + Bonus points (Streaks/Challenges)
+            // Or just p.points, but this logic proves the breakdown
+            displayPoints = totalQuizPoints + bonusPoints
+            displayTime = Math.min(bestTimeNormal, bestTimeIntermediate, bestTimeHard)
+          } else if (activeTab === 'normal') {
+            displayPoints = quizNormal
+            displayTime = bestTimeNormal
+          } else if (activeTab === 'intermediate') {
+            displayPoints = quizIntermediate
+            displayTime = bestTimeIntermediate
+          } else if (activeTab === 'hard') {
+            displayPoints = quizHard
+            displayTime = bestTimeHard
           }
 
-          if (playerStats[playerId].scores[difficulty] !== undefined) {
-            playerStats[playerId].scores[difficulty] += attempt.score
-          }
-
-          if (attemptTime < playerStats[playerId].times[difficulty]) {
-            playerStats[playerId].times[difficulty] = attemptTime
+          return {
+            id: p.id,
+            display_name: p.display_name,
+            avatar_url: p.avatar_url,
+            age_category: p.age_category,
+            points: displayPoints,
+            bestTime: displayTime,
+            border_url: equippedBorder?.cosmetic_items?.preview_url || null,
           }
         })
+        .filter((p: any) => p.points > 0) // Only show players with points
+        .sort((a, b) => {
+          if (b.points !== a.points) {
+            return b.points - a.points
+          }
+          return a.bestTime - b.bestTime
+        })
 
-        const sortedPlayers = Object.values(playerStats)
-          .map((p: any) => {
-            let points = 0;
-            let bestTime = 99999;
-
-            if (activeTab === 'global') {
-              points = p.scores.normal + p.scores.intermediate + p.scores.hard
-              bestTime = Math.min(p.times.normal, p.times.intermediate, p.times.hard)
-            } else {
-              points = p.scores[activeTab]
-              bestTime = p.times[activeTab]
-            }
-
-            return { ...p, points, bestTime }
-          })
-          .filter((p: any) => p.points > 0)
-          .sort((a, b) => {
-            if (b.points !== a.points) {
-              return b.points - a.points
-            }
-            return a.bestTime - b.bestTime
-          })
-
-        setPlayers(sortedPlayers)
+        setPlayers(playerStats)
       }
 
       setLoading(false)
@@ -206,8 +221,8 @@ export default function Leaderboard() {
             </h1>
             <p className="text-gray-400 text-xs md:text-sm">
               {activeTab === 'global' 
-                ? 'Comparing players across ALL age groups.'
-                : <>You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> tier leaderboard.</>
+                ? 'Comparing players across ALL age groups including bonus points.'
+                : <>You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> {activeTab} leaderboard.</>
               }
             </p>
           </div>
@@ -263,7 +278,7 @@ export default function Leaderboard() {
           </div>
         ) : (
           <>
-            {/* ✅ REDESIGNED TOP 3 PODIUM */}
+            {/* TOP 3 PODIUM */}
             <div className="grid grid-cols-3 gap-2 md:gap-6 mb-12 relative z-10 items-end max-w-3xl mx-auto mt-8">
               
               {/* 2nd Place */}
