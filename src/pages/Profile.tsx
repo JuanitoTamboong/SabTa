@@ -155,6 +155,17 @@ export default function Profile() {
 
     setUploadingAvatar(true)
     try {
+      // ✅ FIX: Delete the old avatar from storage if it exists
+      if (avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/')) {
+        // Extract the exact file path from the public URL
+        const oldFilePath = avatarUrl.split('/avatars/')[1]
+        
+        if (oldFilePath) {
+          await supabase.storage.from('avatars').remove([oldFilePath])
+        }
+      }
+
+      // 2. Upload the new avatar
       const fileExt = file.name.split('.').pop() || 'png'
       const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`
 
@@ -325,10 +336,17 @@ export default function Profile() {
                     />
                   )}
 
-                  <div className="absolute inset-[15%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity z-30">
+                  {/* Desktop Hover Effect */}
+                  <div className="hidden md:flex absolute inset-[15%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
                     <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
                     <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
                   </div>
+
+                  {/* ✅ NEW: Mobile Camera Indicator (Always visible on mobile) */}
+                  <div className="md:hidden absolute bottom-0 right-0 bg-[#ccff00] text-black p-2.5 rounded-full z-40 shadow-xl border-4 border-[#0f1014]">
+                    <CameraIcon weight="bold" className="w-5 h-5" />
+                  </div>
+
                 </div>
 
               </div>
