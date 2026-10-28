@@ -1,3 +1,4 @@
+// src/pages/LandingPage.tsx
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
@@ -16,6 +17,7 @@ import {
   CaretRightIcon,
   PlantIcon,
   RocketIcon,
+  GlobeIcon
 } from '@phosphor-icons/react'
 
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -173,7 +175,7 @@ export default function LandingPage() {
               <span>General<br />discovery</span>
             </div>
             <div className="sabta-quiz-tab">
-              <GlobeIconFallback />
+              <GlobeIcon weight="fill" />
               <span>Planet<br />discovery</span>
             </div>
           </div>
@@ -300,24 +302,27 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ✅ Fixed Mission Section */}
       <section className="sabta-section sabta-mission" id="about">
-        <div className="sabta-mission-panel">
-          <TrophyIcon className="sabta-mission-trophy" weight="duotone" />
+        <div className="sabta-mission-panel flex flex-col items-center text-center">
+          <div className="mb-6 flex items-center justify-center">
+            <TrophyIcon className="sabta-mission-trophy text-[#ccff00] w-16 h-16 md:w-20 md:h-20" weight="duotone" />
+          </div>
           <p className="sabta-section-kicker">Inspired by Odiongan, Romblon</p>
           <h2>EVERY ANSWER MATTERS.</h2>
-          <p>
+          <p className="max-w-2xl mx-auto mt-4 mb-8">
             SabTa brings learning, friendly competition, and gaming together.
             Think smart, play fair, and rise higher — one answer at a time.
           </p>
-          <button type="button" onClick={handleGoogleLogin} disabled={loading} className="sabta-button sabta-button--white">
+          <button type="button" onClick={handleGoogleLogin} disabled={loading} className="sabta-button sabta-button--white mb-4">
             {loading ? 'Connecting...' : 'Enter the Quiz Arena'}
             <ArrowRightIcon weight="bold" />
           </button>
-          <div className="sabta-secure-note">
+          <div className="sabta-secure-note flex items-center justify-center gap-2">
             <LockKeyIcon weight="fill" />
             Secure sign-in with Google
           </div>
-          {error && <p className="sabta-mission-error" role="alert">{error}</p>}
+          {error && <p className="sabta-mission-error mt-4" role="alert">{error}</p>}
         </div>
       </section>
 
@@ -337,17 +342,5 @@ export default function LandingPage() {
         <div className="sabta-system-icons"><i /><i /><i /><b>08</b><i /><i /></div>
       </div>
     </main>
-  )
-}
-
-function GlobeIconFallback() {
-  return (
-    <span className="sabta-planet-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="8.5" />
-        <ellipse cx="12" cy="12" rx="3.5" ry="8.5" />
-        <path d="M4 9h16M4 15h16M3 20 21 4" />
-      </svg>
-    </span>
   )
 }
