@@ -80,7 +80,14 @@ export default function QuizGameplay() {
   const [showReview, setShowReview] = useState(false)
   
   // Store the exact database numbers and calculated time
-  const [dbResults, setDbResults] = useState<{ points: number, coins: number, accuracy: number, correct: number } | null>(null) 
+  const [dbResults, setDbResults] = useState<{ 
+    points: number, 
+    coins: number, 
+    accuracy: number, 
+    correct: number,
+    new_total_points: number,
+    new_total_coins: number
+  } | null>(null) 
   const [finalTimeTaken, setFinalTimeTaken] = useState<number>(0)
   const [liveElapsedTime, setLiveElapsedTime] = useState<number>(0)
 
@@ -90,7 +97,7 @@ export default function QuizGameplay() {
   const correctCountRef = useRef(0)
   const pointsSpentRef = useRef(0)
   const coinsSpentRef = useRef(0)
-  const coinsEarnedRef = useRef(0) // Track local coins earned for the DB
+  const coinsEarnedRef = useRef(0)
   const quizStartTimeRef = useRef<number>(0)
 
   const currentQuestion = questions[currentQIndex]
@@ -203,7 +210,7 @@ export default function QuizGameplay() {
       
       setCorrectCount((prev) => prev + 1)
       correctCountRef.current += 1
-      coinsEarnedRef.current += 150 // Track earned coins
+      coinsEarnedRef.current += 150 
       
       setProfile((prev: any) => ({ 
         ...prev, 
@@ -234,9 +241,9 @@ export default function QuizGameplay() {
       pointsSpentRef.current += 5
       setProfile((prev: any) => ({ ...prev, points: Math.max(0, (prev?.points || 0) - 5) }))
     } else {
-      if ((profile?.coins || 0) < 5) return alert("Not enough coins!")
-      coinsSpentRef.current += 5
-      setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 5) }))
+      if ((profile?.coins || 0) < 50) return alert("Not enough coins!")
+      coinsSpentRef.current += 50
+      setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 50) }))
     }
 
     setShowHintModal(false)
@@ -264,7 +271,8 @@ export default function QuizGameplay() {
       if (stopwatchRef.current) clearInterval(stopwatchRef.current)
 
       const totalQuestions = questions.length;
-      const finalIncorrect = totalQuestions - finalCorrect; 
+      const unansweredCount = responses.filter(r => r.selected_answer === null).length;
+      const finalIncorrect = totalQuestions - finalCorrect - unansweredCount; 
 
       const timeTakenSeconds = Math.floor((Date.now() - quizStartTimeRef.current) / 1000)
       setFinalTimeTaken(timeTakenSeconds) 
@@ -273,7 +281,7 @@ export default function QuizGameplay() {
         p_quiz_id: quizId,
         p_correct: finalCorrect,
         p_incorrect: finalIncorrect, 
-        p_unanswered: 0, 
+        p_unanswered: unansweredCount, 
         p_time_taken: timeTakenSeconds,
         p_points_penalty: finalPointsPenalty,
         p_coins_earned: coinsEarnedRef.current,
@@ -287,7 +295,9 @@ export default function QuizGameplay() {
           points: data.points_earned,
           coins: data.coins_earned,
           accuracy: data.accuracy,
-          correct: finalCorrect
+          correct: finalCorrect,
+          new_total_points: data.new_total_points,
+          new_total_coins: data.new_total_coins
         })
       }
       
@@ -346,14 +356,19 @@ export default function QuizGameplay() {
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Points</p>
-                <p className="text-xl sm:text-2xl font-bold text-[#00f0ff]">{dbResults?.points ?? 0}</p>
+                <p className="text-xl sm:text-2xl font-bold text-[#00f0ff]">
+                  {(dbResults?.points ?? 0) - pointsSpentRef.current}
+                </p>
               </div>
               
               <div className="bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Coins</p>
-                <p className="text-xl sm:text-2xl font-bold text-[#ff00a0]">+{dbResults?.coins ?? 0}</p>
+                <p className="text-xl sm:text-2xl font-bold text-[#ff00a0]">
+                  {((dbResults?.coins ?? 0) - coinsSpentRef.current) > 0 ? '+' : ''}
+                  {(dbResults?.coins ?? 0) - coinsSpentRef.current}
+                </p>
               </div>
             </div>
 
@@ -379,6 +394,18 @@ export default function QuizGameplay() {
                   <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold">Correct</p>
                   <p className="text-xs sm:text-sm font-bold">{dbResults?.correct ?? 0}/{questions.length}</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center bg-[#0f1014] border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8">
+              <div className="flex flex-col items-center flex-1">
+                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">New Total Points</p>
+                <p className="text-base sm:text-lg font-bold text-[#ccff00]">{dbResults?.new_total_points ?? 0}</p>
+              </div>
+              <div className="w-[1px] h-8 bg-white/10 mx-2" />
+              <div className="flex flex-col items-center flex-1">
+                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">New Total Coins</p>
+                <p className="text-base sm:text-lg font-bold text-[#ff00a0]">{dbResults?.new_total_coins ?? 0}</p>
               </div>
             </div>
 
@@ -440,7 +467,7 @@ export default function QuizGameplay() {
   if (!currentQuestion) return null
   
   const canAffordHintPoints = (profile?.points || 0) >= 5
-  const canAffordHintCoins = (profile?.coins || 0) >= 5
+  const canAffordHintCoins = (profile?.coins || 0) >= 50
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
@@ -558,7 +585,7 @@ export default function QuizGameplay() {
                 className="w-full py-3 sm:py-4 bg-[#ff00a0]/10 border border-[#ff00a0]/30 hover:bg-[#ff00a0]/20 text-[#ff00a0] rounded-xl font-bold flex items-center justify-between px-4 sm:px-6 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
               >
                 <span>Pay with Coins ({profile?.coins || 0})</span>
-                <span className="flex items-center gap-1"><CoinsIcon weight="fill" /> -5</span>
+                <span className="flex items-center gap-1"><CoinsIcon weight="fill" /> -50</span>
               </button>
             </div>
 

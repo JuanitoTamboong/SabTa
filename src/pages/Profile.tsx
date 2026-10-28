@@ -64,7 +64,12 @@ export default function Profile() {
         setHistory(attempts)
         const totalQuizzes = attempts.length
         const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
-        const avgAccuracy = totalQuizzes > 0 ? attempts.reduce((acc, curr) => acc + (curr.accuracy || 0), 0) / totalQuizzes : 0
+        
+        // ✅ FIXED: Calculate true accuracy dynamically
+        const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
+        const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
+        const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
+        
         const totalCoinsEarned = attempts.reduce((acc, curr) => acc + (curr.correct_answers * 150), 0)
 
         setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), totalCoinsEarned })
@@ -474,23 +479,29 @@ export default function Profile() {
                   {history.length === 0 ? (
                     <p className="text-gray-500 text-sm text-center py-10">No quizzes played yet.</p>
                   ) : (
-                    history.map((attempt) => (
-                      <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${attempt.accuracy >= 80 ? 'bg-green-500/10 text-green-400' : attempt.accuracy >= 50 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
-                            <CheckCircleIcon weight="fill" className="w-6 h-6" />
+                    history.map((attempt) => {
+                      // ✅ FIXED: Calculate true accuracy for each individual attempt
+                      const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
+                      const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
+
+                      return (
+                        <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${acc >= 80 ? 'bg-green-500/10 text-green-400' : acc >= 50 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
+                              <CheckCircleIcon weight="fill" className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-white text-base">Quiz Completed</p>
+                              <p className="text-xs text-gray-500 font-mono mt-0.5">{new Date(attempt.created_at).toLocaleDateString()} • {acc}% Accuracy</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-white text-base">Quiz Completed</p>
-                            <p className="text-xs text-gray-500 font-mono mt-0.5">{new Date(attempt.created_at).toLocaleDateString()}</p>
+                          <div className="flex gap-2">
+                            <div className="bg-[#ccff00]/10 px-3 py-1.5 rounded-lg text-center"><p className="text-[9px] text-gray-400 uppercase font-bold">Points</p><p className="font-bold text-[#ccff00] text-sm">+{attempt.score}</p></div>
+                            <div className="bg-[#ff00a0]/10 px-3 py-1.5 rounded-lg text-center"><p className="text-[9px] text-gray-400 uppercase font-bold">Coins</p><p className="font-bold text-[#ff00a0] text-sm">+{attempt.correct_answers * 150}</p></div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <div className="bg-[#ccff00]/10 px-3 py-1.5 rounded-lg text-center"><p className="text-[9px] text-gray-400 uppercase font-bold">Points</p><p className="font-bold text-[#ccff00] text-sm">+{attempt.score}</p></div>
-                          <div className="bg-[#ff00a0]/10 px-3 py-1.5 rounded-lg text-center"><p className="text-[9px] text-gray-400 uppercase font-bold">Coins</p><p className="font-bold text-[#ff00a0] text-sm">+{attempt.correct_answers * 150}</p></div>
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               ) : (
