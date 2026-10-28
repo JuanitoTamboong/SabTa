@@ -1,19 +1,22 @@
 // src/pages/Profile.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   UserIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon, ShoppingBagIcon,
   LightningIcon, CheckCircleIcon, PencilSimpleIcon, FloppyDiskIcon, 
-  CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon, XIcon
+  CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon, XIcon,
+  CameraIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
 export default function Profile() {
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [equipping, setEquipping] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   
@@ -24,7 +27,7 @@ export default function Profile() {
   // Data State
   const [history, setHistory] = useState<any[]>([])
   const [inventory, setInventory] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'history' | 'inventory'>('history')
+  const [activeTab, setActiveTab] = useState<'history' | 'inventory'>('inventory')
   
   // Play Menu State
   const [showPlayMenu, setShowPlayMenu] = useState(false)
@@ -44,16 +47,16 @@ export default function Profile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
-      if (user.user_metadata?.avatar_url || user.user_metadata?.picture) {
-        setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
-      }
-
-      // 1. Fetch Profile
+      // 1. Fetch Profile first
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (profileData) {
         setProfile(profileData)
         setEditName(profileData.display_name || '')
       }
+
+      // Priority: uploaded avatar > Google avatar > none
+      const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
+      setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
       // 2. Fetch History & Stats
       const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
@@ -73,7 +76,9 @@ export default function Profile() {
         .select('*, cosmetic_items(*)')
         .eq('user_id', user.id)
       
-      if (invData) setInventory(invData.filter(i => i.cosmetic_items !== null))
+      if (invData) {
+        setInventory(invData.filter(i => i.cosmetic_items !== null))
+      }
 
       setLoading(false)
     }
@@ -122,13 +127,60 @@ export default function Profile() {
     }
     setSaving(true)
     try {
-      await supabase.from('profiles').update({ display_name: editName }).eq('id', profile.id)
+      const { error } = await supabase.from('profiles').update({ display_name: editName }).eq('id', profile.id)
+      if (error) throw error
       setProfile({ ...profile, display_name: editName })
       setIsEditing(false)
     } catch (err) {
       alert("Failed to update name.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !profile) return
+
+    e.target.value = ''
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be under 2MB.')
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const fileExt = file.name.split('.').pop() || 'png'
+      const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true, contentType: file.type })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id)
+
+      if (updateError) throw updateError
+
+      setAvatarUrl(publicUrl)
+      setProfile({ ...profile, avatar_url: publicUrl })
+    } catch (err: any) {
+      alert(err.message || 'Upload failed.')
+    } finally {
+      setUploadingAvatar(false)
     }
   }
 
@@ -139,12 +191,30 @@ export default function Profile() {
       const { error } = await supabase.rpc('equip_cosmetic', { p_item_id: itemId })
       if (error) throw error
 
-      const { data: invData } = await supabase
-        .from('user_inventory')
-        .select('*, cosmetic_items(*)')
-        .eq('user_id', profile.id)
+      // Update local state instantly with strict targeting
+      const targetItem = inventory.find(i => i.cosmetic_item_id === itemId);
+      const isCurrentlyEquipped = targetItem?.is_equipped;
+      const itemType = targetItem?.cosmetic_items?.cosmetic_type;
+
+      const updatedInventory = inventory.map(invItem => {
+        // If we clicked an equipped item, just unequip it
+        if (isCurrentlyEquipped) {
+          if (invItem.cosmetic_item_id === itemId) {
+            return { ...invItem, is_equipped: false }
+          }
+          return invItem;
+        } 
+        
+        // If we are equipping, we MUST unequip all other items of the SAME type
+        // This strict check prevents double equipping
+        if (invItem.cosmetic_items?.cosmetic_type === itemType) {
+          return { ...invItem, is_equipped: invItem.cosmetic_item_id === itemId }
+        }
+        
+        return invItem;
+      })
       
-      if (invData) setInventory(invData.filter(i => i.cosmetic_items !== null))
+      setInventory(updatedInventory)
     } catch (err: any) {
       alert(err.message)
     } finally {
@@ -161,8 +231,9 @@ export default function Profile() {
     return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING PROFILE...</div>
   }
 
-  const equippedBorder = inventory.find(i => i.is_equipped && i.cosmetic_items.cosmetic_type === 'border')
-  const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items.cosmetic_type === 'background')
+  // Strictly looking for 'avatar_border' since we fixed the DB
+  const equippedBorder = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'avatar_border')
+  const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'background')
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex">
@@ -214,13 +285,28 @@ export default function Profile() {
             {/* Main Profile Card */}
             <div className="bg-[#0f1014]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00f0ff]/10 to-transparent" />
+
+              <input
+                ref={fileInputRef}
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
               
-              <div className="relative group cursor-pointer" onClick={() => setIsEditing(true)}>
+              <div
+                className="relative group cursor-pointer"
+                onClick={() => !uploadingAvatar && fileInputRef.current?.click()}
+                title="Click to change profile picture"
+              >
                 
                 <div className="relative w-32 h-32 md:w-36 md:h-36 flex items-center justify-center">
                   
                   <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
-                    {avatarUrl ? (
+                    {uploadingAvatar ? (
+                      <div className="text-xs text-[#ccff00] font-mono animate-pulse">UPLOADING...</div>
+                    ) : avatarUrl ? (
                       <img 
                         src={avatarUrl} 
                         alt="Avatar" 
@@ -239,8 +325,9 @@ export default function Profile() {
                     />
                   )}
 
-                  <div className="absolute inset-[15%] bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-30">
-                    <PencilSimpleIcon weight="bold" className="w-8 h-8 text-white" />
+                  <div className="absolute inset-[15%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity z-30">
+                    <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
+                    <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
                   </div>
                 </div>
 
@@ -257,7 +344,12 @@ export default function Profile() {
                   </div>
                 ) : (
                   <>
-                    <h2 className="text-2xl font-bold text-white mb-2">{profile?.display_name || 'Player'}</h2>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h2 className="text-2xl font-bold text-white">{profile?.display_name || 'Player'}</h2>
+                      <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-[#ccff00] transition" title="Edit name">
+                        <PencilSimpleIcon weight="bold" className="w-4 h-4" />
+                      </button>
+                    </div>
                     <span className="text-[#ccff00] font-mono text-xs bg-[#ccff00]/10 px-3 py-1 rounded-full border border-[#ccff00]/20">{profile?.age_category?.toUpperCase() || 'UNASSIGNED'} TIER</span>
                   </>
                 )}
@@ -373,6 +465,7 @@ export default function Profile() {
                               onClick={() => handleEquip(invItem.cosmetic_item_id)}
                               disabled={equipping}
                               className="text-xs font-bold text-[#ccff00] hover:text-[#b3e600] flex items-center gap-1 bg-[#ccff00]/10 hover:bg-[#ccff00]/20 px-3 py-1.5 rounded-lg border border-[#ccff00]/20 transition disabled:opacity-50"
+                              title="Click to Unequip"
                             >
                               <CheckIcon weight="bold" /> Equipped
                             </button>
@@ -406,7 +499,7 @@ export default function Profile() {
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* ✅ FIXED: CHOOSE A CHALLENGE MODAL (Responsive) */}
+      {/* CHOOSE A CHALLENGE MODAL (Responsive) */}
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">

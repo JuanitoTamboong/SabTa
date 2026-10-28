@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
   MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon, XIcon,
-  CoinsIcon // ✅ Added CoinsIcon for the play menu balance
+  CoinsIcon 
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -69,8 +69,11 @@ export default function Leaderboard() {
           const difficulty = attempt.quizzes.difficulty
           const attemptTime = attempt.time_taken_seconds || 99999 
 
+          // ✅ FIXED: Strictly looking for 'avatar_border' since the DB is now clean
           const equippedBorder = attempt.profiles.user_inventory?.find(
-            (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border'
+            (inv: any) => 
+              inv.is_equipped && 
+              inv.cosmetic_items?.cosmetic_type === 'avatar_border'
           )
 
           if (!playerStats[playerId]) {
@@ -266,7 +269,7 @@ export default function Leaderboard() {
               {/* 2nd Place */}
               {players[1] ? (
                 <div className="flex flex-col items-center">
-                  <div className="relative mb-2 w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20">
+                  <div className="relative mb-2 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center">
                     <div className="absolute inset-[15%] rounded-full bg-gray-300 overflow-hidden flex items-center justify-center text-black font-bold text-lg sm:text-xl uppercase shadow-lg z-10">
                       {players[1].avatar_url ? (
                         <img src={players[1].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -275,7 +278,7 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[1].border_url && (
-                      <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
+                      <img src={players[1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
                     )}
                   </div>
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-4 sm:pb-6 md:pb-8">
@@ -291,7 +294,7 @@ export default function Leaderboard() {
               {players[0] && (
                 <div className="flex flex-col items-center">
                   <CrownIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mb-1 animate-bounce" />
-                  <div className="relative mb-2 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24">
+                  <div className="relative mb-2 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center">
                     <div className="absolute inset-[15%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-xl sm:text-2xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.4)] z-10">
                       {players[0].avatar_url ? (
                         <img src={players[0].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -300,7 +303,7 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[0].border_url && (
-                      <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
+                      <img src={players[0].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
                     )}
                   </div>
                   <div className="bg-[#141a10] w-full rounded-t-xl border border-[#ccff00]/30 p-2 md:p-4 text-center pb-6 sm:pb-8 md:pb-12 relative overflow-hidden">
@@ -316,7 +319,7 @@ export default function Leaderboard() {
               {/* 3rd Place */}
               {players[2] ? (
                 <div className="flex flex-col items-center">
-                  <div className="relative mb-2 w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20">
+                  <div className="relative mb-2 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center">
                     <div className="absolute inset-[15%] rounded-full bg-[#cd7f32] overflow-hidden flex items-center justify-center text-black font-bold text-lg sm:text-xl uppercase shadow-lg z-10">
                       {players[2].avatar_url ? (
                         <img src={players[2].avatar_url} alt="" className="w-full h-full object-cover" />
@@ -325,7 +328,7 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[2].border_url && (
-                      <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
+                      <img src={players[2].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
                     )}
                   </div>
                   <div className="bg-[#0f1014] w-full rounded-t-xl border border-white/10 p-2 md:p-4 text-center pb-4 sm:pb-6 md:pb-8">
@@ -357,8 +360,8 @@ export default function Leaderboard() {
                       </span>
                       <div className="flex-1 ml-1 sm:ml-2 md:ml-4 flex items-center gap-2 sm:gap-3 md:gap-4 overflow-hidden">
                         
-                        <div className="relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex-shrink-0">
-                          <div className={`absolute inset-[15%] rounded-full flex items-center justify-center font-bold uppercase overflow-hidden ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
+                        <div className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 flex-shrink-0 flex items-center justify-center">
+                          <div className={`absolute inset-[15%] rounded-full flex items-center justify-center font-bold uppercase overflow-hidden z-10 ${isMe ? 'bg-[#ccff00] text-black' : 'bg-white/10 text-white'}`}>
                             {player.avatar_url ? (
                               <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
                             ) : (
@@ -366,7 +369,7 @@ export default function Leaderboard() {
                             )}
                           </div>
                           {player.border_url && (
-                            <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
+                            <img src={player.border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
                           )}
                         </div>
 
@@ -402,7 +405,7 @@ export default function Leaderboard() {
                 <div className="flex items-center gap-2 sm:gap-3">
                   <span className="font-bold font-mono text-sm sm:text-lg">#{currentUserRank}</span>
                   
-                  <div className="relative w-8 h-8 sm:w-10 sm:h-10">
+                  <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center">
                     <div className="absolute inset-[15%] rounded-full bg-black flex items-center justify-center text-[#ccff00] font-bold uppercase overflow-hidden z-10 text-xs sm:text-base">
                       {profile?.avatar_url ? (
                         <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -411,7 +414,7 @@ export default function Leaderboard() {
                       )}
                     </div>
                     {players[currentUserRank - 1]?.border_url && (
-                      <img src={players[currentUserRank - 1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
+                      <img src={players[currentUserRank - 1].border_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 scale-100" />
                     )}
                   </div>
 
@@ -460,7 +463,6 @@ export default function Leaderboard() {
             
             <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
               <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
-              {/* ✅ FIXED: Changed to CoinsIcon */}
               <div className="flex items-center gap-1.5">
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
                 <span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span>

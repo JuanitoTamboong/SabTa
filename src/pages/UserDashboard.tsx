@@ -51,10 +51,7 @@ export default function UserDashboard() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        if (user.user_metadata?.avatar_url || user.user_metadata?.picture) {
-          setAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture)
-        }
-
+        // 1. Fetch Profile FIRST
         let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         
         // DAILY STREAK LOGIC
@@ -97,6 +94,11 @@ export default function UserDashboard() {
           setProfile(profileData)
         }
 
+        // 2. SET AVATAR URL (Priority: Uploaded > Google > None)
+        const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
+        setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
+
+        // 3. Fetch Inventory
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('*, cosmetic_items(*)')
@@ -104,12 +106,14 @@ export default function UserDashboard() {
           .eq('is_equipped', true)
         
         if (invData) {
-          const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'border')
+          // ✅ FIXED: Strictly looking for 'avatar_border'
+          const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'avatar_border')
           if (border?.cosmetic_items?.preview_url) {
             setEquippedBorder(border.cosmetic_items.preview_url)
           }
         }
 
+        // 4. Fetch Attempts
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
 
         if (attempts && attempts.length > 0) {
@@ -135,6 +139,7 @@ export default function UserDashboard() {
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
+        // 5. Fetch Top Players
         if (profileData?.age_category) {
           const { data: topProfiles } = await supabase
             .from('profiles')
@@ -151,7 +156,11 @@ export default function UserDashboard() {
 
           if (topProfiles) {
             const mappedPlayers = topProfiles.map((p: any) => {
-              const border = p.user_inventory?.find((inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'border')
+              // ✅ FIXED: Strictly looking for 'avatar_border'
+              const border = p.user_inventory?.find((inv: any) => 
+                inv.is_equipped && 
+                inv.cosmetic_items?.cosmetic_type === 'avatar_border'
+              )
               return {
                 ...p,
                 border_url: border?.cosmetic_items?.preview_url || null
@@ -267,7 +276,7 @@ export default function UserDashboard() {
             </div>
             
             <div className="flex items-center gap-2">
-              <div className="relative w-9 h-9">
+              <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center">
                 <div className="absolute inset-[15%] rounded-full bg-gradient-to-br from-[#00f0ff] to-blue-600 flex items-center justify-center font-bold text-black uppercase overflow-hidden z-10">
                   {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : profile?.display_name?.charAt(0) || 'P'}
                 </div>
@@ -363,7 +372,7 @@ export default function UserDashboard() {
                 topPlayers.map((player, idx) => (
                   <div key={idx} className="flex items-center gap-2 sm:gap-3">
                     <span className={`text-[10px] sm:text-xs font-bold w-3 sm:w-4 ${idx === 0 ? 'text-[#ccff00]' : idx === 1 ? 'text-gray-300' : 'text-[#cd7f32]'}`}>#{idx + 1}</span>
-                    <div className="relative w-7 h-7 sm:w-8 sm:h-8 shrink-0">
+                    <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center">
                       <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[9px] sm:text-[10px] font-bold uppercase overflow-hidden z-10">
                         {player.avatar_url ? (
                           <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
