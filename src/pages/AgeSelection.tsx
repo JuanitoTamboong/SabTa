@@ -1,5 +1,6 @@
 // src/pages/AgeSelection.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // ✅ Added useEffect
+import { useNavigate } from 'react-router-dom' // ✅ Added useNavigate
 import { supabase } from '../lib/supabase'
 import { 
   PlantIcon, 
@@ -11,9 +12,29 @@ import {
 } from '@phosphor-icons/react'
 
 export default function AgeSelection() {
+  const navigate = useNavigate()
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true) // ✅ Added checking state
   const [error, setError] = useState<string | null>(null)
+
+  // ✅ NEW: Prevent users who already have a tier from changing it
+  useEffect(() => {
+    const checkExistingTier = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return navigate('/')
+      
+      const { data: profile } = await supabase.from('profiles').select('age_category').eq('id', user.id).single()
+      
+      if (profile?.age_category) {
+        // If they already have a tier, send them to dashboard
+        navigate('/dashboard', { replace: true })
+      } else {
+        setChecking(false)
+      }
+    }
+    checkExistingTier()
+  }, [navigate])
 
   const ageGroups = [
     { 
@@ -72,6 +93,15 @@ export default function AgeSelection() {
       setError(err.message || 'Something went wrong. Please try again.')
       setLoading(false)
     }
+  }
+
+  // Show loading screen while checking if they already have a tier
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
+        CHECKING ACCOUNT...
+      </div>
+    )
   }
 
   return (
