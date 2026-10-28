@@ -236,10 +236,6 @@ export default function UserDashboard() {
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
         </nav>
-        <div className="w-full mt-4 p-3 bg-gradient-to-br from-[#ff00a0]/10 to-transparent border border-[#ff00a0]/20 rounded-xl">
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Coin Balance</p>
-          <div className="flex items-center gap-2"><CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" /><span className="font-bold text-[#ff00a0]">{profile?.coins || 0}</span></div>
-        </div>
         <div className="mt-auto w-full">
           <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition"><SignOutIcon weight="fill" className="w-6 h-6" /> Logout</button>
         </div>
@@ -304,11 +300,6 @@ export default function UserDashboard() {
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
             <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
-          </div>
-          <div className="bg-[#0f1014] border border-[#ff00a0]/20 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Coins</p></div>
-            <p className="text-xl sm:text-2xl font-bold relative z-10 text-[#ff00a0]">{profile?.coins || 0}</p>
           </div>
         </div>
 
@@ -453,11 +444,6 @@ export default function UserDashboard() {
             <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
             <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
-            
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
-              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5"><CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" /><span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span></div>
-            </div>
             
             <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (
