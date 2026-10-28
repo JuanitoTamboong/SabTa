@@ -148,30 +148,77 @@ export default function Profile() {
       alert('Please select an image file.')
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Image must be under 2MB.')
-      return
-    }
 
     setUploadingAvatar(true)
     try {
-      // ✅ FIX: Delete the old avatar from storage if it exists
-      if (avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/')) {
-        // Extract the exact file path from the public URL
-        const oldFilePath = avatarUrl.split('/avatars/')[1]
+      // ✅ FIX: Compress the image before uploading
+      const compressedFile = await new Promise<File>((resolve, reject) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
         
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 500; // Max width/height in pixels (good for avatars)
+          let width = img.width;
+          let height = img.height;
+
+          // Resize calculation
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error("Canvas not supported"));
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to JPEG with 0.8 (80%) quality
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const newFileName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                const newFile = new File([blob], newFileName, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                URL.revokeObjectURL(img.src);
+                resolve(newFile);
+              } else {
+                reject(new Error("Compression failed"));
+              }
+            },
+            'image/jpeg',
+            0.8
+          );
+        };
+        img.onerror = (err) => {
+          URL.revokeObjectURL(img.src);
+          reject(err);
+        };
+      });
+
+      // 1. Delete the old avatar from storage if it exists
+      if (avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/')) {
+        const oldFilePath = avatarUrl.split('/avatars/')[1]
         if (oldFilePath) {
           await supabase.storage.from('avatars').remove([oldFilePath])
         }
       }
 
-      // 2. Upload the new avatar
-      const fileExt = file.name.split('.').pop() || 'png'
+      // 2. Upload the compressed avatar
+      const fileExt = compressedFile.name.split('.').pop() || 'jpg'
       const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true, contentType: file.type })
+        .upload(filePath, compressedFile, { upsert: true, contentType: compressedFile.type })
 
       if (uploadError) throw uploadError
 
@@ -189,6 +236,7 @@ export default function Profile() {
       setAvatarUrl(publicUrl)
       setProfile({ ...profile, avatar_url: publicUrl })
     } catch (err: any) {
+      console.error(err)
       alert(err.message || 'Upload failed.')
     } finally {
       setUploadingAvatar(false)
@@ -208,7 +256,6 @@ export default function Profile() {
       const itemType = targetItem?.cosmetic_items?.cosmetic_type;
 
       const updatedInventory = inventory.map(invItem => {
-        // If we clicked an equipped item, just unequip it
         if (isCurrentlyEquipped) {
           if (invItem.cosmetic_item_id === itemId) {
             return { ...invItem, is_equipped: false }
@@ -216,8 +263,6 @@ export default function Profile() {
           return invItem;
         } 
         
-        // If we are equipping, we MUST unequip all other items of the SAME type
-        // This strict check prevents double equipping
         if (invItem.cosmetic_items?.cosmetic_type === itemType) {
           return { ...invItem, is_equipped: invItem.cosmetic_item_id === itemId }
         }
@@ -242,7 +287,6 @@ export default function Profile() {
     return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING PROFILE...</div>
   }
 
-  // Strictly looking for 'avatar_border' since we fixed the DB
   const equippedBorder = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'avatar_border')
   const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'background')
 
@@ -336,13 +380,11 @@ export default function Profile() {
                     />
                   )}
 
-                  {/* Desktop Hover Effect */}
                   <div className="hidden md:flex absolute inset-[15%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
                     <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
                     <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
                   </div>
 
-                  {/* ✅ NEW: Mobile Camera Indicator (Always visible on mobile) */}
                   <div className="md:hidden absolute bottom-0 right-0 bg-[#ccff00] text-black p-2.5 rounded-full z-40 shadow-xl border-4 border-[#0f1014]">
                     <CameraIcon weight="bold" className="w-5 h-5" />
                   </div>
