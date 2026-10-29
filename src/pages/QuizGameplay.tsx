@@ -54,8 +54,12 @@ export default function QuizGameplay() {
   // ✅ BATTLE MODE DETECTION
   const [searchParams] = useSearchParams()
   const battleId = searchParams.get('battleId')
+  const betBattleId = searchParams.get('betBattleId')
+  
+  const activeBattleId = battleId || betBattleId 
   const isOpponent = searchParams.get('opponent') === 'true'
-  const isBattleMode = !!battleId
+  const isBattleMode = !!activeBattleId 
+  const isBetBattle = !!betBattleId 
 
   // Game State
   const [questions, setQuestions] = useState<any[]>([])
@@ -84,7 +88,7 @@ export default function QuizGameplay() {
 
   // Results State
   const [isFinished, setIsFinished] = useState(false)
-  const [showReview, setShowReview] = useState(false) // ✅ Added Review Toggle
+  const [showReview, setShowReview] = useState(false)
   
   // Store the exact database numbers and calculated time
   const [dbResults, setDbResults] = useState<{ 
@@ -309,16 +313,26 @@ export default function QuizGameplay() {
       setFinalTimeTaken(timeTakenSeconds) 
 
       if (isBattleMode) {
-        // ✅ BATTLE MODE: Only update the battle score. No coins/points.
-        const updateField = isOpponent ? 'opponent_score' : 'challenger_score'
-        
-        await supabase
-          .from('quiz_battles')
-          .update({ 
-            [updateField]: finalCorrect, // Using correct answers as the score
-            status: isOpponent ? 'completed' : 'pending'
+        // ✅ BATTLE MODE: Let the RPC handle everything securely (saves score, checks for draw/win, pays out)
+        if (isBetBattle) {
+          const { data, error } = await supabase.rpc('submit_bet_battle_score', {
+            p_battle_id: activeBattleId,
+            p_score: finalCorrect
           })
-          .eq('id', battleId)
+
+          if (error) throw error
+          console.log("Bet battle result:", data) 
+          // data will be { status: 'waiting' } or { status: 'completed', winner_id: ... } or { draw: true }
+          
+        } else {
+          const { data, error } = await supabase.rpc('submit_pvp_score', {
+            p_battle_id: activeBattleId,
+            p_score: finalCorrect
+          })
+
+          if (error) throw error
+          console.log("Friendly battle result:", data)
+        }
 
         setDbResults({
           points: 0,
@@ -389,7 +403,7 @@ export default function QuizGameplay() {
   if (isFinished) {
     const isPerfect = (dbResults?.correct ?? 0) === questions.length && questions.length > 0
 
-    // ✅ ADDED REVIEW SCREEN
+    // ✅ REVIEW SCREEN
     if (showReview) {
       return (
         <div className="min-h-screen bg-[#050505] text-white p-4 sm:p-6 flex flex-col items-center">
@@ -487,14 +501,12 @@ export default function QuizGameplay() {
                   {isBattleMode ? '0' : (dbResults?.coins ?? 0) > 0 ? '+' : ''}
                   {isBattleMode ? '' : dbResults?.coins ?? 0}
                 </p>
-                {/* ✅ Show spent coins explicitly below the net total */}
                 {!isBattleMode && coinsSpentRef.current > 0 && (
                   <p className="text-[10px] text-red-400 font-bold mt-1">(-{coinsSpentRef.current} Hints)</p>
                 )}
               </div>
             </div>
 
-            {/* ✅ ADDED POINTS DISPLAY WITH DEDUCTIONS */}
             {!isBattleMode && (
               <div className="bg-black/40 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 mb-3 sm:mb-4 relative overflow-hidden">
                  <div className="flex items-center gap-2">
@@ -519,7 +531,6 @@ export default function QuizGameplay() {
             </div>
 
             <div className="space-y-2 sm:space-y-3">
-              {/* ✅ ADDED REVIEW BUTTON */}
               {!isBattleMode && (
                 <button onClick={() => setShowReview(true)} className="w-full bg-white/10 text-white py-3 sm:py-4 rounded-xl text-sm sm:text-base font-bold hover:bg-white/20 transition flex items-center justify-center gap-2 border border-white/10">
                   Review Answers

@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { 
   UserPlusIcon, UserCheckIcon, ArrowLeftIcon, 
   TrophyIcon, LightningIcon, MedalIcon, TargetIcon, XIcon, ClockIcon, 
-  PaletteIcon, ImageIcon, StarIcon, FireIcon 
+  PaletteIcon, ImageIcon, StarIcon, FireIcon, CoinsIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
 
 export default function PlayerProfile() {
@@ -24,12 +24,26 @@ export default function PlayerProfile() {
   const isMutual = isFollowing && isFollowedByThem
   const needsFollowBack = !isFollowing && isFollowedByThem
 
-  // PvP State
+  // ── Custom Alert State ──
+  const [alertData, setAlertData] = useState<{ title: string; message: string; type: 'success' | 'error' } | null>(null)
+
+  // ── Challenge Type Selector ──
+  const [showChallengeTypeModal, setShowChallengeTypeModal] = useState(false)
+
+  // ── Friendly PvP State ──
   const [showChallengeModal, setShowChallengeModal] = useState(false)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [creatingBattle, setCreatingBattle] = useState(false)
   const [existingPendingBattle, setExistingPendingBattle] = useState<any>(null)
   const [hasAlreadyPlayed, setHasAlreadyPlayed] = useState(false)
+
+  // ── Bet Battle State ──
+  const [showBetModal, setShowBetModal] = useState(false)
+  const [betWager, setBetWager] = useState<any>(25)
+  const [creatingBet, setCreatingBet] = useState(false)
+  const [existingBet, setExistingBet] = useState<any>(null)
+  const [hasPlayedBet, setHasPlayedBet] = useState(false)
+  const [betActionLoading, setBetActionLoading] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,7 +73,7 @@ export default function PlayerProfile() {
       setIsFollowing(!!myFollow.data)
       setIsFollowedByThem(!!theirFollow.data)
 
-      // 4. Check for any valid pending battles
+      // 4. Check for any valid pending FRIENDLY battles
       const { data: pending } = await supabase
         .from('quiz_battles')
         .select('id, quiz_id, challenger_id, opponent_id, challenger_score, opponent_score, quizzes(title)')
@@ -68,18 +82,32 @@ export default function PlayerProfile() {
         .limit(1)
         .maybeSingle()
 
-      // Ignore if DB lagged and both already played
       if (pending && (pending.challenger_score !== null && pending.opponent_score !== null)) {
-         // Battle is actually done, ignore it
+        // Battle is actually done, ignore it
       } else if (pending) {
         setExistingPendingBattle(pending)
-        
         const isMeChallenger = pending.challenger_id === user.id
         const myScore = isMeChallenger ? pending.challenger_score : pending.opponent_score
-        
         if (myScore !== null && myScore !== undefined) {
           setHasAlreadyPlayed(true)
         }
+      }
+
+      // 5. Check for active BET battles (pending OR accepted)
+      const { data: bet } = await supabase
+        .from('bet_battles')
+        .select('id, quiz_id, challenger_id, opponent_id, wager_amount, status, challenger_score, opponent_score, challenger_submitted, opponent_submitted, quizzes(title)')
+        .or(`and(challenger_id.eq.${user.id},opponent_id.eq.${playerId}),and(challenger_id.eq.${playerId},opponent_id.eq.${user.id})`)
+        .in('status', ['pending', 'accepted'])
+        .limit(1)
+        .maybeSingle()
+
+      if (bet) {
+        setExistingBet(bet)
+        // ✅ Detect my submission regardless of pending/accepted
+        const isMeChallenger = bet.challenger_id === user.id
+        const mySubmitted = isMeChallenger ? bet.challenger_submitted : bet.opponent_submitted
+        setHasPlayedBet(!!mySubmitted)
       }
 
       setLoading(false)
@@ -101,14 +129,15 @@ export default function PlayerProfile() {
       }
     } catch (err) {
       console.error(err)
-      alert('Action failed.')
+      setAlertData({ title: 'Action Failed', message: 'Could not update follow status.', type: 'error' })
     } finally {
       setFollowLoading(false)
     }
   }
 
-  const openChallengeModal = async () => {
-    setShowChallengeModal(true)
+  // ── Load available quizzes (shared by both modals) ──
+  const loadQuizzes = async () => {
+    if (!myProfile?.age_category) return
     const { data } = await supabase
       .from('quizzes')
       .select('id, title, category, difficulty')
@@ -118,6 +147,26 @@ export default function PlayerProfile() {
     if (data) setAvailableQuizzes(data)
   }
 
+  // ── Open type selector ──
+  const handleChallengeClick = () => {
+    setShowChallengeTypeModal(true)
+  }
+
+  // ── Open friendly modal ──
+  const openChallengeModal = async () => {
+    setShowChallengeTypeModal(false)
+    setShowChallengeModal(true)
+    await loadQuizzes()
+  }
+
+  // ── Open bet modal ──
+  const openBetModal = async () => {
+    setShowChallengeTypeModal(false)
+    setShowBetModal(true)
+    await loadQuizzes()
+  }
+
+  // ── Create friendly battle ──
   const handleCreateBattle = async (quizId: string) => {
     setCreatingBattle(true)
     try {
@@ -133,7 +182,7 @@ export default function PlayerProfile() {
       navigate(`/play/${quizId}?battleId=${data.id}`)
     } catch (err) {
       console.error(err)
-      alert('Failed to create battle.')
+      setAlertData({ title: 'Action Failed', message: 'Failed to create friendly battle.', type: 'error' })
       setCreatingBattle(false)
     }
   }
@@ -142,6 +191,133 @@ export default function PlayerProfile() {
     if (existingPendingBattle) {
       navigate(`/play/${existingPendingBattle.quiz_id}?battleId=${existingPendingBattle.id}&opponent=true`)
     }
+  }
+
+  // ── BET BATTLE HANDLERS ──
+
+  // ✅ NEW: Create bet → do NOT navigate. Show "waiting for opponent" + cancel.
+  const handleCreateBet = async (quizId: string, finalWager: number) => {
+    if (finalWager < 1) return setAlertData({ title: 'Invalid Wager', message: 'Minimum wager is 1 coin.', type: 'error' })
+    if ((myProfile?.coins || 0) < finalWager) return setAlertData({ title: 'Not Enough Coins', message: "You don't have enough coins for this bet.", type: 'error' })
+
+    setCreatingBet(true)
+
+    try {
+      const { data, error } = await supabase.rpc('create_bet_battle', {
+        p_opponent_id: playerId,
+        p_quiz_id: quizId,
+        p_wager: finalWager,
+      })
+      if (error) throw error
+
+      // Deduct coins locally
+      setMyProfile((p: any) => ({ ...p, coins: p.coins - finalWager }))
+      setShowBetModal(false)
+
+      // ✅ Set local state so the UI immediately shows "Waiting for Opponent"
+      setExistingBet({
+        id: data.battle_id,
+        quiz_id: quizId,
+        challenger_id: myProfile.id,
+        opponent_id: playerId,
+        wager_amount: finalWager,
+        status: 'pending',
+        challenger_score: null,
+        opponent_score: null,
+        challenger_submitted: false,
+        opponent_submitted: false,
+      })
+      setHasPlayedBet(false)
+
+      setAlertData({
+        title: 'Bet Created',
+        message: `Waiting for ${player?.display_name || 'opponent'} to accept your ${finalWager}-coin wager.`,
+        type: 'success',
+      })
+    } catch (err: any) {
+      console.error(err)
+      setAlertData({ title: 'Action Failed', message: err.message || 'Failed to create bet battle.', type: 'error' })
+    } finally {
+      setCreatingBet(false)
+    }
+  }
+
+  // ✅ Opponent accepts → navigate into the quiz
+  const handleAcceptBet = async () => {
+    if (!existingBet) return
+    setBetActionLoading(true)
+
+    try {
+      const { error } = await supabase.rpc('accept_bet_battle', { p_battle_id: existingBet.id })
+      if (error) throw error
+
+      setMyProfile((p: any) => ({ ...p, coins: p.coins - existingBet.wager_amount }))
+      setExistingBet({ ...existingBet, status: 'accepted' })
+
+      // Navigate straight into the quiz
+      navigate(`/play/${existingBet.quiz_id}?betBattleId=${existingBet.id}`)
+    } catch (err: any) {
+      console.error(err)
+      setAlertData({ title: 'Action Failed', message: err.message || 'Failed to accept bet.', type: 'error' })
+      setBetActionLoading(false)
+    }
+  }
+
+  const handleDeclineBet = async () => {
+    if (!existingBet) return
+    setBetActionLoading(true)
+    try {
+      const { error } = await supabase.rpc('decline_bet_battle', { p_battle_id: existingBet.id })
+      if (error) throw error
+      setExistingBet(null)
+      setAlertData({ title: 'Bet Declined', message: 'Challenger has been refunded.', type: 'success' })
+    } catch (err: any) {
+      console.error(err)
+      setAlertData({ title: 'Action Failed', message: err.message || 'Failed to decline bet.', type: 'error' })
+    } finally {
+      setBetActionLoading(false)
+    }
+  }
+
+  const handleCancelBet = async () => {
+    if (!existingBet) return
+    setBetActionLoading(true)
+    try {
+      const { error } = await supabase.rpc('cancel_bet_battle', { p_battle_id: existingBet.id })
+      if (error) throw error
+      setMyProfile((p: any) => ({ ...p, coins: p.coins + existingBet.wager_amount }))
+      setExistingBet(null)
+      setAlertData({ title: 'Bet Cancelled', message: 'Your coins have been refunded.', type: 'success' })
+    } catch (err: any) {
+      console.error(err)
+      setAlertData({ title: 'Action Failed', message: err.message || 'Failed to cancel bet.', type: 'error' })
+    } finally {
+      setBetActionLoading(false)
+    }
+  }
+
+  const handlePlayBet = () => {
+    if (existingBet) {
+      navigate(`/play/${existingBet.quiz_id}?betBattleId=${existingBet.id}`)
+    }
+  }
+
+  // Helper for the input to handle typing smoothly
+  const handleWagerChange = (val: string) => {
+    if (val === '') {
+      setBetWager('')
+      return
+    }
+    const num = parseInt(val, 10)
+    if (!isNaN(num)) {
+      setBetWager(num)
+    }
+  }
+
+  const handleWagerBlur = () => {
+    const max = myProfile?.coins || 1
+    const val = Number(betWager) || 0
+    setBetWager(Math.min(Math.max(1, val), max))
   }
 
   const followButtonLabel = isMutual ? 'Friends' : needsFollowBack ? 'Follow Back' : isFollowing ? 'Following' : 'Add Friend'
@@ -161,13 +337,28 @@ export default function PlayerProfile() {
   const totalBgs = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'background').length
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
 
+  // ── Bet derived flags ──
+  const amIBetChallenger = existingBet?.challenger_id === myProfile?.id
+  const amIBetOpponent = existingBet?.opponent_id === myProfile?.id
+
+  // Challenger: pending + not yet played → "Waiting for opponent to accept" + Cancel
+  const challengerWaiting = existingBet?.status === 'pending' && amIBetChallenger
+
+  // Opponent: pending → Accept / Decline
+  const canAcceptBet = existingBet?.status === 'pending' && amIBetOpponent
+
+  // Accepted + haven't played → Play Bet (both players)
+  const canPlayBet = existingBet?.status === 'accepted' && !hasPlayedBet
+
+  // Accepted + already played → Waiting for opponent to play
+  const waitingOnBetOpponent = existingBet?.status === 'accepted' && hasPlayedBet
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
       
       {equippedBg?.cosmetic_items?.preview_url && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img src={equippedBg.cosmetic_items.preview_url} className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
-          {/* Changed: Lighter overlay on mobile so the background shows through */}
           <div className="absolute inset-0 bg-[#050505]/30 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505]" />
         </div>
@@ -180,7 +371,6 @@ export default function PlayerProfile() {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
           
-          {/* Changed: Lighter background and blur on mobile, darker on desktop */}
           <div className="md:col-span-7 bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
             
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#00f0ff]/10 to-transparent pointer-events-none" />
@@ -216,6 +406,7 @@ export default function PlayerProfile() {
               )}
             </div>
 
+            {/* ── ACTION BUTTONS ── */}
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <button 
                 onClick={handleFollow}
@@ -229,6 +420,7 @@ export default function PlayerProfile() {
                 {followButtonIcon} {followButtonLabel}
               </button>
 
+              {/* ── CHALLENGE (unified) ── */}
               {existingPendingBattle ? (
                 hasAlreadyPlayed ? (
                   <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
@@ -244,19 +436,81 @@ export default function PlayerProfile() {
                 )
               ) : (
                 <button 
-                  onClick={openChallengeModal}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#ff00a0] text-white hover:bg-white hover:text-[#ff00a0] transition shadow-[0_0_15px_rgba(255,0,160,0.3)]"
+                  onClick={handleChallengeClick}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-[#ff00a0] to-yellow-500 text-white hover:opacity-90 transition shadow-[0_0_15px_rgba(255,0,160,0.3)]"
                 >
                   <TargetIcon weight="bold" className="w-4 h-4" /> Challenge
                 </button>
               )}
             </div>
+
+            {/* ── EXISTING BET BATTLE STATUS ROW ── */}
+            {existingBet && (
+              <div className="mt-2">
+
+                {/* ✅ CHALLENGER: pending → Waiting + Cancel */}
+                {challengerWaiting && (
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
+                      <ClockIcon weight="bold" className="w-4 h-4" />
+                      Waiting for Opponent to Accept ({existingBet.wager_amount})
+                    </div>
+                    <button
+                      onClick={handleCancelBet}
+                      disabled={betActionLoading}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 border border-white/10 transition disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* ✅ OPPONENT: pending → Accept / Decline */}
+                {canAcceptBet && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAcceptBet}
+                      disabled={betActionLoading}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_15px_rgba(234,179,8,0.3)] disabled:opacity-50"
+                    >
+                      <CoinsIcon weight="fill" className="w-4 h-4" />
+                      Accept Bet ({existingBet.wager_amount})
+                    </button>
+                    <button
+                      onClick={handleDeclineBet}
+                      disabled={betActionLoading}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 border border-white/10 transition disabled:opacity-50"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                )}
+
+                {/* ✅ ACCEPTED + not played → Play Bet (both players) */}
+                {canPlayBet && (
+                  <button
+                    onClick={handlePlayBet}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_15px_rgba(234,179,8,0.3)] animate-pulse"
+                  >
+                    <CoinsIcon weight="fill" className="w-4 h-4" />
+                    Play Bet ({existingBet.wager_amount})
+                  </button>
+                )}
+
+                {/* ✅ ACCEPTED + already played → Waiting for opponent to play */}
+                {waitingOnBetOpponent && (
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
+                    <ClockIcon weight="bold" className="w-4 h-4" />
+                    Waiting for Opponent to Play (Bet: {existingBet.wager_amount})
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-5 space-y-4 sm:space-y-6">
             
             <div className="grid grid-cols-1 gap-3">
-              {/* Changed: Lighter background and blur on mobile */}
               <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
                 <div>
@@ -267,13 +521,11 @@ export default function PlayerProfile() {
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                {/* Changed: Lighter background and blur on mobile */}
                 <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <FireIcon weight="fill" className="text-[#ff00a0] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{player.current_streak}</p>
                   <p className="text-[9px] text-gray-400 uppercase font-bold">Streak</p>
                 </div>
-                {/* Changed: Lighter background and blur on mobile */}
                 <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <MedalIcon weight="fill" className="text-[#00f0ff] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{Math.floor(player.points / 100) + 1}</p>
@@ -282,7 +534,6 @@ export default function PlayerProfile() {
               </div>
             </div>
 
-            {/* Changed: Lighter background and blur on mobile */}
             <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                 <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
@@ -351,9 +602,70 @@ export default function PlayerProfile() {
         </div>
       </div>
 
-      {showChallengeModal && (
+      {/* ══════════════════════════════════════════════ */}
+      {/* STEP 1: CHALLENGE TYPE SELECTOR                */}
+      {/* ══════════════════════════════════════════════ */}
+      {showChallengeTypeModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
+
+            <button
+              onClick={() => setShowChallengeTypeModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 p-1.5 rounded-lg transition"
+            >
+              <XIcon weight="bold" className="w-4 h-4" />
+            </button>
+
+            <h2 className="text-xl font-black mb-1">Challenge {player.display_name}</h2>
+            <p className="text-gray-400 text-xs mb-5">Choose how you want to battle.</p>
+
+            {/* Friendly option */}
+            <button
+              onClick={openChallengeModal}
+              className="w-full text-left bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-4 mb-3 hover:border-[#ff00a0] hover:bg-[#ff00a0]/5 transition group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#ff00a0]/20 flex items-center justify-center shrink-0">
+                  <TargetIcon weight="fill" className="w-5 h-5 text-[#ff00a0]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm text-white group-hover:text-[#ff00a0] transition">Friendly Battle</p>
+                  <p className="text-[11px] text-gray-400">Just for fun — no coins at stake.</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Bet option */}
+            <button
+              onClick={openBetModal}
+              disabled={(myProfile?.coins || 0) < 1}
+              className="w-full text-left bg-black/40 border border-yellow-500/30 rounded-2xl p-4 hover:border-yellow-500 hover:bg-yellow-500/5 transition group disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
+                  <CoinsIcon weight="fill" className="w-5 h-5 text-yellow-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm text-white group-hover:text-yellow-400 transition">Bet Battle</p>
+                  <p className="text-[11px] text-gray-400">
+                    Wager coins. Winner takes the pot.
+                  </p>
+                  <p className="text-[10px] text-yellow-400 font-bold mt-0.5 flex items-center gap-1">
+                    You have {myProfile?.coins || 0} <CoinsIcon weight="fill" className="w-3 h-3" />
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* STEP 2A: FRIENDLY QUIZ PICKER                 */}
+      {/* ══════════════════════════════════════════════ */}
+      {showChallengeModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
             
             <button 
               onClick={() => setShowChallengeModal(false)} 
@@ -362,7 +674,10 @@ export default function PlayerProfile() {
               <XIcon weight="bold" className="w-4 h-4" />
             </button>
 
-            <h2 className="text-xl font-black mb-1">Challenge {player.display_name}</h2>
+            <h2 className="text-xl font-black mb-1 flex items-center gap-2">
+              <TargetIcon weight="fill" className="text-[#ff00a0]" />
+              Friendly Battle
+            </h2>
             <p className="text-gray-400 text-xs mb-4">Pick a quiz. You play first, then they have to beat your score!</p>
             
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-hide">
@@ -377,10 +692,10 @@ export default function PlayerProfile() {
                     key={q.id} 
                     onClick={() => handleCreateBattle(q.id)}
                     disabled={creatingBattle}
-                    className="w-full text-left bg-black/40 border border-white/10 rounded-xl p-3 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center disabled:opacity-50"
+                    className="w-full text-left bg-black/40 border border-white/10 rounded-xl p-3 hover:border-[#ff00a0]/50 hover:bg-[#ff00a0]/5 transition group flex justify-between items-center disabled:opacity-50"
                   >
                     <div className="pr-2">
-                      <p className="font-bold text-sm text-white group-hover:text-[#ccff00] transition">{q.title}</p>
+                      <p className="font-bold text-sm text-white group-hover:text-[#ff00a0] transition">{q.title}</p>
                       <p className="text-[10px] text-gray-400">{q.category}</p>
                     </div>
                     <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded border shrink-0 ${
@@ -392,6 +707,155 @@ export default function PlayerProfile() {
                 ))
               )}
             </div>
+
+            <button
+              onClick={() => { setShowChallengeModal(false); setShowChallengeTypeModal(true) }}
+              className="w-full mt-3 text-[11px] text-gray-400 hover:text-white font-bold py-2 transition"
+            >
+              ← Back to battle type
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* STEP 2B: BET WAGER + QUIZ PICKER               */}
+      {/* ══════════════════════════════════════════════ */}
+      {showBetModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
+            
+            <button 
+              onClick={() => setShowBetModal(false)} 
+              className="absolute top-3 right-3 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 p-1.5 rounded-lg transition"
+            >
+              <XIcon weight="bold" className="w-4 h-4" />
+            </button>
+
+            <h2 className="text-xl font-black mb-1 flex items-center gap-2">
+              <CoinsIcon weight="fill" className="text-yellow-400 w-5 h-5" />
+              Bet Battle
+            </h2>
+            <p className="text-gray-400 text-xs mb-4">Winner takes the pot. Loser loses their wager.</p>
+
+            {/* Wager Selector */}
+            <div className="bg-black/40 rounded-xl p-3 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-gray-400 uppercase font-bold">Your Coins</p>
+                <p className="text-sm font-black text-yellow-400">{myProfile?.coins || 0}</p>
+              </div>
+              
+              <label className="text-[10px] text-gray-400 uppercase font-bold">Wager Amount</label>
+              <div className="flex gap-2 mt-1">
+                {[25, 50, 100, 250].map(amt => (
+                  <button
+                    key={amt}
+                    onClick={() => setBetWager(amt)}
+                    disabled={(myProfile?.coins || 0) < amt}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition disabled:opacity-30 ${
+                      betWager === amt 
+                        ? 'bg-yellow-500 text-black border-yellow-500' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    {amt}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={myProfile?.coins || 0}
+                value={betWager}
+                onChange={e => handleWagerChange(e.target.value)}
+                onBlur={handleWagerBlur}
+                className="mt-2 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold outline-none focus:border-yellow-500/50"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] mb-2 bg-black/30 rounded-lg px-3 py-1.5">
+              <span className="text-gray-400">If you win:</span>
+              <span className="text-yellow-400 font-bold">+{betWager || 0} coins</span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] mb-4 bg-black/30 rounded-lg px-3 py-1.5">
+              <span className="text-gray-400">If you lose:</span>
+              <span className="text-red-400 font-bold">-{betWager || 0} coins</span>
+            </div>
+
+            <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Pick a Quiz</p>
+            <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1 scrollbar-hide">
+              {availableQuizzes.length === 0 ? (
+                <div className="text-center py-6 bg-black/40 rounded-xl border border-white/5">
+                  <TargetIcon weight="duotone" className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                  <p className="text-gray-500 text-xs font-bold">No quizzes available for your tier.</p>
+                </div>
+              ) : (
+                availableQuizzes.map(q => (
+                  <button
+                    key={q.id}
+                    onClick={() => {
+                      const max = myProfile?.coins || 1
+                      const val = Number(betWager) || 0
+                      const finalWager = Math.min(Math.max(1, val), max)
+                      setBetWager(finalWager) 
+                      handleCreateBet(q.id, finalWager) 
+                    }}
+                    disabled={creatingBet || Number(betWager) > (myProfile?.coins || 0) || Number(betWager) < 1 || betWager === ''}
+                    className="w-full text-left bg-black/40 border border-white/10 rounded-xl p-3 hover:border-yellow-500/50 hover:bg-yellow-500/5 transition group flex justify-between items-center disabled:opacity-40"
+                  >
+                    <div className="pr-2">
+                      <p className="font-bold text-sm text-white group-hover:text-yellow-400 transition">{q.title}</p>
+                      <p className="text-[10px] text-gray-400">{q.category}</p>
+                    </div>
+                    <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded border shrink-0 ${
+                      q.difficulty === 'hard' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
+                      q.difficulty === 'intermediate' ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' : 
+                      'text-green-400 border-green-500/30 bg-green-500/10'
+                    }`}>{q.difficulty}</span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => { setShowBetModal(false); setShowChallengeTypeModal(true) }}
+              className="w-full mt-3 text-[11px] text-gray-400 hover:text-white font-bold py-2 transition"
+            >
+              ← Back to battle type
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* CUSTOM ALERT MODAL                             */}
+      {/* ══════════════════════════════════════════════ */}
+      {alertData && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              alertData.type === 'success' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-500'
+            }`}>
+              {alertData.type === 'success' ? (
+                <CoinsIcon weight="fill" className="w-8 h-8" />
+              ) : (
+                <WarningCircleIcon weight="fill" className="w-8 h-8" />
+              )}
+            </div>
+            
+            <h2 className="text-xl font-black text-white mb-2">{alertData.title}</h2>
+            <p className="text-gray-400 text-sm mb-6">{alertData.message}</p>
+            
+            <button
+              onClick={() => setAlertData(null)}
+              className={`w-full py-3 rounded-xl font-bold text-sm transition shadow-lg ${
+                alertData.type === 'success' 
+                  ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/20' 
+                  : 'bg-red-500 text-white hover:bg-red-400 shadow-red-500/20'
+              }`}
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

@@ -1,12 +1,12 @@
 // src/pages/UserDashboard.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, CoinsIcon,
-  GiftIcon, SwordIcon, XCircleIcon, SparkleIcon, XIcon
+  GiftIcon, SwordIcon, XCircleIcon, SparkleIcon, XIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -25,19 +25,33 @@ export default function UserDashboard() {
   // Daily Challenge Bonus State
   const [showDailyBonusModal, setShowDailyBonusModal] = useState(false)
 
-  // ✅ PvP Incoming Battles State
+  // PvP Incoming Battles State (friendly)
   const [incomingBattles, setIncomingBattles] = useState<any[]>([])
 
-  // ✅ NEW: New Content Banner State
+  // Incoming BET Battles State
+  const [incomingBetBattles, setIncomingBetBattles] = useState<any[]>([])
+
+  // New Content Banner State
   const [showNewContentBanner, setShowNewContentBanner] = useState(false)
   const [newContentCount, setNewContentCount] = useState(0)
 
-  // ✅ Declining Modal State
+  // Declining Modal State (friendly battles)
   const [declineModal, setDeclineModal] = useState<{ isOpen: boolean; battleId: string | null }>({
     isOpen: false,
     battleId: null
   })
   const [declining, setDeclining] = useState(false)
+
+  // Bet Decline Modal State
+  const [betDeclineModal, setBetDeclineModal] = useState<{ isOpen: boolean; battleId: string | null; wager: number }>({
+    isOpen: false,
+    battleId: null,
+    wager: 0
+  })
+  const [betDeclining, setBetDeclining] = useState(false)
+
+  // Inline alert state (replaces native alert())
+  const [alertData, setAlertData] = useState<{ title: string; message: string; type: 'success' | 'error' } | null>(null)
 
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -62,20 +76,60 @@ export default function UserDashboard() {
     if (showNewContentBanner) {
       const timer = setTimeout(() => {
         handleDismissNewContent()
-      }, 5000) // Auto-dismiss after 5 seconds
+      }, 5000)
       
       return () => clearTimeout(timer)
     }
   }, [showNewContentBanner])
 
+  // ─────────────────────────────────────────────
+  // ✅ INCOMING BATTLES REFRESH (callable on demand + polling)
+  // ─────────────────────────────────────────────
+  const refreshIncomingBattles = useCallback(async (userId: string) => {
+    try {
+      // Incoming FRIENDLY battles
+      const { data: pendingBattles } = await supabase
+        .from('quiz_battles')
+        .select(`id, quiz_id, challenger_id, challenger_score, opponent_score, profiles!challenger_id ( display_name, avatar_url )`)
+        .eq('opponent_id', userId)
+        .eq('status', 'pending')
+        .is('opponent_score', null)
+
+      setIncomingBattles(pendingBattles || [])
+
+      // Incoming BET battles
+      const { data: pendingBets } = await supabase
+        .from('bet_battles')
+        .select(`id, quiz_id, challenger_id, wager_amount, profiles!challenger_id ( display_name, avatar_url )`)
+        .eq('opponent_id', userId)
+        .eq('status', 'pending')
+
+      setIncomingBetBattles(pendingBets || [])
+    } catch (error) {
+      console.error("Error refreshing battles:", error)
+    }
+  }, [])
+
+  // ─────────────────────────────────────────────
+  // ✅ INITIAL FETCH
+  // ─────────────────────────────────────────────
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const fetchData = async () => {
+    let isMounted = true;
+    // ✅ FIXED: Changed NodeJS.Timeout to ReturnType<typeof setTimeout> for browser compatibility
+    let timer: ReturnType<typeof setTimeout>;
+
+    const fetchData = async () => {
+      try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return navigate('/')
+        if (!user) {
+          if (isMounted) navigate('/')
+          return
+        }
 
         let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         
+        if (!isMounted) return;
+
         if (profileData) {
           const { data: streakResult } = await supabase.rpc('claim_daily_streak')
 
@@ -91,15 +145,8 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
-        // ✅ INCOMING BATTLES FETCH
-        const { data: pendingBattles } = await supabase
-          .from('quiz_battles')
-          .select(`id, quiz_id, challenger_id, opponent_score, profiles!challenger_id ( display_name, avatar_url )`)
-          .eq('opponent_id', user.id)
-          .eq('status', 'pending')
-          .is('opponent_score', null)
-
-        if (pendingBattles) setIncomingBattles(pendingBattles)
+        // ✅ Load incoming battles (friendly + bet)
+        await refreshIncomingBattles(user.id)
 
         const { data: invData } = await supabase
           .from('user_inventory')
@@ -107,7 +154,7 @@ export default function UserDashboard() {
           .eq('user_id', user.id)
           .eq('is_equipped', true)
         
-        if (invData) {
+        if (invData && isMounted) {
           const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'avatar_border')
           if (border?.cosmetic_items?.preview_url) setEquippedBorder(border.cosmetic_items.preview_url)
           
@@ -118,6 +165,8 @@ export default function UserDashboard() {
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
         const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
         
+        if (!isMounted) return;
+
         let quizzesToday = 0
         if (challengeResult) {
           quizzesToday = challengeResult.quizzes_today
@@ -126,7 +175,7 @@ export default function UserDashboard() {
             if (profileData?.last_challenge_date !== today) {
                setShowDailyBonusModal(true)
                const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-               if (updatedProfile) {
+               if (updatedProfile && isMounted) {
                  setProfile(updatedProfile)
                  profileData = updatedProfile 
                }
@@ -134,7 +183,7 @@ export default function UserDashboard() {
           }
         }
 
-        if (attempts && attempts.length > 0) {
+        if (attempts && attempts.length > 0 && isMounted) {
           const quizIds = attempts.map(a => a.quiz_id)
           const { data: quizzes } = await supabase.from('quizzes').select('id, category').in('id', quizIds)
 
@@ -155,7 +204,7 @@ export default function UserDashboard() {
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
-        if (profileData?.age_category) {
+        if (profileData?.age_category && isMounted) {
           const { data: topProfiles } = await supabase
             .from('profiles')
             .select(`id, display_name, points, coins, avatar_url, user_inventory ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )`)
@@ -172,15 +221,14 @@ export default function UserDashboard() {
           }
         }
 
-        // ✅ NEW CONTENT BANNER LOGIC
-        if (profileData?.age_category) {
+        // NEW CONTENT BANNER LOGIC
+        if (profileData?.age_category && isMounted) {
           const lastSeen = localStorage.getItem('last_seen_banner_date')
           const today = new Date().toISOString().split('T')[0]
 
           if (lastSeen !== today) {
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
             
-            // Check for new quizzes
             const { data: newQ } = await supabase
               .from('quizzes')
               .select('id')
@@ -188,7 +236,6 @@ export default function UserDashboard() {
               .eq('status', 'published')
               .gte('created_at', weekAgo)
 
-            // Check for new cosmetics not owned
             const { data: userInv } = await supabase.from('user_inventory').select('cosmetic_item_id').eq('user_id', user.id)
             const ownedIds = userInv?.map(i => i.cosmetic_item_id) || []
 
@@ -202,20 +249,44 @@ export default function UserDashboard() {
             
             const totalNew = (newQ?.length || 0) + unownedCosmetics.length
 
-            if (totalNew > 0) {
+            if (totalNew > 0 && isMounted) {
               setNewContentCount(totalNew)
               setShowNewContentBanner(true)
             }
           }
         }
 
-        setLoading(false)
+      } catch (error) {
+        console.error("Dashboard fetch error:", error)
+      } finally {
+        if (isMounted) setLoading(false)
       }
+    }
+
+    // Small delay to let UI render
+    timer = setTimeout(() => {
       fetchData()
     }, 500)
 
-    return () => clearTimeout(timer)
-  }, [navigate])
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    }
+  }, [navigate, refreshIncomingBattles])
+
+  // ─────────────────────────────────────────────
+  // ✅ POLLING — refresh incoming battles every 15s
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (loading) return
+    if (!profile?.id) return
+
+    const interval = setInterval(() => {
+      refreshIncomingBattles(profile.id)
+    }, 15000)
+
+    return () => clearInterval(interval)
+  }, [loading, profile?.id, refreshIncomingBattles])
 
   const handleDismissNewContent = () => {
     setShowNewContentBanner(false)
@@ -223,7 +294,9 @@ export default function UserDashboard() {
     localStorage.setItem('last_seen_banner_date', today)
   }
 
-  // ✅ Custom Decline Logic
+  // ─────────────────────────────────────────────
+  // ✅ FRIENDLY: Custom Decline Logic
+  // ─────────────────────────────────────────────
   const openDeclineModal = (battleId: string) => {
     setDeclineModal({ isOpen: true, battleId })
   }
@@ -243,16 +316,72 @@ export default function UserDashboard() {
       setIncomingBattles(prev => prev.filter(b => b.id !== declineModal.battleId))
       setDeclineModal({ isOpen: false, battleId: null })
     } catch (err: any) {
-      alert(err.message || "Failed to decline challenge.")
+      setAlertData({ title: 'Decline Failed', message: err.message || 'Failed to decline challenge.', type: 'error' })
     } finally {
       setDeclining(false)
     }
   }
 
-  // ✅ Handles Accepting a Battle (Instantly hides banner)
+  // ─────────────────────────────────────────────
+  // ✅ FRIENDLY: Accept
+  // ─────────────────────────────────────────────
   const handleAcceptBattle = (battleId: string, quizId: string) => {
     setIncomingBattles(prev => prev.filter(b => b.id !== battleId))
     navigate(`/play/${quizId}?battleId=${battleId}&opponent=true`)
+  }
+
+  // ─────────────────────────────────────────────
+  // ✅ BET: Open decline modal
+  // ─────────────────────────────────────────────
+  const openBetDeclineModal = (battleId: string, wager: number) => {
+    setBetDeclineModal({ isOpen: true, battleId, wager })
+  }
+
+  // ─────────────────────────────────────────────
+  // ✅ BET: Accept — RPC then navigate. On failure, restore banner.
+  // ─────────────────────────────────────────────
+  const handleAcceptBetBattle = async (battle: any) => {
+    // Optimistic remove from UI
+    setIncomingBetBattles(prev => prev.filter(b => b.id !== battle.id))
+
+    try {
+      const { error } = await supabase.rpc('accept_bet_battle', { p_battle_id: battle.id })
+      if (error) throw error
+
+      // Deduct coins locally for immediate feedback
+      setProfile((p: any) => p ? { ...p, coins: (p.coins || 0) - battle.wager_amount } : p)
+
+      // Navigate straight into the quiz
+      navigate(`/play/${battle.quiz_id}?betBattleId=${battle.id}`)
+    } catch (err: any) {
+      console.error(err)
+      // ✅ Restore the battle back into the incoming list on failure
+      setIncomingBetBattles(prev => [battle, ...prev])
+      setAlertData({ title: 'Accept Failed', message: err.message || 'Failed to accept bet battle.', type: 'error' })
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // ✅ BET: Confirm decline
+  // ─────────────────────────────────────────────
+  const confirmBetDecline = async () => {
+    if (!betDeclineModal.battleId) return
+    setBetDeclining(true)
+
+    try {
+      const { error } = await supabase.rpc('decline_bet_battle', {
+        p_battle_id: betDeclineModal.battleId,
+      })
+      if (error) throw error
+
+      setIncomingBetBattles(prev => prev.filter(b => b.id !== betDeclineModal.battleId))
+      setBetDeclineModal({ isOpen: false, battleId: null, wager: 0 })
+    } catch (err: any) {
+      console.error(err)
+      setAlertData({ title: 'Decline Failed', message: err.message || 'Failed to decline bet battle.', type: 'error' })
+    } finally {
+      setBetDeclining(false)
+    }
   }
 
   const handleLogout = async () => {
@@ -336,7 +465,7 @@ export default function UserDashboard() {
           </div>
         </header>
 
-        {/* ✅ NEW CONTENT BANNER (Slim & Sleek) */}
+        {/* ✅ NEW CONTENT BANNER */}
         {showNewContentBanner && (
           <div className="mb-4 relative z-10 bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex items-center justify-between shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
             <div className="flex items-center gap-3">
@@ -371,7 +500,7 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {/* ✅ INCOMING PVP BATTLE BANNER */}
+        {/* ✅ INCOMING FRIENDLY PVP BATTLE BANNER */}
         {incomingBattles.length > 0 && (
           <div className="mb-6 relative z-10 space-y-3">
             {incomingBattles.map((battle) => (
@@ -416,7 +545,66 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {/* STATS GRID ... (unchanged) */}
+        {/* ✅ INCOMING BET BATTLES BANNER */}
+        {incomingBetBattles.length > 0 && (
+          <div className="mb-6 relative z-10 space-y-3">
+            {incomingBetBattles.map((battle) => {
+              const canAfford = (profile?.coins || 0) >= battle.wager_amount
+              return (
+                <div
+                  key={battle.id}
+                  className="bg-gradient-to-r from-yellow-500/20 to-yellow-500/5 border border-yellow-500/40 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-[0_0_20px_rgba(234,179,8,0.15)] animate-in slide-in-from-top-4"
+                >
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-yellow-500 shrink-0">
+                      {battle.profiles?.avatar_url ? (
+                        <img src={battle.profiles.avatar_url} alt="Challenger" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">
+                          {battle.profiles?.display_name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-base sm:text-lg flex items-center gap-2">
+                        <CoinsIcon weight="fill" className="text-yellow-400" /> 
+                        Bet Challenge!
+                      </h3>
+                      <p className="text-sm text-gray-300">
+                        <span className="font-bold text-white">{battle.profiles?.display_name}</span> wagered{' '}
+                        <span className="font-black text-yellow-400">{battle.wager_amount} coins</span> against you.
+                      </p>
+                      {!canAfford && (
+                        <p className="text-[10px] text-red-400 font-bold mt-1 flex items-center gap-1">
+                          <WarningCircleIcon weight="fill" /> Not enough coins to accept (need {battle.wager_amount})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button 
+                      onClick={() => openBetDeclineModal(battle.id, battle.wager_amount)}
+                      className="flex-1 sm:flex-none bg-white/10 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-500/20 hover:text-red-400 transition whitespace-nowrap"
+                    >
+                      Decline
+                    </button>
+                    <button 
+                      onClick={() => handleAcceptBetBattle(battle)}
+                      disabled={!canAfford}
+                      className="flex-1 sm:flex-none bg-yellow-500 text-black px-6 py-3 rounded-xl font-bold hover:bg-yellow-400 transition whitespace-nowrap shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <CoinsIcon weight="fill" className="w-4 h-4" />
+                      Accept ({battle.wager_amount})
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* STATS GRID */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6 relative z-10">
           <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
@@ -446,7 +634,6 @@ export default function UserDashboard() {
           </button>
         </div>
 
-        {/* ... (rest of the dashboard content unchanged) */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
           <div className="relative bg-black/50 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={() => navigate('/quizzes')}>
             <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
@@ -624,7 +811,7 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* ✅ CUSTOM DECLINE MODAL */}
+      {/* ✅ FRIENDLY DECLINE MODAL */}
       {declineModal.isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.1)]">
@@ -655,6 +842,72 @@ export default function UserDashboard() {
                 {declining ? 'Processing...' : 'Decline'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ BET DECLINE MODAL */}
+      {betDeclineModal.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(234,179,8,0.15)]">
+            
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg bg-yellow-500/20 text-yellow-400">
+              <CoinsIcon weight="fill" className="w-8 h-8 sm:w-10 sm:h-10" />
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Decline Bet Battle?</h2>
+            
+            <p className="text-gray-400 text-sm mb-6 sm:mb-8">
+              Declining will refund the challenger's <span className="font-bold text-yellow-400">{betDeclineModal.wager} coins</span>. Are you sure?
+            </p>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setBetDeclineModal({ isOpen: false, battleId: null, wager: 0 })} 
+                disabled={betDeclining}
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition disabled:opacity-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmBetDecline} 
+                disabled={betDeclining}
+                className="flex-1 py-3 rounded-xl font-bold transition disabled:opacity-50 text-sm shadow-lg bg-yellow-500 hover:bg-yellow-400 text-black"
+              >
+                {betDeclining ? 'Processing...' : 'Decline & Refund'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ INLINE ALERT MODAL */}
+      {alertData && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              alertData.type === 'success' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-500'
+            }`}>
+              {alertData.type === 'success' ? (
+                <CoinsIcon weight="fill" className="w-8 h-8" />
+              ) : (
+                <WarningCircleIcon weight="fill" className="w-8 h-8" />
+              )}
+            </div>
+            
+            <h2 className="text-xl font-black text-white mb-2">{alertData.title}</h2>
+            <p className="text-gray-400 text-sm mb-6">{alertData.message}</p>
+            
+            <button
+              onClick={() => setAlertData(null)}
+              className={`w-full py-3 rounded-xl font-bold text-sm transition shadow-lg ${
+                alertData.type === 'success' 
+                  ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/20' 
+                  : 'bg-red-500 text-white hover:bg-red-400 shadow-red-500/20'
+              }`}
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

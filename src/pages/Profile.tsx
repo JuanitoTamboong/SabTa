@@ -35,8 +35,6 @@ export default function Profile() {
   const [friendTab, setFriendTab] = useState<'followers' | 'following'>('followers')
   const [followBackLoading, setFollowBackLoading] = useState<string | null>(null)
   const [unfollowLoading, setUnfollowLoading] = useState<string | null>(null)
-  
-  // ❌ REMOVED: Play Menu States
 
   // Stats State
   const [stats, setStats] = useState({
@@ -89,7 +87,7 @@ export default function Profile() {
       }
 
       // ✅ 4. Fetch Friends
-      await refreshConnections(user.id)
+      await refreshFriends(user.id)
 
       setLoading(false)
     }
@@ -98,7 +96,7 @@ export default function Profile() {
   }, [navigate])
 
   // ✅ Function to fetch fresh data from DB and normalize relations
-  const refreshConnections = async (userId: string) => {
+  const refreshFriends = async (userId: string) => {
     const { data: followersData } = await supabase
       .from('follows')
       .select(`follower_id, profiles!follower_id ( id, display_name, avatar_url, points )`)
@@ -140,7 +138,7 @@ export default function Profile() {
         .insert({ follower_id: profile.id, following_id: targetId })
       
       if (error && error.code !== '23505') throw error
-      await refreshConnections(profile.id)
+      await refreshFriends(profile.id)
     } catch (err: any) {
       alert(err.message || 'Failed to follow back.')
     } finally {
@@ -162,15 +160,13 @@ export default function Profile() {
       if (error) throw error
       
       // Refresh to instantly update both lists
-      await refreshConnections(profile.id)
+      await refreshFriends(profile.id)
     } catch (err: any) {
       alert(err.message || 'Failed to unfollow.')
     } finally {
       setUnfollowLoading(null)
     }
   }
-
-  // ❌ REMOVED: openPlayMenu function
 
   const handleUpdateName = async () => {
     if (!editName.trim() || editName === profile.display_name) {
@@ -372,7 +368,6 @@ export default function Profile() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          {/* ✅ ROUTES TO QUIZZES PAGE */}
           <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
@@ -504,7 +499,8 @@ export default function Profile() {
               <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4">
                 <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History</button>
                 <button onClick={() => setActiveTab('inventory')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'inventory' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>My Inventory</button>
-                <button onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Connections</button>
+                {/* ✅ REPLACED "Connections" with "Friends" */}
+                <button onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Friends</button>
               </div>
 
               {activeTab === 'history' && (
@@ -709,14 +705,11 @@ export default function Profile() {
       {/* MOBILE NAVIGATION */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
-        {/* ✅ ROUTES TO QUIZZES PAGE */}
         <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
-
-      {/* ❌ PLAY MENU MODAL IS COMPLETELY GONE FROM HERE */}
     </div>
   )
 }
