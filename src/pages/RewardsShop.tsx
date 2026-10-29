@@ -15,10 +15,11 @@ export default function RewardsShop() {
   const [profile, setProfile] = useState<any>(null)
   const [inventory, setInventory] = useState<string[]>([])
   const [items, setItems] = useState<any[]>([])
-  
+  const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
+
   // Modals State
-  const [selectedItem, setSelectedItem] = useState<any>(null) // For Full Details
-  const [purchaseItem, setPurchaseItem] = useState<any>(null) // For Buy Confirmation
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [purchaseItem, setPurchaseItem] = useState<any>(null)
   
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
@@ -37,8 +38,22 @@ export default function RewardsShop() {
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (profileData) setProfile(profileData)
 
-      const { data: inventoryData } = await supabase.from('user_inventory').select('cosmetic_item_id').eq('user_id', user.id)
-      if (inventoryData) setInventory(inventoryData.map(i => i.cosmetic_item_id))
+      const { data: inventoryData } = await supabase
+        .from('user_inventory')
+        .select('cosmetic_item_id, is_equipped, cosmetic_items(cosmetic_type, preview_url)')
+        .eq('user_id', user.id)
+      
+      if (inventoryData) {
+        setInventory(inventoryData.map(i => i.cosmetic_item_id))
+        
+        const bg = inventoryData.find(i => 
+          i.is_equipped && 
+          (i.cosmetic_items as any)?.cosmetic_type === 'background'
+        )
+        if (bg && (bg.cosmetic_items as any)?.preview_url) {
+          setEquippedBackground((bg.cosmetic_items as any).preview_url)
+        }
+      }
 
       const { data: itemsData } = await supabase.from('cosmetic_items').select('*').eq('status', 'published').order('price', { ascending: true })
       if (itemsData) setItems(itemsData)
@@ -49,7 +64,6 @@ export default function RewardsShop() {
     fetchData()
   }, [navigate])
 
-  // Auto-dismiss toast
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3000)
@@ -137,7 +151,6 @@ export default function RewardsShop() {
     }
   }
 
-  // Sort items by Rarity (Legendary -> Epic -> Rare -> Common)
   const rarityOrder: Record<string, number> = {
     legendary: 1,
     epic: 2,
@@ -162,10 +175,22 @@ export default function RewardsShop() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex">
+    /* ✅ REMOVED overflow-hidden here to prevent cutting off the right side */
+    <div className="min-h-screen bg-[#050505] text-white flex relative">
       
+      {equippedBackground && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <img 
+            src={equippedBackground} 
+            alt="bg" 
+            className="w-full h-full object-cover opacity-60" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+        </div>
+      )}
+
       {/* DESKTOP SIDEBAR */}
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
+      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
         <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
              <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
@@ -189,7 +214,6 @@ export default function RewardsShop() {
             <UserIcon weight="fill" className="w-6 h-6" /> My Profile
           </button>
         </nav>
-        {/* REMOVED COIN BALANCE SIDEBAR BOX HERE */}
         <div className="mt-auto w-full">
           <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
             <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
@@ -198,9 +222,9 @@ export default function RewardsShop() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
-
+      {/* ✅ ADDED w-full to prevent overflow on mobile */}
+      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
+        
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">Rewards Shop</h1>
@@ -208,7 +232,7 @@ export default function RewardsShop() {
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(255,0,160,0.1)]">
+            <div className="bg-black/50 backdrop-blur-md border border-[#ff00a0]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(255,0,160,0.1)]">
               <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
               <span className="font-bold text-[#ff00a0] text-lg">{profile?.coins || 0} COINS</span>
             </div>
@@ -232,7 +256,7 @@ export default function RewardsShop() {
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap font-semibold text-sm transition-all ${
                 activeTab === tab.id 
                   ? 'bg-[#ccff00] text-black' 
-                  : 'bg-[#0f1014] text-gray-400 border border-white/5 hover:border-white/20 hover:text-white'
+                  : 'bg-black/40 backdrop-blur-md text-gray-400 border border-white/5 hover:border-white/20 hover:text-white'
               }`}
             >
               <tab.icon weight={activeTab === tab.id ? "fill" : "regular"} className="w-5 h-5" />
@@ -241,10 +265,10 @@ export default function RewardsShop() {
           ))}
         </div>
 
-        {/* Items Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 relative z-10">
+        {/* ITEMS GRID */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6 relative z-10 w-full">
           {filteredItems.length === 0 ? (
-            <div className="col-span-full text-center py-20 bg-[#0f1014] rounded-3xl border border-white/10">
+            <div className="col-span-full text-center py-20 bg-black/40 backdrop-blur-md rounded-3xl border border-white/10">
               <ShoppingBagIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400 font-bold mb-1">No items available</p>
               <p className="text-gray-500 text-sm">Check back later for new cosmetics!</p>
@@ -255,15 +279,16 @@ export default function RewardsShop() {
               const canAfford = (profile?.coins || 0) >= item.price
 
               return (
-                <div key={item.id} className="bg-[#0f1014] border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col">
+                /* ✅ ADDED min-w-0 to ensure it doesn't overflow on mobile */
+                <div key={item.id} className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col min-w-0 w-full">
                   
                   {/* Small Preview Box */}
                   <div 
-                    className="h-24 md:h-40 bg-black/50 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-2 md:p-4 cursor-pointer"
+                    className="h-28 md:h-48 bg-black/30 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-1 md:p-4 cursor-pointer"
                     onClick={() => setSelectedItem(item)}
                   >
                     {item.preview_url ? (
-                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-scale-down group-hover:scale-110 transition-transform duration-500" />
+                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="text-gray-600 flex flex-col items-center">
                         <ImageIcon weight="duotone" className="w-6 h-6 mb-1" />
@@ -271,7 +296,8 @@ export default function RewardsShop() {
                       </div>
                     )}
                     
-                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider border border-white/10 pointer-events-none">
+                    {/* Rarity Badge */}
+                    <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 bg-black/60 backdrop-blur-md px-1.5 md:px-3 py-0.5 md:py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider border border-white/10 pointer-events-none">
                       <span className={`${
                         item.rarity === 'legendary' ? 'text-[#ff00a0]' :
                         item.rarity === 'epic' ? 'text-[#ccff00]' :
@@ -281,46 +307,51 @@ export default function RewardsShop() {
                     </div>
                   </div>
 
-                  {/* Compact Details */}
-                  <div className="p-3 md:p-5 flex-1 flex flex-col">
-                    <div className="mb-2 md:mb-4 cursor-pointer" onClick={() => setSelectedItem(item)}>
-                      <h3 className="text-sm md:text-lg font-bold text-white mb-1 hover:text-[#ccff00] transition line-clamp-1">{item.name}</h3>
-                      <p className="hidden md:block text-xs md:text-sm text-gray-400 line-clamp-2">{item.description}</p>
+                  {/* Details */}
+                  <div className="p-2 md:p-5 flex-1 flex flex-col min-w-0">
+                    
+                    {/* Title & Price row */}
+                    <div className="mb-2 md:mb-4 cursor-pointer flex flex-col justify-between items-start gap-1" onClick={() => setSelectedItem(item)}>
+                      <div className="flex-1 min-w-0 w-full">
+                        <h3 className="text-[11px] md:text-lg font-bold text-white mb-0.5 hover:text-[#ccff00] transition truncate leading-tight w-full">{item.name}</h3>
+                        <p className="hidden md:block text-xs text-gray-400 line-clamp-2">{item.description}</p>
+                      </div>
+                      {!isOwned && (
+                        <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-[10px] md:text-base shrink-0 mt-1">
+                          <CoinsIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> 
+                          <span>{item.price}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-auto flex flex-col md:flex-row items-center justify-between pt-2 md:pt-4 border-t border-white/5 gap-2">
+                    {/* Action Buttons Row */}
+                    <div className="mt-auto pt-2 md:pt-4 border-t border-white/5 w-full">
                       {isOwned ? (
-                        <div className="flex items-center gap-1 md:gap-1.5 text-green-400 font-bold text-[10px] md:text-sm bg-green-500/10 px-2 md:px-3 py-1.5 rounded-lg w-full justify-center">
+                        <div className="flex items-center justify-center gap-1 text-green-400 font-bold text-[9px] md:text-sm bg-green-500/10 px-1 py-1.5 rounded-lg w-full">
                           <CheckCircleIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> Owned
                         </div>
                       ) : (
-                        <>
-                          <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-xs md:text-base shrink-0 w-full md:w-auto justify-start md:justify-center">
-                            <CoinsIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> {item.price}
-                          </div>
-                          
-                          <div className="flex items-center gap-1.5 w-full md:w-auto">
-                            <button
-                              onClick={() => setSelectedItem(item)}
-                              className="flex-1 md:flex-none flex items-center justify-center p-1.5 md:p-2.5 rounded-lg md:rounded-xl font-bold transition bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
-                              title="View Details"
-                            >
-                              <EyeIcon weight="bold" className="w-4 h-4 md:w-5 md:h-5" />
-                            </button>
+                        <div className="flex gap-1.5 w-full">
+                          <button
+                            onClick={() => setSelectedItem(item)}
+                            className="flex-none flex items-center justify-center p-1.5 md:p-2.5 rounded-lg md:rounded-xl font-bold transition bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
+                            title="View Details"
+                          >
+                            <EyeIcon weight="bold" className="w-3 h-3 md:w-5 md:h-5" />
+                          </button>
 
-                            <button
-                              onClick={() => setPurchaseItem(item)}
-                              disabled={!canAfford}
-                              className={`flex-1 md:flex-none px-2 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-bold text-[10px] md:text-sm transition ${
-                                canAfford 
-                                  ? 'bg-white text-black hover:bg-[#ccff00]' 
-                                  : 'bg-white/5 text-gray-500 cursor-not-allowed'
-                              }`}
-                            >
-                              {canAfford ? 'Buy' : 'Locked'}
-                            </button>
-                          </div>
-                        </>
+                          <button
+                            onClick={() => setPurchaseItem(item)}
+                            disabled={!canAfford}
+                            className={`flex-1 px-1 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-bold text-[10px] md:text-sm transition text-center ${
+                              canAfford 
+                                ? 'bg-white text-black hover:bg-[#ccff00]' 
+                                : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {canAfford ? 'Buy' : 'Locked'}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -331,7 +362,7 @@ export default function RewardsShop() {
         </div>
       </main>
 
-      {/* FULL DETAILS MODAL FOR MOBILE */}
+      {/* FULL DETAILS MODAL */}
       {selectedItem && !purchaseItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 max-w-md w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
@@ -466,8 +497,6 @@ export default function RewardsShop() {
             
             <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
-            
-            {/* REMOVED YOUR BALANCE BOX HERE */}
             
             <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (

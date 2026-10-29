@@ -16,6 +16,9 @@ export default function UserDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
+  
+  // ✅ NEW: State for equipped background
+  const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   // Daily Streak State
   const [showStreakModal, setShowStreakModal] = useState(false)
@@ -79,7 +82,7 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
-        // 3. Fetch Inventory
+        // 3. Fetch Inventory (Border & Background)
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('*, cosmetic_items(*)')
@@ -90,6 +93,12 @@ export default function UserDashboard() {
           const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'avatar_border')
           if (border?.cosmetic_items?.preview_url) {
             setEquippedBorder(border.cosmetic_items.preview_url)
+          }
+          
+          // ✅ Find equipped background
+          const bg = invData.find(i => i.cosmetic_items?.cosmetic_type === 'background')
+          if (bg?.cosmetic_items?.preview_url) {
+            setEquippedBackground(bg.cosmetic_items.preview_url)
           }
         }
 
@@ -104,17 +113,14 @@ export default function UserDashboard() {
           quizzesToday = challengeResult.quizzes_today
           
           if (challengeResult.claimed) {
-            // If the function just awarded the reward, trigger the modal
-            // But we only want to show the modal if it wasn't claimed BEFORE this load.
             const today = new Date().toISOString().split('T')[0]
             if (profileData?.last_challenge_date !== today) {
                setShowDailyBonusModal(true)
                
-               // Refresh local profile data to reflect the new points/coins
                const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
                if (updatedProfile) {
                  setProfile(updatedProfile)
-                 profileData = updatedProfile // update local var for the rest of the function
+                 profileData = updatedProfile 
                }
             }
           }
@@ -144,7 +150,7 @@ export default function UserDashboard() {
             bestScore, 
             accuracy: Math.round(avgAccuracy), 
             level, 
-            quizzesToday // ✅ Now comes directly from the database function
+            quizzesToday 
           })
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
@@ -230,8 +236,21 @@ export default function UserDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex">
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
+    <div className="min-h-screen bg-[#050505] text-white flex relative">
+      
+      {/* ✅ NEW: Fixed Background */}
+      {equippedBackground && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <img 
+            src={equippedBackground} 
+            alt="bg" 
+            className="w-full h-full object-cover opacity-60" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+        </div>
+      )}
+
+      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
         <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
             <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
@@ -250,7 +269,7 @@ export default function UserDashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
+      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
         <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -270,11 +289,11 @@ export default function UserDashboard() {
           
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
             <div className="flex items-center gap-2">
-              <div className="bg-[#0f1014] border border-[#ff00a0]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+              <div className="bg-black/50 backdrop-blur-md border border-[#ff00a0]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
                 <span className="font-bold text-xs text-[#ff00a0]">{profile?.coins || 0}</span>
               </div>
-              <div className="bg-[#0f1014] border border-white/10 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+              <div className="bg-black/50 backdrop-blur-md border border-white/10 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
                 <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
                 <span className="font-bold text-xs">{profile?.points || 0} PTS</span>
               </div>
@@ -294,19 +313,19 @@ export default function UserDashboard() {
 
         {/* STATS GRID */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
-          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.totalQuizzes}</p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TrophyIcon weight="duotone" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Best Score</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.bestScore} <span className="text-[10px] sm:text-xs text-gray-500">pts</span></p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TargetIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Accuracy</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.accuracy}%</p>
           </div>
-          <div className="bg-[#0f1014] border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
             <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
@@ -314,7 +333,7 @@ export default function UserDashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
-          <div className="relative bg-gradient-to-r from-[#111] to-[#1a1a1a] border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
+          <div className="relative bg-black/40 backdrop-blur-md border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
             <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
             <div className="relative z-10 flex flex-col items-start">
               <div className="bg-[#ccff00]/20 text-[#ccff00] px-3 py-1 rounded-full text-[10px] font-bold mb-3 uppercase tracking-wider">{profile?.age_category || 'General'} Tier</div>
@@ -324,7 +343,7 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4">
             <div className="flex justify-between items-center mb-3"><h3 className="text-xs sm:text-sm font-bold">Recent Activity</h3><ClockIcon className="text-gray-500 w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             {recentActivity.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-6 bg-black/20 rounded-2xl border border-white/5">No recent quizzes played.</div>
@@ -356,7 +375,7 @@ export default function UserDashboard() {
             )}
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-[#ff00a0]/10 rounded-bl-full" />
             <div className="flex justify-between items-center mb-3 relative z-10"><h3 className="text-xs sm:text-sm font-bold">Daily Challenge</h3><TargetIcon className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /></div>
             <p className="text-[11px] sm:text-xs text-gray-400 mb-3 relative z-10 flex flex-wrap items-center gap-1.5">
@@ -370,7 +389,7 @@ export default function UserDashboard() {
             </p>
           </div>
 
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-3 sm:p-4">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4">
             <div className="flex justify-between items-center mb-4"><h3 className="text-xs sm:text-sm font-bold">Top {profile?.age_category || 'Players'}</h3><MedalIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             <div className="space-y-3">
               {topPlayers.length === 0 ? (

@@ -65,7 +65,6 @@ export default function Profile() {
         const totalQuizzes = attempts.length
         const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
         
-        // ✅ FIXED: Calculate true accuracy dynamically
         const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
         const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
         const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
@@ -156,18 +155,16 @@ export default function Profile() {
 
     setUploadingAvatar(true)
     try {
-      // ✅ FIX: Compress the image before uploading
       const compressedFile = await new Promise<File>((resolve, reject) => {
         const img = new Image();
         img.src = URL.createObjectURL(file);
         
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_SIZE = 500; // Max width/height in pixels (good for avatars)
+          const MAX_SIZE = 500;
           let width = img.width;
           let height = img.height;
 
-          // Resize calculation
           if (width > height && width > MAX_SIZE) {
             height *= MAX_SIZE / width;
             width = MAX_SIZE;
@@ -184,7 +181,6 @@ export default function Profile() {
           
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Convert to JPEG with 0.8 (80%) quality
           canvas.toBlob(
             (blob) => {
               if (blob) {
@@ -209,7 +205,6 @@ export default function Profile() {
         };
       });
 
-      // 1. Delete the old avatar from storage if it exists
       if (avatarUrl && avatarUrl.includes('/storage/v1/object/public/avatars/')) {
         const oldFilePath = avatarUrl.split('/avatars/')[1]
         if (oldFilePath) {
@@ -217,7 +212,6 @@ export default function Profile() {
         }
       }
 
-      // 2. Upload the compressed avatar
       const fileExt = compressedFile.name.split('.').pop() || 'jpg'
       const filePath = `${profile.id}/avatar-${Date.now()}.${fileExt}`
 
@@ -255,7 +249,6 @@ export default function Profile() {
       const { error } = await supabase.rpc('equip_cosmetic', { p_item_id: itemId })
       if (error) throw error
 
-      // Update local state instantly with strict targeting
       const targetItem = inventory.find(i => i.cosmetic_item_id === itemId);
       const isCurrentlyEquipped = targetItem?.is_equipped;
       const itemType = targetItem?.cosmetic_items?.cosmetic_type;
@@ -288,6 +281,21 @@ export default function Profile() {
     navigate('/')
   }
 
+  // ✅ Categorization Logic
+  const categorizedInventory = inventory.reduce((acc, item) => {
+    const type = item.cosmetic_items?.cosmetic_type || 'other';
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const categoryLabels: Record<string, string> = {
+    avatar_border: 'Avatar Borders',
+    background: 'Profile Backgrounds',
+    quiz_theme: 'Quiz Themes',
+    other: 'Other Items'
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING PROFILE...</div>
   }
@@ -296,10 +304,24 @@ export default function Profile() {
   const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'background')
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex">
+    <div className="min-h-screen bg-[#050505] text-white flex relative">
       
+      {/* ✅ UPDATED BACKGROUND: More visible on mobile, no stretching */}
+      {equippedBackground?.cosmetic_items?.preview_url && (
+        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+          <img 
+            src={equippedBackground.cosmetic_items.preview_url} 
+            alt="bg" 
+            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
+          />
+          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+        </div>
+      )}
+
       {/* SIDEBAR */}
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
+      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
         <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
              <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
@@ -319,18 +341,8 @@ export default function Profile() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
+      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
         
-        {equippedBackground?.cosmetic_items?.preview_url && (
-          <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src={equippedBackground.cosmetic_items.preview_url} alt="bg" className="w-full h-full object-cover opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/60 to-[#050505]" />
-          </div>
-        )}
-
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
-
         <header className="mb-6 md:mb-10 relative z-10 flex justify-between items-start">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">My Profile</h1>
@@ -343,7 +355,7 @@ export default function Profile() {
           
           <div className="lg:col-span-4 space-y-6 md:space-y-8">
             {/* Main Profile Card */}
-            <div className="bg-[#0f1014]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
+            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00f0ff]/10 to-transparent" />
 
               <input
@@ -361,9 +373,10 @@ export default function Profile() {
                 title="Click to change profile picture"
               >
                 
-                <div className="relative w-32 h-32 md:w-36 md:h-36 flex items-center justify-center">
+                {/* ✅ Slightly larger container to prevent mobile borders from clipping */}
+                <div className="relative w-36 h-36 md:w-40 md:h-40 flex items-center justify-center">
                   
-                  <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
+                  <div className="absolute inset-[18%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
                     {uploadingAvatar ? (
                       <div className="text-xs text-[#ccff00] font-mono animate-pulse">UPLOADING...</div>
                     ) : avatarUrl ? (
@@ -385,7 +398,7 @@ export default function Profile() {
                     />
                   )}
 
-                  <div className="hidden md:flex absolute inset-[15%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
+                  <div className="hidden md:flex absolute inset-[18%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
                     <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
                     <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
                   </div>
@@ -437,7 +450,7 @@ export default function Profile() {
             </div>
 
             {/* Lifetime Stats */}
-            <div className="bg-[#0f1014]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 relative overflow-hidden">
+            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#ccff00]/5 rounded-bl-full" />
               <h3 className="text-lg font-bold mb-5 flex items-center gap-2"><StarIcon weight="fill" className="text-[#ccff00]" /> Lifetime Stats</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -467,7 +480,7 @@ export default function Profile() {
 
           {/* RIGHT COLUMN: TABS */}
           <div className="lg:col-span-8">
-            <div className="bg-[#0f1014]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
               
               <div className="flex gap-2 mb-6 border-b border-white/10 pb-4">
                 <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History</button>
@@ -480,7 +493,6 @@ export default function Profile() {
                     <p className="text-gray-500 text-sm text-center py-10">No quizzes played yet.</p>
                   ) : (
                     history.map((attempt) => {
-                      // ✅ FIXED: Calculate true accuracy for each individual attempt
                       const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
                       const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
 
@@ -505,7 +517,7 @@ export default function Profile() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   {inventory.length === 0 ? (
                     <div className="text-center py-16">
                       <ShoppingBagIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -514,44 +526,52 @@ export default function Profile() {
                       <button onClick={() => navigate('/rewards')} className="bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">Visit Shop</button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {inventory.map((invItem) => (
-                        <div key={invItem.id} className={`flex items-center justify-between p-4 bg-black/40 border rounded-2xl transition ${invItem.is_equipped ? 'border-[#ccff00]/50 shadow-[0_0_15px_rgba(204,255,0,0.1)]' : 'border-white/5'}`}>
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10">
-                              {invItem.cosmetic_items?.preview_url ? (
-                                <img src={invItem.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover" />
+                    /* ✅ CATEGORIZED INVENTORY */
+                    Object.entries(categorizedInventory).map(([type, items]) => (
+                      <div key={type} className="mb-6">
+                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
+                          {categoryLabels[type] || type}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {(items as any[]).map((invItem) => (
+                            <div key={invItem.id} className={`flex items-center justify-between p-4 bg-black/40 border rounded-2xl transition ${invItem.is_equipped ? 'border-[#ccff00]/50 shadow-[0_0_15px_rgba(204,255,0,0.1)]' : 'border-white/5'}`}>
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10">
+                                  {invItem.cosmetic_items?.preview_url ? (
+                                    <img src={invItem.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <StarIcon className="w-full h-full p-3 text-gray-500" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-white text-sm">{invItem.cosmetic_items?.name}</p>
+                                  <p className="text-[10px] uppercase font-bold text-gray-500">{invItem.cosmetic_items?.cosmetic_type}</p>
+                                </div>
+                              </div>
+                              
+                              {invItem.is_equipped ? (
+                                <button 
+                                  onClick={() => handleEquip(invItem.cosmetic_item_id)}
+                                  disabled={equipping}
+                                  className="text-xs font-bold text-[#ccff00] hover:text-[#b3e600] flex items-center gap-1 bg-[#ccff00]/10 hover:bg-[#ccff00]/20 px-3 py-1.5 rounded-lg border border-[#ccff00]/20 transition disabled:opacity-50"
+                                  title="Click to Unequip"
+                                >
+                                  <CheckIcon weight="bold" /> Equipped
+                                </button>
                               ) : (
-                                <StarIcon className="w-full h-full p-3 text-gray-500" />
+                                <button 
+                                  onClick={() => handleEquip(invItem.cosmetic_item_id)}
+                                  disabled={equipping}
+                                  className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition disabled:opacity-50"
+                                >
+                                  Equip
+                                </button>
                               )}
                             </div>
-                            <div>
-                              <p className="font-bold text-white text-sm">{invItem.cosmetic_items?.name}</p>
-                              <p className="text-[10px] uppercase font-bold text-gray-500">{invItem.cosmetic_items?.cosmetic_type}</p>
-                            </div>
-                          </div>
-                          
-                          {invItem.is_equipped ? (
-                            <button 
-                              onClick={() => handleEquip(invItem.cosmetic_item_id)}
-                              disabled={equipping}
-                              className="text-xs font-bold text-[#ccff00] hover:text-[#b3e600] flex items-center gap-1 bg-[#ccff00]/10 hover:bg-[#ccff00]/20 px-3 py-1.5 rounded-lg border border-[#ccff00]/20 transition disabled:opacity-50"
-                              title="Click to Unequip"
-                            >
-                              <CheckIcon weight="bold" /> Equipped
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => handleEquip(invItem.cosmetic_item_id)}
-                              disabled={equipping}
-                              className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition disabled:opacity-50"
-                            >
-                              Equip
-                            </button>
-                          )}
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))
                   )}
                 </div>
               )}
@@ -570,7 +590,7 @@ export default function Profile() {
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* CHOOSE A CHALLENGE MODAL (Responsive) */}
+      {/* CHOOSE A CHALLENGE MODAL */}
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
@@ -578,14 +598,6 @@ export default function Profile() {
             
             <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
-            
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
-              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5">
-                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
-                <span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span>
-              </div>
-            </div>
             
             <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
               {loadingQuizzes ? (

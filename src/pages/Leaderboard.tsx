@@ -16,6 +16,9 @@ export default function Leaderboard() {
   const [profile, setProfile] = useState<any>(null)
   const [players, setPlayers] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
+  
+  // ✅ NEW: State for equipped background
+  const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   // Play Menu State
   const [showPlayMenu, setShowPlayMenu] = useState(false)
@@ -36,11 +39,25 @@ export default function Leaderboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
+      // 1. Fetch Profile & Equipped Background
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (profileData) setProfile(profileData)
       if (!profileData?.age_category) { setLoading(false); return }
 
-      // 1. Fetch all profiles (to get their total real points)
+      const { data: myInventory } = await supabase
+        .from('user_inventory')
+        .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
+        .eq('user_id', user.id)
+        .eq('is_equipped', true)
+
+      if (myInventory) {
+        const bg = myInventory.find(i => (i.cosmetic_items as any)?.cosmetic_type === 'background')
+        if (bg && (bg.cosmetic_items as any)?.preview_url) {
+          setEquippedBackground((bg.cosmetic_items as any).preview_url)
+        }
+      }
+
+      // 2. Fetch all profiles (to get their total real points)
       let profileQuery = supabase
         .from('profiles')
         .select(`
@@ -57,7 +74,7 @@ export default function Leaderboard() {
 
       const { data: allProfiles, error: profileError } = await profileQuery
 
-      // 2. Fetch all attempts (to calculate difficulty breakdowns and times)
+      // 3. Fetch all attempts (to calculate difficulty breakdowns and times)
       const { data: attempts } = await supabase
         .from('quiz_attempts')
         .select('user_id, score, time_taken_seconds, quizzes(difficulty)')
@@ -90,19 +107,12 @@ export default function Leaderboard() {
           })
 
           const totalQuizPoints = quizNormal + quizIntermediate + quizHard
-          
-          // ✅ THE MAGIC FIX: 
-          // The profile points include bonuses. 
-          // We find the bonus by subtracting the quiz points from the profile total.
-          // If they somehow have less profile points than quiz points (due to penalties), we default bonus to 0.
           const bonusPoints = Math.max(0, (p.points || 0) - totalQuizPoints)
 
           let displayPoints = 0
           let displayTime = 99999
 
           if (activeTab === 'global') {
-            // Global = All Quiz points + Bonus points (Streaks/Challenges)
-            // Or just p.points, but this logic proves the breakdown
             displayPoints = totalQuizPoints + bonusPoints
             displayTime = Math.min(bestTimeNormal, bestTimeIntermediate, bestTimeHard)
           } else if (activeTab === 'normal') {
@@ -126,7 +136,7 @@ export default function Leaderboard() {
             border_url: equippedBorder?.cosmetic_items?.preview_url || null,
           }
         })
-        .filter((p: any) => p.points > 0) // Only show players with points
+        .filter((p: any) => p.points > 0)
         .sort((a, b) => {
           if (b.points !== a.points) {
             return b.points - a.points
@@ -190,9 +200,21 @@ export default function Leaderboard() {
   const currentUserPoints = players[currentUserRank - 1]?.points || 0
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex">
+    <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014] flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
+      {/* ✅ NEW: Fixed Background */}
+      {equippedBackground && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <img 
+            src={equippedBackground} 
+            alt="bg" 
+            className="w-full h-full object-cover opacity-60" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+        </div>
+      )}
+
+      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
         <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
              <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
@@ -211,9 +233,8 @@ export default function Leaderboard() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#ccff00]/5 rounded-full blur-[100px] pointer-events-none" />
-
+      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
+        
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">
@@ -227,7 +248,7 @@ export default function Leaderboard() {
             </p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <div className="bg-[#0f1014] border border-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
+            <div className="bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
               <LightningIcon weight="fill" className="text-[#ccff00] w-5 h-5" />
               <span className="font-bold">{profile?.points || 0} PTS</span>
             </div>
@@ -244,7 +265,7 @@ export default function Leaderboard() {
             className={`flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm capitalize transition-all flex items-center justify-center gap-2 ${
               activeTab === 'global' 
                 ? 'bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)]' 
-                : 'bg-[#0f1014] text-gray-400 border border-white/5 hover:border-white/20'
+                : 'bg-black/40 backdrop-blur-md text-gray-400 border border-white/5 hover:border-white/20'
             }`}
           >
             <GlobeIcon weight="bold" size={16} className="sm:w-[18px] sm:h-[18px]" /> Global
@@ -259,7 +280,7 @@ export default function Leaderboard() {
               className={`flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm capitalize transition-all ${
                 activeTab === diff 
                   ? 'bg-[#ccff00] text-black shadow-[0_0_20px_rgba(204,255,0,0.3)]' 
-                  : 'bg-[#0f1014] text-gray-400 border border-white/5 hover:border-white/20'
+                  : 'bg-black/40 backdrop-blur-md text-gray-400 border border-white/5 hover:border-white/20'
               }`}
             >
               {diff}
@@ -268,7 +289,7 @@ export default function Leaderboard() {
         </div>
 
         {players.length === 0 ? (
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-12 text-center relative z-10">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-12 text-center relative z-10">
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
             <p className="text-gray-500 text-sm">Be the first to complete a quiz!</p>
@@ -297,7 +318,7 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-gray-400 text-gray-300 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#2</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1a1c23] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)]">
+                  <div className="bg-gradient-to-t from-[#1a1c23]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)]">
                     <MedalIcon weight="fill" className="text-gray-400 w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
                     <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[1].display_name}</p>
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[1].age_category}</p>}
@@ -323,7 +344,7 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#ccff00] text-black w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-sm sm:text-lg z-30 shadow-[0_0_15px_rgba(204,255,0,0.4)] border-2 border-[#0f1014]">#1</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1a2210] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)]">
+                  <div className="bg-gradient-to-t from-[#1a2210]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)]">
                     <div className="absolute inset-0 bg-[#ccff00]/5 pointer-events-none" />
                     <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 relative z-10 drop-shadow-md" />
                     <p className="text-xs sm:text-base font-black truncate text-white relative z-10">{players[0].display_name}</p>
@@ -349,7 +370,7 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-[#cd7f32] text-[#cd7f32] w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#3</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1c1512] to-[#0f1014] w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)]">
+                  <div className="bg-gradient-to-t from-[#1c1512]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)]">
                     <MedalIcon weight="fill" className="text-[#cd7f32] w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
                     <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[2].display_name}</p>
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[2].age_category}</p>}
@@ -359,7 +380,7 @@ export default function Leaderboard() {
               ) : <div />}
             </div>
 
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl overflow-hidden relative z-10">
+            <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden relative z-10">
               <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b border-white/5 bg-black/20 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Rank</span>
                 <span className="flex-1 ml-2 sm:ml-4">Player</span>
@@ -372,7 +393,7 @@ export default function Leaderboard() {
                   const isMe = player.id === profile?.id
 
                   return (
-                    <div key={player.id} className={`flex items-center p-3 sm:p-4 md:p-6 transition ${isMe ? 'bg-[#ccff00]/5' : 'hover:bg-white/5'}`}>
+                    <div key={player.id} className={`flex items-center p-3 sm:p-4 md:p-6 transition ${isMe ? 'bg-[#ccff00]/10' : 'hover:bg-white/5'}`}>
                       <span className={`w-6 sm:w-8 md:w-12 font-mono font-bold text-xs sm:text-sm md:text-base ${isMe ? 'text-[#ccff00]' : 'text-gray-500'}`}>
                         #{rank}
                       </span>
@@ -470,7 +491,7 @@ export default function Leaderboard() {
         </button>
       </nav>
 
-      {/* PLAY MENU MODAL (Responsive) */}
+      {/* PLAY MENU MODAL */}
       {showPlayMenu && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
