@@ -74,6 +74,7 @@ export default function QuizGameplay() {
   
   // User Profile Data
   const [profile, setProfile] = useState<any>(null)
+  const [equippedTheme, setEquippedTheme] = useState<string | null>(null) 
 
   // Results State
   const [isFinished, setIsFinished] = useState(false)
@@ -117,6 +118,23 @@ export default function QuizGameplay() {
           .maybeSingle()
         
         if (profileData) setProfile(profileData)
+
+        // ✅ Fetch all equipped items and filter for the quiz theme
+        const { data: invData } = await supabase
+          .from('user_inventory')
+          .select('cosmetic_items(cosmetic_type, preview_url)')
+          .eq('user_id', user.id)
+          .eq('is_equipped', true)
+
+        if (invData) {
+          // Cast cosmetic_items as any to fix the TypeScript array error
+          const themeItem = invData.find((item: any) => 
+            (item.cosmetic_items as any)?.cosmetic_type === 'quiz_theme'
+          )
+          if (themeItem && (themeItem.cosmetic_items as any)?.preview_url) {
+            setEquippedTheme((themeItem.cosmetic_items as any).preview_url)
+          }
+        }
 
         const { data: existingAttempt } = await supabase
           .from('quiz_attempts')
@@ -337,9 +355,19 @@ export default function QuizGameplay() {
 
     return (
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative overflow-y-auto">
+        
+        {/* APPLY THEME TO RESULTS SCREEN */}
+        {equippedTheme && (
+          <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+            <img src={equippedTheme} alt="bg" className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
+            <div className="absolute inset-0 bg-[#050505]/70 md:bg-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+          </div>
+        )}
+
         <div className="w-full max-w-2xl py-6 md:py-10 relative z-10">
           
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 md:p-10 text-center shadow-2xl mb-4 sm:mb-6">
+          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 md:p-10 text-center shadow-2xl mb-4 sm:mb-6">
             <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#ccff00] to-green-400 rounded-full flex items-center justify-center mb-4 sm:mb-6 shadow-[0_0_40px_rgba(204,255,0,0.3)]">
               <TrophyIcon weight="fill" className="w-8 h-8 sm:w-10 sm:h-10 text-black" />
             </div>
@@ -397,7 +425,7 @@ export default function QuizGameplay() {
               </div>
             </div>
 
-            <div className="flex justify-between items-center bg-[#0f1014] border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8">
+            <div className="flex justify-between items-center bg-black/40 border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8">
               <div className="flex flex-col items-center flex-1">
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">New Total Points</p>
                 <p className="text-base sm:text-lg font-bold text-[#ccff00]">{dbResults?.new_total_points ?? 0}</p>
@@ -427,7 +455,7 @@ export default function QuizGameplay() {
           </div>
 
           {showReview && (
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-4 sm:p-6 md:p-8 shadow-2xl">
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl sm:rounded-[2rem] p-4 sm:p-6 md:p-8 shadow-2xl">
               <h3 className="text-base sm:text-lg font-bold mb-4 sm:mb-6 flex items-center gap-2">
                 <TargetIcon className="text-[#ccff00]" /> Answer Breakdown
               </h3>
@@ -472,22 +500,35 @@ export default function QuizGameplay() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
       
+      {/* ✅ BACKGROUND THEME */}
+      {equippedTheme && (
+        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+          <img 
+            src={equippedTheme} 
+            alt="theme" 
+            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
+          />
+          <div className="absolute inset-0 bg-[#050505]/60 md:bg-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+        </div>
+      )}
+
       {/* HEADER BAR */}
-      <div className="w-full max-w-3xl flex justify-between items-center mb-4">
+      <div className="w-full max-w-3xl flex justify-between items-center mb-4 relative z-10">
         <button 
           onClick={() => setShowQuitModal(true)} 
-          className="flex items-center gap-1.5 sm:gap-2 text-gray-400 hover:text-red-400 transition bg-white/5 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold"
+          className="flex items-center gap-1.5 sm:gap-2 text-gray-400 hover:text-red-400 transition bg-black/40 backdrop-blur-md px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border border-white/10"
         >
           <ArrowLeftIcon weight="bold" /> Quit
         </button>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-[#0f1014] border border-white/10 px-3 sm:px-4 py-2 rounded-xl">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-black/40 backdrop-blur-md border border-white/10 px-3 sm:px-4 py-2 rounded-xl">
             <TimerIcon weight="fill" className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
             <span className="font-bold text-gray-300 font-mono text-xs sm:text-base">{formatTime(liveElapsedTime)}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-[#0f1014] border border-[#ff00a0]/30 px-3 sm:px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-black/40 backdrop-blur-md border border-[#ff00a0]/30 px-3 sm:px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(255,0,160,0.1)]">
             <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" />
             <span className="font-bold text-[#ff00a0] text-xs sm:text-base">{profile?.coins || 0}</span>
           </div>
@@ -496,27 +537,27 @@ export default function QuizGameplay() {
 
       <div className="w-full max-w-3xl relative z-10">
         <div className="flex justify-between items-center mb-6">
-          <div className="text-gray-400 font-mono text-xs sm:text-sm">Q {currentQIndex + 1} / {questions.length}</div>
-          <div className={`flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border ${timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/10 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
+          <div className="text-gray-400 font-mono text-xs sm:text-sm bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">Q {currentQIndex + 1} / {questions.length}</div>
+          <div className={`flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border backdrop-blur-md ${timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/20 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
             <ClockIcon weight="bold" className="w-5 h-5 sm:w-6 sm:h-6" /> 00:{timeLeft.toString().padStart(2, '0')}
           </div>
         </div>
 
-        <div className="w-full h-1.5 sm:h-2 bg-[#0f1014] rounded-full mb-8 sm:mb-12 overflow-hidden border border-white/5">
-          <div className="h-full bg-[#ccff00] transition-all duration-300" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
+        <div className="w-full h-1.5 sm:h-2 bg-black/40 backdrop-blur-md rounded-full mb-8 sm:mb-12 overflow-hidden border border-white/5">
+          <div className="h-full bg-[#ccff00] transition-all duration-300 shadow-[0_0_10px_rgba(204,255,0,0.5)]" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug">{currentQuestion.question_text}</h2>
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md">{currentQuestion.question_text}</h2>
         
         {!isAnswerRevealed && (
           <div className="flex justify-center mb-4 sm:mb-6">
             <button 
               onClick={() => setShowHintModal(true)} 
               disabled={showHint} 
-              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition backdrop-blur-md ${
                 showHint 
                   ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500/50 cursor-not-allowed' 
-                  : 'bg-transparent border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'
+                  : 'bg-black/40 border-[#ff00a0]/30 text-[#ff00a0] hover:bg-[#ff00a0]/10'
               }`}
             >
               <LightbulbIcon weight="fill" /> 
@@ -526,7 +567,7 @@ export default function QuizGameplay() {
         )}
 
         {showHint && (
-          <div className="bg-[#ff00a0]/10 border border-[#ff00a0]/20 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center text-xs sm:text-sm text-[#ff00a0]">
+          <div className="bg-[#ff00a0]/10 backdrop-blur-md border border-[#ff00a0]/20 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center text-xs sm:text-sm text-[#ff00a0] font-semibold">
             {currentQuestion.hint || "Think carefully about the question."}
           </div>
         )}
@@ -535,11 +576,11 @@ export default function QuizGameplay() {
           {currentQuestion.options.map((option: string, idx: number) => {
             const isCorrect = option === currentQuestion.correct_answer
             const isSelected = option === selectedAnswer
-            let btnClass = "bg-[#0f1014] border border-white/10 hover:border-white/30 hover:bg-white/5"
+            let btnClass = "bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 hover:bg-white/10"
             if (isAnswerRevealed) {
-              if (isCorrect) btnClass = "bg-green-500/20 border-green-500 text-green-400"
-              else if (isSelected && !isCorrect) btnClass = "bg-red-500/20 border-red-500 text-red-400"
-              else btnClass = "bg-[#0f1014] border-white/5 opacity-50"
+              if (isCorrect) btnClass = "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
+              else if (isSelected && !isCorrect) btnClass = "bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+              else btnClass = "bg-black/40 backdrop-blur-sm border-white/5 opacity-50"
             }
             return (
               <button key={idx} onClick={() => handleSelectAnswer(option)} disabled={isAnswerRevealed} className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl text-left text-sm sm:text-lg font-semibold transition-all flex justify-between items-center ${btnClass}`}>
@@ -557,7 +598,7 @@ export default function QuizGameplay() {
         </div>
 
         <div className="mt-8 sm:mt-12 flex justify-between items-center text-gray-500 text-xs sm:text-sm">
-          <div className="flex items-center gap-1.5 sm:gap-2"><TargetIcon weight="fill" className="text-[#00f0ff]" /> Correct: <span className="font-bold text-white">{correctCount}</span></div>
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5"><TargetIcon weight="fill" className="text-[#00f0ff]" /> Correct: <span className="font-bold text-white">{correctCount}</span></div>
         </div>
       </div>
 
