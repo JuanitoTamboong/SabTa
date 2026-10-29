@@ -1,5 +1,5 @@
 // src/pages/LandingPage.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   ArrowRightIcon,
@@ -28,6 +28,28 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ✅ NEW: Reject Admin accounts on the Player app
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        // If the user is an admin, sign them out of this player project immediately
+        if (profile?.role === 'admin') {
+          await supabase.auth.signOut()
+          setError("Admin accounts must use the separate Admin Portal.")
+        }
+      }
+    }
+    checkUserRole()
+  }, [])
+
   const handleGoogleLogin = async () => {
     setLoading(true)
     setError(null)
@@ -36,7 +58,7 @@ export default function LandingPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/`,
         },
       })
 
@@ -106,7 +128,6 @@ export default function LandingPage() {
 
       <section className="sabta-hero" aria-labelledby="sabta-hero-title">
         
-        {/* FIXED SIDE TABS */}
         <div className="sabta-side-tab sabta-side-tab--left">
           <span className="sabta-side-chevron">»</span>
           <TrophyIcon weight="fill" className="sabta-side-icon" />
@@ -146,6 +167,7 @@ export default function LandingPage() {
             </a>
           </div>
 
+          {/* ✅ Shows the error message if an admin tries to sign in */}
           {error && (
             <div className="sabta-error" role="alert">
               <strong>Sign-in failed</strong>

@@ -14,6 +14,7 @@ export default function GlobalChat() {
   const [newMessage, setNewMessage] = useState('')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [sending, setSending] = useState(false)
+  const [onlineCount, setOnlineCount] = useState(1) 
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -23,16 +24,17 @@ export default function GlobalChat() {
   }
 
   useEffect(() => {
+    // ✅ 1. Create a flag to prevent state updates after unmount (Strict Mode)
+    let isMounted = true
     let channel: any = null
 
     const initChat = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || !isMounted) return
       
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      setCurrentUser(profile)
+      if (isMounted) setCurrentUser(profile)
 
-      // ✅ 24-HOUR FILTER: Only fetch messages from the last 24 hours
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
       const { data } = await supabase
@@ -41,31 +43,34 @@ export default function GlobalChat() {
           id, message, created_at, user_id,
           profiles ( display_name, avatar_url )
         `)
-        .gte('created_at', twentyFourHoursAgo) // The filter
+        .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: true })
         .limit(50)
 
-      if (data) {
+      if (data && isMounted) {
         setMessages(data)
         setTimeout(scrollToBottom, 100)
       }
 
-      // Unique channel name prevents StrictMode double-mount errors
-      const channelName = `chat_room_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
+      // ✅ 2. Build the ENTIRE chain synchronously in one go.
+      // This guarantees postgres_changes is attached BEFORE subscribe() is called.
       channel = supabase
-        .channel(channelName)
+        .channel('global_chat_room', {
+          config: {
+            presence: { key: user.id },
+          },
+        })
         .on(
           'postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
-          async (payload) => {
+          async (payload: any) => {
             const { data: newMsg } = await supabase
               .from('chat_messages')
               .select(`id, message, created_at, user_id, profiles ( display_name, avatar_url )`)
               .eq('id', payload.new.id)
               .single()
 
-            if (newMsg) {
+            if (newMsg && isMounted) {
               setMessages((prev) => {
                 if (prev.some(m => m.id === newMsg.id)) return prev;
                 return [...prev, newMsg]
@@ -79,12 +84,34 @@ export default function GlobalChat() {
             }
           }
         )
-        .subscribe()
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel?.presenceState() || {}
+          
+          const uniqueUserIds = new Set()
+          Object.values(state).forEach((presences: any) => {
+            presences.forEach((p: any) => {
+              if (p.user_id) uniqueUserIds.add(p.user_id)
+            })
+          })
+
+          const count = Math.max(1, uniqueUserIds.size)
+          if (isMounted) setOnlineCount(count)
+        })
+        .subscribe(async (status: string) => {
+          if (status === 'SUBSCRIBED' && isMounted) {
+            await channel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString(),
+            })
+          }
+        })
     }
 
     initChat()
 
+    // ✅ 3. Cleanup: Remove the channel entirely on unmount
     return () => {
+      isMounted = false
       if (channel) {
         supabase.removeChannel(channel)
       }
@@ -125,7 +152,7 @@ export default function GlobalChat() {
 
   return (
     <>
-      {/* FLOATING BUTTON */}
+      {/* ... (Your JSX remains completely unchanged) ... */}
       <button
         onClick={() => setIsOpen(true)}
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[90] bg-[#ccff00] text-black p-4 rounded-full shadow-[0_0_20px_rgba(204,255,0,0.4)] hover:scale-110 transition-transform ${isOpen ? 'hidden' : 'flex'}`}
@@ -133,22 +160,24 @@ export default function GlobalChat() {
         <ChatCircleDotsIcon weight="fill" className="w-7 h-7" />
       </button>
 
-      {/* CHAT WINDOW */}
       {isOpen && (
         <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[100] w-[calc(100vw-2rem)] sm:w-96 h-[500px] max-h-[70vh] bg-[#0f1014] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
           
-          {/* Header */}
           <div className="flex items-center justify-between p-4 bg-black/40 border-b border-white/10">
             <div className="flex items-center gap-2">
               <ChatCircleDotsIcon weight="fill" className="text-[#ccff00] w-6 h-6" />
               <h3 className="font-bold text-white">Global Chat</h3>
+              
+              <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full ml-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-bold text-green-400">{onlineCount} Online</span>
+              </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-lg transition">
               <XIcon weight="bold" size={18} />
             </button>
           </div>
 
-          {/* Messages Area */}
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 admin-custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 text-sm mt-10">No recent messages. Say hello!</div>
@@ -158,7 +187,6 @@ export default function GlobalChat() {
                 return (
                   <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                     
-                    {/* ✅ Avatar with Online Indicator & Click to View Profile */}
                     <div 
                       onClick={() => { if (!isMe) navigate(`/player/${msg.user_id}`) }}
                       className={`relative w-8 h-8 rounded-full bg-white/10 shrink-0 flex items-center justify-center overflow-hidden border border-white/10 mt-1 ${!isMe ? 'cursor-pointer hover:border-[#ccff00] transition' : ''}`}
@@ -170,14 +198,11 @@ export default function GlobalChat() {
                         <UserIcon className="w-4 h-4 text-gray-400" />
                       )}
                       
-                      {/* Green Online Dot */}
                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#0f1014] rounded-full z-10 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                     </div>
 
-                    {/* Message Bubble */}
                     <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                       <div className="flex items-center gap-2 mb-1">
-                        {/* ✅ Clickable Name */}
                         <span 
                           onClick={() => { if (!isMe) navigate(`/player/${msg.user_id}`) }}
                           className={`text-[10px] text-gray-400 font-bold ${!isMe ? 'cursor-pointer hover:text-[#ccff00] transition' : ''}`}
@@ -193,7 +218,6 @@ export default function GlobalChat() {
                       }`}>
                         {msg.message}
                         
-                        {/* Delete Button */}
                         {isMe && (
                           <button 
                             onClick={() => handleDelete(msg.id)}
@@ -212,7 +236,6 @@ export default function GlobalChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <form onSubmit={handleSendMessage} className="p-3 bg-black/40 border-t border-white/10 flex gap-2">
             <input
               type="text"

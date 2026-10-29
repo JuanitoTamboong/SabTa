@@ -13,7 +13,7 @@ import Leaderboard from './pages/Leaderboard'
 import GlobalChat from './pages/GlobalChat'
 import PlayerProfile from './pages/PlayerProfile'
 import Quizzes from './pages/Quizzes'
-import BattleHistory from './pages/BattleHistory' // ✅ IMPORTED BATTLE HISTORY
+import BattleHistory from './pages/BattleHistory' 
 
 function AuthCallback() {
   const navigate = useNavigate()
@@ -29,6 +29,14 @@ function AuthCallback() {
 
         if (error || !profile) {
           await supabase.auth.signOut()
+          navigate('/')
+          return
+        }
+
+        // ✅ FIX 1: Block Admins at the callback level
+        if (profile.role === 'admin') {
+          await supabase.auth.signOut()
+          alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
           navigate('/')
           return
         }
@@ -87,7 +95,14 @@ function App() {
       await supabase.auth.signOut()
       setProfile(null)
     } else {
-      setProfile(data)
+      // ✅ FIX 2: Block Admins globally if they try to load the app
+      if (data.role === 'admin') {
+        await supabase.auth.signOut()
+        setProfile(null)
+        alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
+      } else {
+        setProfile(data)
+      }
     }
     setLoading(false)
   }
@@ -131,7 +146,6 @@ function App() {
           } 
         />
 
-        {/* ✅ QUIZZES ROUTE */}
         <Route 
           path="/quizzes" 
           element={
@@ -140,7 +154,6 @@ function App() {
           } 
         />
 
-        {/* ✅ BATTLE HISTORY ROUTE */}
         <Route 
           path="/battles" 
           element={

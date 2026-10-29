@@ -1,6 +1,6 @@
 // src/pages/AgeSelection.tsx
-import { useState, useEffect } from 'react' // ✅ Added useEffect
-import { useNavigate } from 'react-router-dom' // ✅ Added useNavigate
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { 
   PlantIcon, 
@@ -15,19 +15,29 @@ export default function AgeSelection() {
   const navigate = useNavigate()
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [checking, setChecking] = useState(true) // ✅ Added checking state
+  const [checking, setChecking] = useState(true) 
   const [error, setError] = useState<string | null>(null)
 
-  // ✅ NEW: Prevent users who already have a tier from changing it
+  // ✅ Prevent users who already have a tier from changing it, and route admins properly
   useEffect(() => {
     const checkExistingTier = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
       
-      const { data: profile } = await supabase.from('profiles').select('age_category').eq('id', user.id).single()
+      // ✅ Fetch both role and age_category
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('age_category, role')
+        .eq('id', user.id)
+        .single()
       
+      // ✅ FIX: If the user is an admin, send them to the Admin Dashboard
+      if (profile?.role === 'admin') {
+        return navigate('/admin/dashboard', { replace: true })
+      }
+
       if (profile?.age_category) {
-        // If they already have a tier, send them to dashboard
+        // If they already have a tier, send them to player dashboard
         navigate('/dashboard', { replace: true })
       } else {
         setChecking(false)
