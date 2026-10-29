@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { TrophyIcon, ArrowLeftIcon, CoinsIcon, GameControllerIcon } from '@phosphor-icons/react'
+import { TrophyIcon, ArrowLeftIcon, CoinsIcon, GameControllerIcon, SparkleIcon } from '@phosphor-icons/react'
 
 export default function Quizzes() {
   const navigate = useNavigate()
@@ -36,7 +36,7 @@ export default function Quizzes() {
       // Fetch available quizzes
       let query = supabase
         .from('quizzes')
-        .select('id, title, category, difficulty, questions(count)')
+        .select('id, title, category, difficulty, created_at, questions(count)')
         .eq('age_category', profileData.age_category)
         .eq('status', 'published')
 
@@ -51,6 +51,14 @@ export default function Quizzes() {
 
     fetchQuizzes()
   }, [navigate])
+
+  // ✅ Helper to determine if a quiz was created today
+  const isNewQuiz = (createdAt: string) => {
+    if (!createdAt) return false
+    const quizDate = new Date(createdAt).toDateString()
+    const today = new Date().toDateString()
+    return quizDate === today
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING QUIZZES...</div>
@@ -91,12 +99,22 @@ export default function Quizzes() {
               <button 
                 key={q.id} 
                 onClick={() => navigate(`/play/${q.id}`)} 
-                className="w-full text-left bg-[#0f1014] border border-white/10 rounded-2xl p-4 sm:p-5 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg"
+                className="w-full text-left bg-[#0f1014] border border-white/10 rounded-2xl p-4 sm:p-5 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg relative overflow-hidden"
               >
+                {/* ❌ REMOVED: The glowing left border */}
+
                 <div className="w-full">
-                  <p className="font-bold text-sm sm:text-base text-white group-hover:text-[#ccff00] transition leading-tight mb-1 break-words">
-                    {q.title}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-bold text-sm sm:text-base text-white group-hover:text-[#ccff00] transition leading-tight break-words">
+                      {q.title}
+                    </p>
+                    {/* ✅ KEPT: The New Badge */}
+                    {isNewQuiz(q.created_at) && (
+                      <span className="bg-[#00f0ff]/20 text-[#00f0ff] text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-[#00f0ff]/30 flex items-center gap-1 shrink-0">
+                        <SparkleIcon weight="fill" className="w-3 h-3" /> New
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1.5">
                     <GameControllerIcon weight="fill" className="w-3.5 h-3.5" />
                     {q.category}

@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
   CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, CoinsIcon,
-  GiftIcon, SwordIcon, XCircleIcon
+  GiftIcon, SwordIcon, XCircleIcon, SparkleIcon, XIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -27,6 +27,10 @@ export default function UserDashboard() {
 
   // ✅ PvP Incoming Battles State
   const [incomingBattles, setIncomingBattles] = useState<any[]>([])
+
+  // ✅ NEW: New Content Banner State
+  const [showNewContentBanner, setShowNewContentBanner] = useState(false)
+  const [newContentCount, setNewContentCount] = useState(0)
 
   // ✅ Declining Modal State
   const [declineModal, setDeclineModal] = useState<{ isOpen: boolean; battleId: string | null }>({
@@ -53,6 +57,17 @@ export default function UserDashboard() {
     return 'Good evening'
   }
 
+  // ✅ AUTOMATIC DISMISS LOGIC
+  useEffect(() => {
+    if (showNewContentBanner) {
+      const timer = setTimeout(() => {
+        handleDismissNewContent()
+      }, 5000) // Auto-dismiss after 5 seconds
+      
+      return () => clearTimeout(timer)
+    }
+  }, [showNewContentBanner])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       const fetchData = async () => {
@@ -76,14 +91,13 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
-        // ✅ FIXED: INCOMING BATTLES FETCH
-        // We only want to show battles where we haven't played yet (opponent_score is null)
+        // ✅ INCOMING BATTLES FETCH
         const { data: pendingBattles } = await supabase
           .from('quiz_battles')
           .select(`id, quiz_id, challenger_id, opponent_score, profiles!challenger_id ( display_name, avatar_url )`)
           .eq('opponent_id', user.id)
           .eq('status', 'pending')
-          .is('opponent_score', null) // <--- This prevents the banner from showing after you play
+          .is('opponent_score', null)
 
         if (pendingBattles) setIncomingBattles(pendingBattles)
 
@@ -157,6 +171,44 @@ export default function UserDashboard() {
             setTopPlayers(mappedPlayers)
           }
         }
+
+        // ✅ NEW CONTENT BANNER LOGIC
+        if (profileData?.age_category) {
+          const lastSeen = localStorage.getItem('last_seen_banner_date')
+          const today = new Date().toISOString().split('T')[0]
+
+          if (lastSeen !== today) {
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+            
+            // Check for new quizzes
+            const { data: newQ } = await supabase
+              .from('quizzes')
+              .select('id')
+              .eq('age_category', profileData.age_category)
+              .eq('status', 'published')
+              .gte('created_at', weekAgo)
+
+            // Check for new cosmetics not owned
+            const { data: userInv } = await supabase.from('user_inventory').select('cosmetic_item_id').eq('user_id', user.id)
+            const ownedIds = userInv?.map(i => i.cosmetic_item_id) || []
+
+            const { data: newC } = await supabase
+              .from('cosmetic_items')
+              .select('id')
+              .eq('status', 'published')
+              .gte('created_at', weekAgo)
+
+            const unownedCosmetics = (newC || []).filter(c => !ownedIds.includes(c.id))
+            
+            const totalNew = (newQ?.length || 0) + unownedCosmetics.length
+
+            if (totalNew > 0) {
+              setNewContentCount(totalNew)
+              setShowNewContentBanner(true)
+            }
+          }
+        }
+
         setLoading(false)
       }
       fetchData()
@@ -164,6 +216,12 @@ export default function UserDashboard() {
 
     return () => clearTimeout(timer)
   }, [navigate])
+
+  const handleDismissNewContent = () => {
+    setShowNewContentBanner(false)
+    const today = new Date().toISOString().split('T')[0]
+    localStorage.setItem('last_seen_banner_date', today)
+  }
 
   // ✅ Custom Decline Logic
   const openDeclineModal = (battleId: string) => {
@@ -193,10 +251,7 @@ export default function UserDashboard() {
 
   // ✅ Handles Accepting a Battle (Instantly hides banner)
   const handleAcceptBattle = (battleId: string, quizId: string) => {
-    // 1. Immediately remove it from the UI to prevent it showing when you return
     setIncomingBattles(prev => prev.filter(b => b.id !== battleId))
-    
-    // 2. Navigate to the play screen (with the opponent flag so the quiz page knows to submit as opponent)
     navigate(`/play/${quizId}?battleId=${battleId}&opponent=true`)
   }
 
@@ -280,6 +335,41 @@ export default function UserDashboard() {
             </div>
           </div>
         </header>
+
+        {/* ✅ NEW CONTENT BANNER (Slim & Sleek) */}
+        {showNewContentBanner && (
+          <div className="mb-4 relative z-10 bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex items-center justify-between shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-[#00f0ff]/20 p-2 rounded-xl shrink-0">
+                <SparkleIcon weight="fill" className="w-5 h-5 text-[#00f0ff]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  New Content Available!
+                </h3>
+                <p className="text-xs text-gray-300">
+                  <span className="font-bold text-[#00f0ff]">{newContentCount} new items</span> have been added for your tier.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                onClick={() => { handleDismissNewContent(); navigate('/rewards'); }} 
+                className="bg-[#00f0ff] text-black px-4 py-2 rounded-xl text-xs font-bold hover:bg-white transition"
+              >
+                Check it out
+              </button>
+              <button 
+                onClick={handleDismissNewContent} 
+                className="p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition"
+                title="Dismiss"
+              >
+                <XIcon weight="bold" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ✅ INCOMING PVP BATTLE BANNER */}
         {incomingBattles.length > 0 && (
