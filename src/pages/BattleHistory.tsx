@@ -144,28 +144,17 @@ export default function BattleHistory() {
               const myScore = isMeChallenger ? battle.challenger_score : battle.opponent_score
               const theirScore = isMeChallenger ? battle.opponent_score : battle.challenger_score
 
-              // 🔥 FIX: If the score is not null, they have played. No need for the boolean check.
               const iHavePlayed = myScore !== null && myScore !== undefined
               const theyHavePlayed = theirScore !== null && theirScore !== undefined
               
-              const needsMyAction = battle.status === 'pending' && !iHavePlayed
-              const canCancel = isMeChallenger && battle.status === 'pending' && !iHavePlayed
-              const iAmWaiting = battle.status === 'pending' && iHavePlayed && !theyHavePlayed
+              const bothPlayed = iHavePlayed && theyHavePlayed
+              const isCompleted = battle.status === 'completed' || bothPlayed
 
-              let actualWinnerId = battle.winner_id
-              let isDraw = false
-
-              if (battle.status === 'completed') {
-                if (actualWinnerId === null) {
-                  if (battle.challenger_score > (battle.opponent_score || 0)) {
-                    actualWinnerId = battle.challenger_id
-                  } else if ((battle.opponent_score || 0) > battle.challenger_score) {
-                    actualWinnerId = battle.opponent_id
-                  } else {
-                    isDraw = true
-                  }
-                }
-              }
+              const needsMyAction = !isCompleted && !iHavePlayed
+              const canCancel = isMeChallenger && !isCompleted && !iHavePlayed
+              
+              // 🔥 Explicitly check if I am waiting for the opponent
+              const iAmWaiting = !isCompleted && iHavePlayed && !theyHavePlayed
 
               return (
                 <div key={battle.id} className={`relative bg-black/40 backdrop-blur-xl border ${needsMyAction ? 'border-[#ff00a0]' : 'border-white/10'} rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all`}>
@@ -212,14 +201,14 @@ export default function BattleHistory() {
                       </p>
                     </div>
 
-                    {/* 🔥 WAITING STATE: I played, waiting for them */}
+                    {/* 🔥 WAITING BADGE: Shows if I played, but they haven't */}
                     {iAmWaiting && (
                       <div className="flex items-center text-yellow-500 text-xs font-bold bg-yellow-500/10 px-3 py-2 rounded-lg shrink-0">
                         <ClockIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Waiting...
                       </div>
                     )}
 
-                    {/* 🔥 YOUR TURN: Show button only if it's your turn */}
+                    {/* 🔥 PLAY TURN: Shows if it's my turn */}
                     {needsMyAction && (
                       <button 
                         onClick={() => navigate(`/play/${battle.quiz_id}?battleId=${battle.id}&opponent=true`)}
@@ -229,17 +218,18 @@ export default function BattleHistory() {
                       </button>
                     )}
 
-                    {battle.status === 'completed' && (
+                    {/* 🔥 RESULTS: Shows ONLY if both played */}
+                    {isCompleted && bothPlayed && (
                       <div className={`flex items-center text-xs font-bold px-3 py-2 rounded-lg shrink-0 ${
-                        actualWinnerId === userId 
+                        myScore > theirScore
                           ? 'text-[#ccff00] bg-[#ccff00]/10' 
-                          : isDraw 
+                          : myScore === theirScore
                             ? 'text-gray-300 bg-white/10'
                             : 'text-red-400 bg-red-500/10'
                       }`}>
-                        {actualWinnerId === userId ? (
+                        {myScore > theirScore ? (
                           <><TrophyIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Victory!</>
-                        ) : isDraw ? (
+                        ) : myScore === theirScore ? (
                           <><MinusIcon weight="bold" className="mr-1.5 w-4 h-4 hidden sm:block" /> Draw</>
                         ) : (
                           <><XCircleIcon weight="bold" className="mr-1.5 w-4 h-4 hidden sm:block" /> Defeat</>
@@ -247,7 +237,7 @@ export default function BattleHistory() {
                       </div>
                     )}
 
-                    {/* ✅ ACTION BUTTONS TRIGGER CUSTOM MODAL */}
+                    {/* ACTION BUTTONS */}
                     {canCancel ? (
                       <button 
                         onClick={() => openConfirmModal(battle.id, 'cancel')}
@@ -266,7 +256,7 @@ export default function BattleHistory() {
                       >
                         <XCircleIcon weight="bold" className="w-5 h-5" />
                       </button>
-                    ) : (!needsMyAction && !iAmWaiting && battle.status === 'completed') ? (
+                    ) : (isCompleted && bothPlayed) ? (
                       <button 
                         onClick={() => openConfirmModal(battle.id, 'delete')}
                         disabled={processingId === battle.id}

@@ -29,6 +29,7 @@ export default function PlayerProfile() {
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [creatingBattle, setCreatingBattle] = useState(false)
   const [existingPendingBattle, setExistingPendingBattle] = useState<any>(null)
+  const [hasAlreadyPlayed, setHasAlreadyPlayed] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,17 +59,28 @@ export default function PlayerProfile() {
       setIsFollowing(!!myFollow.data)
       setIsFollowedByThem(!!theirFollow.data)
 
-      // 4. Check pending battle
+      // 4. Check for any valid pending battles
       const { data: pending } = await supabase
         .from('quiz_battles')
-        .select('id, quiz_id, quizzes(title)')
-        .eq('challenger_id', user.id)
-        .eq('opponent_id', playerId)
+        .select('id, quiz_id, challenger_id, opponent_id, challenger_score, opponent_score, quizzes(title)')
+        .or(`and(challenger_id.eq.${user.id},opponent_id.eq.${playerId}),and(challenger_id.eq.${playerId},opponent_id.eq.${user.id})`)
         .eq('status', 'pending')
         .limit(1)
         .maybeSingle()
 
-      if (pending) setExistingPendingBattle(pending)
+      // Ignore if DB lagged and both already played
+      if (pending && (pending.challenger_score !== null && pending.opponent_score !== null)) {
+         // Battle is actually done, ignore it
+      } else if (pending) {
+        setExistingPendingBattle(pending)
+        
+        const isMeChallenger = pending.challenger_id === user.id
+        const myScore = isMeChallenger ? pending.challenger_score : pending.opponent_score
+        
+        if (myScore !== null && myScore !== undefined) {
+          setHasAlreadyPlayed(true)
+        }
+      }
 
       setLoading(false)
     }
@@ -113,7 +125,8 @@ export default function PlayerProfile() {
         challenger_id: myProfile.id,
         opponent_id: playerId,
         quiz_id: quizId,
-        challenger_score: 0
+        challenger_score: null,
+        challenger_submitted: false
       }).select().single()
 
       if (error) throw error
@@ -127,7 +140,7 @@ export default function PlayerProfile() {
 
   const handleResumeBattle = () => {
     if (existingPendingBattle) {
-      navigate(`/play/${existingPendingBattle.quiz_id}?battleId=${existingPendingBattle.id}`)
+      navigate(`/play/${existingPendingBattle.quiz_id}?battleId=${existingPendingBattle.id}&opponent=true`)
     }
   }
 
@@ -137,7 +150,6 @@ export default function PlayerProfile() {
   if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING PROFILE...</div>
   if (!player) return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center">Player not found.</div>
 
-  // ✅ Extract cosmetics and calculate totals
   const allInventory = player.user_inventory || []
   const equippedItems = allInventory.filter((i: any) => i.is_equipped)
   
@@ -145,7 +157,6 @@ export default function PlayerProfile() {
   const equippedBg = equippedItems.find((i: any) => i.cosmetic_items?.cosmetic_type === 'background')
   const equippedTheme = equippedItems.find((i: any) => i.cosmetic_items?.cosmetic_type === 'quiz_theme')
 
-  // Counts
   const totalThemes = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'quiz_theme').length
   const totalBgs = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'background').length
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
@@ -153,7 +164,6 @@ export default function PlayerProfile() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
       
-      {/* Background Image */}
       {equippedBg?.cosmetic_items?.preview_url && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img src={equippedBg.cosmetic_items.preview_url} className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
@@ -169,12 +179,10 @@ export default function PlayerProfile() {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
           
-          {/* LEFT COLUMN: Main Profile Info */}
           <div className="md:col-span-7 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
             
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#00f0ff]/10 to-transparent pointer-events-none" />
 
-            {/* Avatar */}
             <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 flex items-center justify-center">
               <div className="absolute inset-[12%] rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-3xl font-bold uppercase shadow-inner">
                 {player.avatar_url ? (
@@ -188,13 +196,11 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            {/* Name & Tier */}
             <h1 className="text-2xl sm:text-3xl font-black text-white mb-1 tracking-tight">{player.display_name}</h1>
             <span className="inline-block text-[#ccff00] font-mono text-[10px] sm:text-xs bg-[#ccff00]/10 px-3 py-1 rounded-full border border-[#ccff00]/20 mb-3">
               {player.age_category?.toUpperCase()} TIER
             </span>
 
-            {/* Follow Status */}
             <div className="mb-6 min-h-[20px]">
               {isMutual && (
                 <p className="text-xs text-[#ccff00] font-bold flex items-center justify-center gap-1.5">
@@ -208,7 +214,6 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <button 
                 onClick={handleFollow}
@@ -223,12 +228,18 @@ export default function PlayerProfile() {
               </button>
 
               {existingPendingBattle ? (
-                <button 
-                  onClick={handleResumeBattle}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_15px_rgba(234,179,8,0.3)] animate-pulse"
-                >
-                  <ClockIcon weight="bold" className="w-4 h-4" /> Resume Battle
-                </button>
+                hasAlreadyPlayed ? (
+                  <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
+                    <ClockIcon weight="bold" className="w-4 h-4" /> Waiting for Opponent
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleResumeBattle}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500 text-black hover:bg-yellow-400 transition shadow-[0_0_15px_rgba(234,179,8,0.3)] animate-pulse"
+                  >
+                    <ClockIcon weight="bold" className="w-4 h-4" /> Resume Battle
+                  </button>
+                )
               ) : (
                 <button 
                   onClick={openChallengeModal}
@@ -240,10 +251,8 @@ export default function PlayerProfile() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Stats & Cosmetics */}
           <div className="md:col-span-5 space-y-4 sm:space-y-6">
             
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 gap-3">
               <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
@@ -268,14 +277,12 @@ export default function PlayerProfile() {
               </div>
             </div>
 
-            {/* Equipped Cosmetics Showcase */}
             <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                 <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
               </h3>
               
               <div className="space-y-2">
-                {/* Theme */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedTheme?.cosmetic_items?.preview_url ? (
@@ -287,7 +294,6 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Quiz Theme</p>
-                      {/* ✅ COUNT BADGE */}
                       <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
                         {totalThemes} Owned
                       </span>
@@ -296,7 +302,6 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                {/* Background */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBg?.cosmetic_items?.preview_url ? (
@@ -308,7 +313,6 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Background</p>
-                      {/* ✅ COUNT BADGE */}
                       <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
                         {totalBgs} Owned
                       </span>
@@ -317,7 +321,6 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                {/* Border */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBorder?.cosmetic_items?.preview_url ? (
@@ -329,7 +332,6 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Avatar Border</p>
-                      {/* ✅ COUNT BADGE */}
                       <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
                         {totalBorders} Owned
                       </span>
@@ -343,7 +345,6 @@ export default function PlayerProfile() {
         </div>
       </div>
 
-      {/* CHALLENGE MODAL */}
       {showChallengeModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
