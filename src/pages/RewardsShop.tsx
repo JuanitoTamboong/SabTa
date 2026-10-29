@@ -175,17 +175,19 @@ export default function RewardsShop() {
   }
 
   return (
-    /* ✅ REMOVED overflow-hidden here to prevent cutting off the right side */
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
+      {/* ✅ UPDATED BACKGROUND: Visible on mobile, no stretching */}
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img 
             src={equippedBackground} 
             alt="bg" 
-            className="w-full h-full object-cover opacity-60" 
+            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
       )}
 
@@ -222,7 +224,6 @@ export default function RewardsShop() {
       </aside>
 
       {/* MAIN CONTENT */}
-      {/* ✅ ADDED w-full to prevent overflow on mobile */}
       <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
         
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
@@ -255,7 +256,7 @@ export default function RewardsShop() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap font-semibold text-sm transition-all ${
                 activeTab === tab.id 
-                  ? 'bg-[#ccff00] text-black' 
+                  ? 'bg-[#ccff00] text-black shadow-[0_0_15px_rgba(204,255,0,0.2)]' 
                   : 'bg-black/40 backdrop-blur-md text-gray-400 border border-white/5 hover:border-white/20 hover:text-white'
               }`}
             >
@@ -279,8 +280,7 @@ export default function RewardsShop() {
               const canAfford = (profile?.coins || 0) >= item.price
 
               return (
-                /* ✅ ADDED min-w-0 to ensure it doesn't overflow on mobile */
-                <div key={item.id} className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col min-w-0 w-full">
+                <div key={item.id} className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col min-w-0 w-full shadow-lg">
                   
                   {/* Small Preview Box */}
                   <div 
@@ -345,7 +345,7 @@ export default function RewardsShop() {
                             disabled={!canAfford}
                             className={`flex-1 px-1 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-bold text-[10px] md:text-sm transition text-center ${
                               canAfford 
-                                ? 'bg-white text-black hover:bg-[#ccff00]' 
+                                ? 'bg-white text-black hover:bg-[#ccff00] shadow-[0_0_10px_rgba(255,255,255,0.2)]' 
                                 : 'bg-white/5 text-gray-500 cursor-not-allowed'
                             }`}
                           >

@@ -17,7 +17,7 @@ export default function Leaderboard() {
   const [players, setPlayers] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
   
-  // ✅ NEW: State for equipped background
+  // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   // Play Menu State
@@ -202,15 +202,17 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      {/* ✅ NEW: Fixed Background */}
+      {/* ✅ UPDATED BACKGROUND: Visible on mobile, no stretching */}
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img 
             src={equippedBackground} 
             alt="bg" 
-            className="w-full h-full object-cover opacity-60" 
+            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
       )}
 
@@ -380,7 +382,7 @@ export default function Leaderboard() {
               ) : <div />}
             </div>
 
-            <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden relative z-10">
+            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden relative z-10">
               <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b border-white/5 bg-black/20 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
                 <span>Rank</span>
                 <span className="flex-1 ml-2 sm:ml-4">Player</span>

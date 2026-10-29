@@ -17,7 +17,7 @@ export default function UserDashboard() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
   
-  // ✅ NEW: State for equipped background
+  // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   // Daily Streak State
@@ -95,7 +95,7 @@ export default function UserDashboard() {
             setEquippedBorder(border.cosmetic_items.preview_url)
           }
           
-          // ✅ Find equipped background
+          // Find equipped background
           const bg = invData.find(i => i.cosmetic_items?.cosmetic_type === 'background')
           if (bg?.cosmetic_items?.preview_url) {
             setEquippedBackground(bg.cosmetic_items.preview_url)
@@ -105,7 +105,7 @@ export default function UserDashboard() {
         // 4. Fetch Attempts & Check Daily Challenge via Secure RPC
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
 
-        // ✅ Call the secure function to check and award the challenge
+        // Call the secure function to check and award the challenge
         const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
         
         let quizzesToday = 0
@@ -238,15 +238,17 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      {/* ✅ NEW: Fixed Background */}
+      {/* ✅ UPDATED BACKGROUND: Visible on mobile, no stretching */}
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img 
             src={equippedBackground} 
             alt="bg" 
-            className="w-full h-full object-cover opacity-60" 
+            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-[#050505]/80 to-[#050505]" />
+          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
       )}
 
@@ -313,19 +315,19 @@ export default function UserDashboard() {
 
         {/* STATS GRID */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.totalQuizzes}</p>
           </div>
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TrophyIcon weight="duotone" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Best Score</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.bestScore} <span className="text-[10px] sm:text-xs text-gray-500">pts</span></p>
           </div>
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TargetIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Accuracy</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.accuracy}%</p>
           </div>
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
             <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
@@ -333,7 +335,7 @@ export default function UserDashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
-          <div className="relative bg-black/40 backdrop-blur-md border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
+          <div className="relative bg-black/50 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
             <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
             <div className="relative z-10 flex flex-col items-start">
               <div className="bg-[#ccff00]/20 text-[#ccff00] px-3 py-1 rounded-full text-[10px] font-bold mb-3 uppercase tracking-wider">{profile?.age_category || 'General'} Tier</div>
@@ -343,7 +345,7 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4">
             <div className="flex justify-between items-center mb-3"><h3 className="text-xs sm:text-sm font-bold">Recent Activity</h3><ClockIcon className="text-gray-500 w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             {recentActivity.length === 0 ? (
               <div className="text-gray-500 text-xs text-center py-6 bg-black/20 rounded-2xl border border-white/5">No recent quizzes played.</div>
@@ -375,7 +377,7 @@ export default function UserDashboard() {
             )}
           </div>
 
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-[#ff00a0]/10 rounded-bl-full" />
             <div className="flex justify-between items-center mb-3 relative z-10"><h3 className="text-xs sm:text-sm font-bold">Daily Challenge</h3><TargetIcon className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" /></div>
             <p className="text-[11px] sm:text-xs text-gray-400 mb-3 relative z-10 flex flex-wrap items-center gap-1.5">
@@ -389,7 +391,7 @@ export default function UserDashboard() {
             </p>
           </div>
 
-          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-4">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4">
             <div className="flex justify-between items-center mb-4"><h3 className="text-xs sm:text-sm font-bold">Top {profile?.age_category || 'Players'}</h3><MedalIcon weight="fill" className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4" /></div>
             <div className="space-y-3">
               {topPlayers.length === 0 ? (
