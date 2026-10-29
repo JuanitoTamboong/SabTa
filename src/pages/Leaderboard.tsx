@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
-  MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon, XIcon,
+  MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon,
   CoinsIcon 
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -19,11 +19,6 @@ export default function Leaderboard() {
   
   // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
-
-  // Play Menu State
-  const [showPlayMenu, setShowPlayMenu] = useState(false)
-  const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
-  const [loadingQuizzes, setLoadingQuizzes] = useState(false)
 
   const formatTime = (totalSeconds: number) => {
     if (!totalSeconds || totalSeconds === 99999 || totalSeconds === 9999) return null
@@ -153,40 +148,6 @@ export default function Leaderboard() {
     fetchLeaderboard()
   }, [navigate, activeTab])
 
-  const openPlayMenu = async () => {
-    setShowPlayMenu(true)
-    setLoadingQuizzes(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !profile?.age_category) return
-
-      const { data: completed } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed') 
-        
-      const completedIds = completed?.map(c => c.quiz_id) || []
-
-      let query = supabase
-        .from('quizzes')
-        .select('id, title, category, difficulty, questions(count)')
-        .eq('age_category', profile.age_category)
-        .eq('status', 'published')
-
-      if (completedIds.length > 0) {
-        query = query.not('id', 'in', `(${completedIds.join(',')})`)
-      }
-
-      const { data: quizzes } = await query
-      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoadingQuizzes(false)
-    }
-  }
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/')
@@ -202,7 +163,6 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      {/* ✅ UPDATED BACKGROUND: Visible on mobile, no stretching */}
       {equippedBackground && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img 
@@ -210,7 +170,6 @@ export default function Leaderboard() {
             alt="bg" 
             className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
           />
-          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
           <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
@@ -225,7 +184,7 @@ export default function Leaderboard() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
@@ -295,7 +254,7 @@ export default function Leaderboard() {
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
             <p className="text-gray-500 text-sm">Be the first to complete a quiz!</p>
-            <button onClick={openPlayMenu} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
+            <button onClick={() => navigate('/quizzes')} className="mt-6 bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">
               Play Now
             </button>
           </div>
@@ -306,7 +265,10 @@ export default function Leaderboard() {
               
               {/* 2nd Place */}
               {players[1] ? (
-                <div className="flex flex-col items-center group">
+                <div 
+                  onClick={() => navigate(`/player/${players[1].id}`)}
+                  className="flex flex-col items-center group cursor-pointer"
+                >
                   <div className="relative mb-3 sm:mb-4 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center transition-transform hover:scale-105">
                     <div className="w-[70%] h-[70%] rounded-full bg-[#1a1c23] overflow-hidden flex items-center justify-center text-gray-300 font-bold text-lg sm:text-xl uppercase shadow-lg z-10 border border-white/10">
                       {players[1].avatar_url ? (
@@ -320,9 +282,9 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-gray-400 text-gray-300 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#2</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1a1c23]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)]">
+                  <div className="bg-gradient-to-t from-[#1a1c23]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)] group-hover:border-gray-400 transition-colors">
                     <MedalIcon weight="fill" className="text-gray-400 w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
-                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[1].display_name}</p>
+                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[1].display_name}</p>
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[1].age_category}</p>}
                     <p className="text-[10px] sm:text-xs text-gray-300 font-black mt-1 sm:mt-2">{players[1].points} PTS</p>
                   </div>
@@ -331,7 +293,10 @@ export default function Leaderboard() {
 
               {/* 1st Place */}
               {players[0] && (
-                <div className="flex flex-col items-center group">
+                <div 
+                  onClick={() => navigate(`/player/${players[0].id}`)}
+                  className="flex flex-col items-center group cursor-pointer"
+                >
                   <CrownIcon weight="fill" className="text-[#ccff00] w-8 h-8 sm:w-10 sm:h-10 mb-2 animate-bounce drop-shadow-[0_0_15px_rgba(204,255,0,0.5)] z-30" />
                   <div className="relative mb-3 sm:mb-4 w-24 h-24 sm:w-32 sm:h-32 md:w-36 md:h-36 flex items-center justify-center transition-transform hover:scale-105">
                     <div className="w-[70%] h-[70%] rounded-full bg-[#ccff00] overflow-hidden flex items-center justify-center text-black font-bold text-xl sm:text-3xl uppercase shadow-[0_0_30px_rgba(204,255,0,0.3)] z-10 border-2 border-[#ccff00]">
@@ -346,7 +311,7 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#ccff00] text-black w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-sm sm:text-lg z-30 shadow-[0_0_15px_rgba(204,255,0,0.4)] border-2 border-[#0f1014]">#1</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1a2210]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)]">
+                  <div className="bg-gradient-to-t from-[#1a2210]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)] group-hover:border-[#ccff00] transition-colors">
                     <div className="absolute inset-0 bg-[#ccff00]/5 pointer-events-none" />
                     <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 relative z-10 drop-shadow-md" />
                     <p className="text-xs sm:text-base font-black truncate text-white relative z-10">{players[0].display_name}</p>
@@ -358,7 +323,10 @@ export default function Leaderboard() {
 
               {/* 3rd Place */}
               {players[2] ? (
-                <div className="flex flex-col items-center group">
+                <div 
+                  onClick={() => navigate(`/player/${players[2].id}`)}
+                  className="flex flex-col items-center group cursor-pointer"
+                >
                   <div className="relative mb-3 sm:mb-4 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex items-center justify-center transition-transform hover:scale-105">
                     <div className="w-[70%] h-[70%] rounded-full bg-[#1c1512] overflow-hidden flex items-center justify-center text-[#cd7f32] font-bold text-lg sm:text-xl uppercase shadow-lg z-10 border border-white/10">
                       {players[2].avatar_url ? (
@@ -372,9 +340,9 @@ export default function Leaderboard() {
                     )}
                     <div className="absolute -bottom-2 -right-2 bg-[#0f1014] border border-[#cd7f32] text-[#cd7f32] w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm z-30 shadow-lg">#3</div>
                   </div>
-                  <div className="bg-gradient-to-t from-[#1c1512]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)]">
+                  <div className="bg-gradient-to-t from-[#1c1512]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)] group-hover:border-[#cd7f32] transition-colors">
                     <MedalIcon weight="fill" className="text-[#cd7f32] w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
-                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200">{players[2].display_name}</p>
+                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[2].display_name}</p>
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[2].age_category}</p>}
                     <p className="text-[10px] sm:text-xs text-[#cd7f32] font-black mt-1 sm:mt-2">{players[2].points} PTS</p>
                   </div>
@@ -395,7 +363,11 @@ export default function Leaderboard() {
                   const isMe = player.id === profile?.id
 
                   return (
-                    <div key={player.id} className={`flex items-center p-3 sm:p-4 md:p-6 transition ${isMe ? 'bg-[#ccff00]/10' : 'hover:bg-white/5'}`}>
+                    <div 
+                      key={player.id} 
+                      onClick={() => navigate(`/player/${player.id}`)}
+                      className={`flex items-center p-3 sm:p-4 md:p-6 transition cursor-pointer group ${isMe ? 'bg-[#ccff00]/10' : 'hover:bg-white/5'}`}
+                    >
                       <span className={`w-6 sm:w-8 md:w-12 font-mono font-bold text-xs sm:text-sm md:text-base ${isMe ? 'text-[#ccff00]' : 'text-gray-500'}`}>
                         #{rank}
                       </span>
@@ -415,7 +387,7 @@ export default function Leaderboard() {
                         </div>
 
                         <div className="truncate">
-                          <span className={`font-bold text-xs sm:text-sm md:text-base truncate block ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm md:text-base truncate block group-hover:text-[#ccff00] transition-colors ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
                             {player.display_name} {isMe && '(You)'}
                           </span>
                           {activeTab === 'global' && (
@@ -475,7 +447,7 @@ export default function Leaderboard() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+        <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
         </button>
@@ -492,48 +464,6 @@ export default function Leaderboard() {
           <span className="text-[9px] font-bold">Profile</span>
         </button>
       </nav>
-
-      {/* PLAY MENU MODAL */}
-      {showPlayMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
-            
-            <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
-            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
-            
-            <div className="flex items-center justify-between mb-4 bg-[#ff00a0]/5 border border-[#ff00a0]/20 rounded-xl px-3 sm:px-4 py-2">
-              <span className="text-[10px] sm:text-xs text-gray-400 font-semibold">Your Balance</span>
-              <div className="flex items-center gap-1.5">
-                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
-                <span className="font-bold text-[#ff00a0] text-xs sm:text-sm">{profile?.coins || 0}</span>
-              </div>
-            </div>
-            
-            <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
-              {loadingQuizzes ? (
-                <p className="text-center text-[#ccff00] font-mono text-xs sm:text-sm py-4 animate-pulse">LOADING...</p>
-              ) : availableQuizzes.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 bg-black/20 rounded-2xl border border-white/5">
-                  <TrophyIcon weight="duotone" className="w-10 h-10 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
-                  <p className="text-gray-400 text-xs sm:text-sm font-bold">All caught up!</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-1">You've completed all available quizzes for your tier.</p>
-                </div>
-              ) : (
-                availableQuizzes.map((q) => (
-                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
-                    <div className="pr-2">
-                      <p className="font-bold text-xs sm:text-sm text-white group-hover:text-[#ccff00] transition line-clamp-1">{q.title}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{q.category}</p>
-                    </div>
-                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-1 rounded-lg border shrink-0 ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

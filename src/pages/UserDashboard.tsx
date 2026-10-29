@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase'
 import {
   TrophyIcon, LightningIcon, TargetIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon, ClockIcon,
-  CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, XIcon, CoinsIcon,
-  GiftIcon
+  CaretRightIcon, MedalIcon, FireIcon, CheckCircleIcon, CoinsIcon,
+  GiftIcon, SwordIcon, XCircleIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -16,8 +16,6 @@ export default function UserDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
-  
-  // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   // Daily Streak State
@@ -26,6 +24,16 @@ export default function UserDashboard() {
 
   // Daily Challenge Bonus State
   const [showDailyBonusModal, setShowDailyBonusModal] = useState(false)
+
+  // ✅ PvP Incoming Battles State
+  const [incomingBattles, setIncomingBattles] = useState<any[]>([])
+
+  // ✅ Declining Modal State
+  const [declineModal, setDeclineModal] = useState<{ isOpen: boolean; battleId: string | null }>({
+    isOpen: false,
+    battleId: null
+  })
+  const [declining, setDeclining] = useState(false)
 
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -37,11 +45,6 @@ export default function UserDashboard() {
 
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [topPlayers, setTopPlayers] = useState<any[]>([])
-
-  // Play Menu State
-  const [showPlayMenu, setShowPlayMenu] = useState(false)
-  const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
-  const [loadingQuizzes, setLoadingQuizzes] = useState(false)
 
   const getGreeting = () => {
     const hour = new Date().getHours()
@@ -56,33 +59,31 @@ export default function UserDashboard() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return navigate('/')
 
-        // 1. Fetch Profile FIRST
         let { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         
-        // ✅ DAILY STREAK LOGIC USING SECURE RPC
         if (profileData) {
           const { data: streakResult } = await supabase.rpc('claim_daily_streak')
 
           if (streakResult && streakResult.status === 'success') {
-            setStreakReward({ 
-              coins: streakResult.coins, 
-              newStreak: streakResult.streak 
-            })
+            setStreakReward({ coins: streakResult.coins, newStreak: streakResult.streak })
             setShowStreakModal(true)
-            
-            // Update local state to reflect DB changes immediately
             profileData.current_streak = streakResult.streak
             profileData.coins = (profileData.coins || 0) + streakResult.coins
           }
-          
           setProfile(profileData)
         }
 
-        // 2. SET AVATAR URL
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
-        // 3. Fetch Inventory (Border & Background)
+        const { data: pendingBattles } = await supabase
+          .from('quiz_battles')
+          .select(`id, quiz_id, challenger_id, profiles!challenger_id ( display_name, avatar_url )`)
+          .eq('opponent_id', user.id)
+          .eq('status', 'pending')
+
+        if (pendingBattles) setIncomingBattles(pendingBattles)
+
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('*, cosmetic_items(*)')
@@ -91,32 +92,22 @@ export default function UserDashboard() {
         
         if (invData) {
           const border = invData.find(i => i.cosmetic_items?.cosmetic_type === 'avatar_border')
-          if (border?.cosmetic_items?.preview_url) {
-            setEquippedBorder(border.cosmetic_items.preview_url)
-          }
+          if (border?.cosmetic_items?.preview_url) setEquippedBorder(border.cosmetic_items.preview_url)
           
-          // Find equipped background
           const bg = invData.find(i => i.cosmetic_items?.cosmetic_type === 'background')
-          if (bg?.cosmetic_items?.preview_url) {
-            setEquippedBackground(bg.cosmetic_items.preview_url)
-          }
+          if (bg?.cosmetic_items?.preview_url) setEquippedBackground(bg.cosmetic_items.preview_url)
         }
 
-        // 4. Fetch Attempts & Check Daily Challenge via Secure RPC
         const { data: attempts } = await supabase.from('quiz_attempts').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-
-        // Call the secure function to check and award the challenge
         const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
         
         let quizzesToday = 0
         if (challengeResult) {
           quizzesToday = challengeResult.quizzes_today
-          
           if (challengeResult.claimed) {
             const today = new Date().toISOString().split('T')[0]
             if (profileData?.last_challenge_date !== today) {
                setShowDailyBonusModal(true)
-               
                const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
                if (updatedProfile) {
                  setProfile(updatedProfile)
@@ -137,49 +128,28 @@ export default function UserDashboard() {
 
           const totalQuizzes = attempts.length
           const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
-          
           const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
           const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
           const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
-          
           const currentPoints = profileData?.points || 0
           const level = Math.floor(currentPoints / 100) + 1
 
-          setStats({ 
-            totalQuizzes, 
-            bestScore, 
-            accuracy: Math.round(avgAccuracy), 
-            level, 
-            quizzesToday 
-          })
+          setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), level, quizzesToday })
           setRecentActivity(attemptsWithCategory.slice(0, 3))
         }
 
-        // 5. Fetch Top Players
         if (profileData?.age_category) {
           const { data: topProfiles } = await supabase
             .from('profiles')
-            .select(`
-              id, display_name, points, coins, avatar_url,
-              user_inventory (
-                is_equipped,
-                cosmetic_items ( preview_url, cosmetic_type )
-              )
-            `)
+            .select(`id, display_name, points, coins, avatar_url, user_inventory ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )`)
             .eq('age_category', profileData.age_category)
             .order('points', { ascending: false })
             .limit(3)
 
           if (topProfiles) {
             const mappedPlayers = topProfiles.map((p: any) => {
-              const border = p.user_inventory?.find((inv: any) => 
-                inv.is_equipped && 
-                inv.cosmetic_items?.cosmetic_type === 'avatar_border'
-              )
-              return {
-                ...p,
-                border_url: border?.cosmetic_items?.preview_url || null
-              }
+              const border = p.user_inventory?.find((inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border')
+              return { ...p, border_url: border?.cosmetic_items?.preview_url || null }
             })
             setTopPlayers(mappedPlayers)
           }
@@ -192,37 +162,29 @@ export default function UserDashboard() {
     return () => clearTimeout(timer)
   }, [navigate])
 
-  const openPlayMenu = async () => {
-    setShowPlayMenu(true)
-    setLoadingQuizzes(true)
+  // ✅ Custom Decline Logic
+  const openDeclineModal = (battleId: string) => {
+    setDeclineModal({ isOpen: true, battleId })
+  }
+
+  const confirmDecline = async () => {
+    if (!declineModal.battleId) return
+    setDeclining(true)
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !profile?.age_category) return
+      const { error } = await supabase
+        .from('quiz_battles')
+        .delete()
+        .eq('id', declineModal.battleId)
 
-      const { data: completed } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed') 
-        
-      const completedIds = completed?.map(c => c.quiz_id) || []
+      if (error) throw error
 
-      let query = supabase
-        .from('quizzes')
-        .select('id, title, category, difficulty, questions(count)')
-        .eq('age_category', profile.age_category)
-        .eq('status', 'published')
-
-      if (completedIds.length > 0) {
-        query = query.not('id', 'in', `(${completedIds.join(',')})`)
-      }
-
-      const { data: quizzes } = await query
-      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
-    } catch (err) {
-      console.error(err)
+      setIncomingBattles(prev => prev.filter(b => b.id !== declineModal.battleId))
+      setDeclineModal({ isOpen: false, battleId: null })
+    } catch (err: any) {
+      alert(err.message || "Failed to decline challenge.")
     } finally {
-      setLoadingQuizzes(false)
+      setDeclining(false)
     }
   }
 
@@ -238,15 +200,9 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      {/* ✅ UPDATED BACKGROUND: Visible on mobile, no stretching */}
       {equippedBackground && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img 
-            src={equippedBackground} 
-            alt="bg" 
-            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
-          />
-          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <img src={equippedBackground} alt="bg" className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" />
           <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
@@ -261,7 +217,7 @@ export default function UserDashboard() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
@@ -313,8 +269,54 @@ export default function UserDashboard() {
           </div>
         </header>
 
-        {/* STATS GRID */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 mb-6 relative z-10">
+        {/* ✅ INCOMING PVP BATTLE BANNER */}
+        {incomingBattles.length > 0 && (
+          <div className="mb-6 relative z-10 space-y-3">
+            {incomingBattles.map((battle) => (
+              <div key={battle.id} className="bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-[0_0_20px_rgba(255,0,160,0.15)] animate-in slide-in-from-top-4">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-[#ff00a0] shrink-0">
+                    {battle.profiles?.avatar_url ? (
+                      <img src={battle.profiles.avatar_url} alt="Challenger" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-[#ff00a0]/20 flex items-center justify-center text-[#ff00a0] font-bold">
+                        {battle.profiles?.display_name?.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base sm:text-lg flex items-center gap-2">
+                      <SwordIcon weight="fill" className="text-[#ff00a0]" /> 
+                      Incoming Challenge!
+                    </h3>
+                    <p className="text-sm text-gray-300">
+                      <span className="font-bold text-white">{battle.profiles?.display_name}</span> has challenged you to a quiz.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {/* ✅ Opens Custom Modal */}
+                  <button 
+                    onClick={() => openDeclineModal(battle.id)}
+                    className="flex-1 sm:flex-none bg-white/10 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-500/20 hover:text-red-400 transition whitespace-nowrap"
+                  >
+                    Decline
+                  </button>
+                  <button 
+                    onClick={() => navigate(`/play/${battle.quiz_id}?battleId=${battle.id}&opponent=true`)}
+                    className="flex-1 sm:flex-none bg-[#ff00a0] text-white px-6 py-3 rounded-xl font-bold hover:bg-white hover:text-[#ff00a0] transition whitespace-nowrap shadow-lg"
+                  >
+                    Accept & Play
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* STATS GRID ... (unchanged) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6 relative z-10">
           <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><GameControllerIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Played</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.totalQuizzes}</p>
@@ -327,15 +329,25 @@ export default function UserDashboard() {
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1"><TargetIcon weight="duotone" className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Accuracy</p></div>
             <p className="text-xl sm:text-2xl font-bold">{stats.accuracy}%</p>
           </div>
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10"><MedalIcon weight="duotone" className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5" /><p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Level</p></div>
-            <p className="text-xl sm:text-2xl font-bold relative z-10">{stats.level}</p>
-          </div>
+          
+          <button 
+            onClick={() => navigate('/battles')}
+            className="bg-gradient-to-br from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/30 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden group hover:bg-[#ff00a0]/20 transition shadow-[0_0_15px_rgba(255,0,160,0.1)] text-left"
+          >
+            <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full group-hover:scale-110 transition" />
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10">
+              <SwordIcon weight="fill" className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" />
+              <p className="text-[9px] sm:text-[10px] text-gray-300 font-semibold uppercase tracking-wider">Battles</p>
+            </div>
+            <p className="text-xl sm:text-2xl font-bold text-[#ff00a0] relative z-10 flex items-center gap-1">
+              History <CaretRightIcon weight="bold" className="w-4 h-4" />
+            </p>
+          </button>
         </div>
 
+        {/* ... (rest of the dashboard content unchanged) */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
-          <div className="relative bg-black/50 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={openPlayMenu}>
+          <div className="relative bg-black/50 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer" onClick={() => navigate('/quizzes')}>
             <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
             <div className="relative z-10 flex flex-col items-start">
               <div className="bg-[#ccff00]/20 text-[#ccff00] px-3 py-1 rounded-full text-[10px] font-bold mb-3 uppercase tracking-wider">{profile?.age_category || 'General'} Tier</div>
@@ -354,7 +366,6 @@ export default function UserDashboard() {
                 {recentActivity.map((attempt) => {
                   const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
                   const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
-                  
                   const coinsEarned = attempt.score * 15 
 
                   return (
@@ -428,7 +439,7 @@ export default function UserDashboard() {
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
-        <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
+        <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
@@ -512,34 +523,36 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* ✅ PLAY MENU MODAL */}
-      {showPlayMenu && (
-        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative my-auto max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg z-10"><XIcon weight="bold" size={20} /></button>
-            <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
-            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
+      {/* ✅ CUSTOM DECLINE MODAL */}
+      {declineModal.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.1)]">
             
-            <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
-              {loadingQuizzes ? (
-                <p className="text-center text-[#ccff00] font-mono text-xs sm:text-sm py-4 animate-pulse">LOADING...</p>
-              ) : availableQuizzes.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 bg-black/20 rounded-2xl border border-white/5">
-                  <TrophyIcon weight="duotone" className="w-10 h-10 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
-                  <p className="text-gray-400 text-xs sm:text-sm font-bold">All caught up!</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-1">You've completed all available quizzes for your tier.</p>
-                </div>
-              ) : (
-                availableQuizzes.map((q) => (
-                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
-                    <div className="pr-2">
-                      <p className="font-bold text-xs sm:text-sm text-white group-hover:text-[#ccff00] transition line-clamp-1">{q.title}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{q.category}</p>
-                    </div>
-                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-1 rounded-lg border shrink-0 ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
-                  </button>
-                ))
-              )}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg bg-[#ff00a0]/20 text-[#ff00a0]">
+              <XCircleIcon weight="fill" className="w-8 h-8 sm:w-10 sm:h-10" />
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Decline Challenge?</h2>
+            
+            <p className="text-gray-400 text-sm mb-6 sm:mb-8">
+              Are you sure you want to decline this challenge? It will be removed from your list.
+            </p>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeclineModal({ isOpen: false, battleId: null })} 
+                disabled={declining}
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition disabled:opacity-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDecline} 
+                disabled={declining}
+                className="flex-1 py-3 rounded-xl font-bold transition disabled:opacity-50 text-sm shadow-lg bg-[#ff00a0] hover:bg-white text-white hover:text-[#ff00a0] shadow-[#ff00a0]/20"
+              >
+                {declining ? 'Processing...' : 'Decline'}
+              </button>
             </div>
           </div>
         </div>

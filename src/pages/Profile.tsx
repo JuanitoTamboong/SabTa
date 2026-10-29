@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase'
 import {
   UserIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon, ShoppingBagIcon,
   LightningIcon, CheckCircleIcon, PencilSimpleIcon, FloppyDiskIcon, 
-  CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon, XIcon,
-  CameraIcon
+  CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon,
+  CameraIcon, UsersIcon, CaretRightIcon, UserPlusIcon, UserMinusIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -27,12 +27,16 @@ export default function Profile() {
   // Data State
   const [history, setHistory] = useState<any[]>([])
   const [inventory, setInventory] = useState<any[]>([])
-  const [activeTab, setActiveTab] = useState<'history' | 'inventory'>('inventory')
+  const [activeTab, setActiveTab] = useState<'history' | 'inventory' | 'friends'>('inventory')
+
+  // ✅ Friends State
+  const [followers, setFollowers] = useState<any[]>([])
+  const [following, setFollowing] = useState<any[]>([])
+  const [friendTab, setFriendTab] = useState<'followers' | 'following'>('followers')
+  const [followBackLoading, setFollowBackLoading] = useState<string | null>(null)
+  const [unfollowLoading, setUnfollowLoading] = useState<string | null>(null)
   
-  // Play Menu State
-  const [showPlayMenu, setShowPlayMenu] = useState(false)
-  const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
-  const [loadingQuizzes, setLoadingQuizzes] = useState(false)
+  // ❌ REMOVED: Play Menu States
 
   // Stats State
   const [stats, setStats] = useState({
@@ -84,45 +88,89 @@ export default function Profile() {
         setInventory(invData.filter(i => i.cosmetic_items !== null))
       }
 
+      // ✅ 4. Fetch Friends
+      await refreshConnections(user.id)
+
       setLoading(false)
     }
 
     fetchProfileData()
   }, [navigate])
 
-  const openPlayMenu = async () => {
-    setShowPlayMenu(true)
-    setLoadingQuizzes(true)
+  // ✅ Function to fetch fresh data from DB and normalize relations
+  const refreshConnections = async (userId: string) => {
+    const { data: followersData } = await supabase
+      .from('follows')
+      .select(`follower_id, profiles!follower_id ( id, display_name, avatar_url, points )`)
+      .eq('following_id', userId)
+
+    const { data: followingData } = await supabase
+      .from('follows')
+      .select(`following_id, profiles!following_id ( id, display_name, avatar_url, points )`)
+      .eq('follower_id', userId)
+
+    // Supabase sometimes returns nested relations as an array [ { ... } ]. We handle both.
+    const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+
+    const validFollowing = (followingData || []).filter(f => normalizeProfile(f.profiles) !== null);
+    const followingIds = new Set(validFollowing.map(f => normalizeProfile(f.profiles).id));
+
+    // ✅ FILTER LOGIC: Only keep followers who you are NOT following back
+    const enrichedFollowers = (followersData || [])
+      .map(f => {
+        const profile = normalizeProfile(f.profiles);
+        if (!profile) return null;
+        const isMutual = followingIds.has(profile.id);
+        return { ...f, profiles: profile, isMutual };
+      })
+      // Hide them from the Followers tab if you already follow them back
+      .filter(f => f !== null && f.isMutual === false); 
+
+    setFollowers(enrichedFollowers)
+    setFollowing(validFollowing)
+  }
+
+  // ✅ Follow back from the Followers tab
+  const handleFollowBack = async (targetId: string, targetProfile: any) => {
+    if (!profile || followBackLoading) return
+    setFollowBackLoading(targetId)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !profile?.age_category) return
-
-      const { data: completed } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed') 
-        
-      const completedIds = completed?.map(c => c.quiz_id) || []
-
-      let query = supabase
-        .from('quizzes')
-        .select('id, title, category, difficulty, questions(count)')
-        .eq('age_category', profile.age_category)
-        .eq('status', 'published')
-
-      if (completedIds.length > 0) {
-        query = query.not('id', 'in', `(${completedIds.join(',')})`)
-      }
-
-      const { data: quizzes } = await query
-      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
-    } catch (err) {
-      console.error(err)
+      const { error } = await supabase
+        .from('follows')
+        .insert({ follower_id: profile.id, following_id: targetId })
+      
+      if (error && error.code !== '23505') throw error
+      await refreshConnections(profile.id)
+    } catch (err: any) {
+      alert(err.message || 'Failed to follow back.')
     } finally {
-      setLoadingQuizzes(false)
+      setFollowBackLoading(null)
     }
   }
+
+  // ✅ Unfollow from the Following tab
+  const handleUnfollow = async (targetId: string) => {
+    if (!profile || unfollowLoading) return
+    setUnfollowLoading(targetId)
+    try {
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', profile.id)
+        .eq('following_id', targetId)
+      
+      if (error) throw error
+      
+      // Refresh to instantly update both lists
+      await refreshConnections(profile.id)
+    } catch (err: any) {
+      alert(err.message || 'Failed to unfollow.')
+    } finally {
+      setUnfollowLoading(null)
+    }
+  }
+
+  // ❌ REMOVED: openPlayMenu function
 
   const handleUpdateName = async () => {
     if (!editName.trim() || editName === profile.display_name) {
@@ -281,7 +329,6 @@ export default function Profile() {
     navigate('/')
   }
 
-  // ✅ Categorization Logic
   const categorizedInventory = inventory.reduce((acc, item) => {
     const type = item.cosmetic_items?.cosmetic_type || 'other';
     if (!acc[type]) acc[type] = [];
@@ -306,15 +353,10 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
-      {/* ✅ UPDATED BACKGROUND: More visible on mobile, no stretching */}
+      {/* BACKGROUND */}
       {equippedBackground?.cosmetic_items?.preview_url && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img 
-            src={equippedBackground.cosmetic_items.preview_url} 
-            alt="bg" 
-            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
-          />
-          {/* Lighter mobile overlay so the background is visible, while keeping text readable */}
+          <img src={equippedBackground.cosmetic_items.preview_url} alt="bg" className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" />
           <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
@@ -330,7 +372,8 @@ export default function Profile() {
         </div>
         <nav className="flex flex-col w-full gap-2">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={openPlayMenu} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
+          {/* ✅ ROUTES TO QUIZZES PAGE */}
+          <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
@@ -358,44 +401,22 @@ export default function Profile() {
             <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00f0ff]/10 to-transparent" />
 
-              <input
-                ref={fileInputRef}
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
+              <input ref={fileInputRef} id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               
-              <div
-                className="relative group cursor-pointer"
-                onClick={() => !uploadingAvatar && fileInputRef.current?.click()}
-                title="Click to change profile picture"
-              >
-                
-                {/* ✅ Slightly larger container to prevent mobile borders from clipping */}
+              <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && fileInputRef.current?.click()} title="Click to change profile picture">
                 <div className="relative w-36 h-36 md:w-40 md:h-40 flex items-center justify-center">
-                  
                   <div className="absolute inset-[18%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
                     {uploadingAvatar ? (
                       <div className="text-xs text-[#ccff00] font-mono animate-pulse">UPLOADING...</div>
                     ) : avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt="Avatar" 
-                        className="w-full h-full object-cover" 
-                      />
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
                       profile?.display_name?.charAt(0) || 'P'
                     )}
                   </div>
 
                   {equippedBorder?.cosmetic_items?.preview_url && (
-                    <img 
-                      src={equippedBorder.cosmetic_items.preview_url} 
-                      alt="Border" 
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" 
-                    />
+                    <img src={equippedBorder.cosmetic_items.preview_url} alt="Border" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                   )}
 
                   <div className="hidden md:flex absolute inset-[18%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
@@ -406,9 +427,7 @@ export default function Profile() {
                   <div className="md:hidden absolute bottom-0 right-0 bg-[#ccff00] text-black p-2.5 rounded-full z-40 shadow-xl border-4 border-[#0f1014]">
                     <CameraIcon weight="bold" className="w-5 h-5" />
                   </div>
-
                 </div>
-
               </div>
 
               <div className="mt-5 mb-2 relative z-10 w-full flex flex-col items-center">
@@ -480,14 +499,15 @@ export default function Profile() {
 
           {/* RIGHT COLUMN: TABS */}
           <div className="lg:col-span-8">
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
+            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
               
-              <div className="flex gap-2 mb-6 border-b border-white/10 pb-4">
+              <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4">
                 <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History</button>
                 <button onClick={() => setActiveTab('inventory')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'inventory' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>My Inventory</button>
+                <button onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Connections</button>
               </div>
 
-              {activeTab === 'history' ? (
+              {activeTab === 'history' && (
                 <div className="space-y-3">
                   {history.length === 0 ? (
                     <p className="text-gray-500 text-sm text-center py-10">No quizzes played yet.</p>
@@ -516,7 +536,9 @@ export default function Profile() {
                     })
                   )}
                 </div>
-              ) : (
+              )}
+
+              {activeTab === 'inventory' && (
                 <div className="space-y-8">
                   {inventory.length === 0 ? (
                     <div className="text-center py-16">
@@ -526,7 +548,6 @@ export default function Profile() {
                       <button onClick={() => navigate('/rewards')} className="bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">Visit Shop</button>
                     </div>
                   ) : (
-                    /* ✅ CATEGORIZED INVENTORY */
                     Object.entries(categorizedInventory).map(([type, items]) => (
                       <div key={type} className="mb-6">
                         <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -575,6 +596,110 @@ export default function Profile() {
                   )}
                 </div>
               )}
+
+              {activeTab === 'friends' && (
+                <div>
+                  <div className="flex gap-2 mb-6">
+                    <button 
+                      onClick={() => setFriendTab('followers')} 
+                      className={`flex-1 py-2 rounded-xl text-sm font-bold transition ${friendTab === 'followers' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                    >
+                      Followers ({followers.length})
+                    </button>
+                    <button 
+                      onClick={() => setFriendTab('following')} 
+                      className={`flex-1 py-2 rounded-xl text-sm font-bold transition ${friendTab === 'following' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                    >
+                      Following ({following.length})
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(friendTab === 'followers' ? followers : following).length === 0 ? (
+                      <div className="text-center py-10">
+                        <UsersIcon weight="duotone" className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-400 text-sm font-bold">
+                          {friendTab === 'followers' ? "You don't have any new followers." : "You aren't following anyone yet."}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          {friendTab === 'followers' ? "When someone follows you, they will appear here." : "Find players on the Leaderboard and add them."}
+                        </p>
+                      </div>
+                    ) : (
+                      (friendTab === 'followers' ? followers : following).map((connection) => {
+                        const player = connection.profiles
+                        if (!player) return null
+
+                        return (
+                          <div 
+                            key={player.id} 
+                            onClick={() => navigate(`/player/${player.id}`)}
+                            className="flex items-center justify-between p-3 sm:p-4 bg-black/40 border border-white/5 rounded-2xl hover:border-[#ccff00]/50 transition cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-sm font-bold uppercase shrink-0">
+                                {player.avatar_url ? (
+                                  <img src={player.avatar_url} className="w-full h-full object-cover" />
+                                ) : (
+                                  player.display_name?.charAt(0) || 'P'
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-bold text-white text-sm sm:text-base group-hover:text-[#ccff00] transition truncate">{player.display_name}</p>
+                                </div>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
+                                  <LightningIcon weight="fill" className="text-[#ccff00]" /> {player.points} PTS
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {/* Show Follow Back in the Followers tab */}
+                              {friendTab === 'followers' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleFollowBack(player.id, player)
+                                  }}
+                                  disabled={followBackLoading === player.id}
+                                  className="text-[10px] sm:text-xs font-bold bg-[#ccff00] text-black px-3 py-1.5 rounded-lg hover:bg-white transition flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <UserPlusIcon weight="bold" className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">
+                                    {followBackLoading === player.id ? '...' : 'Follow Back'}
+                                  </span>
+                                  <span className="sm:hidden">Back</span>
+                                </button>
+                              )}
+                              
+                              {/* Show Unfollow in the Following tab */}
+                              {friendTab === 'following' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleUnfollow(player.id)
+                                  }}
+                                  disabled={unfollowLoading === player.id}
+                                  className="text-[10px] sm:text-xs font-bold bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  <UserMinusIcon weight="bold" className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">
+                                    {unfollowLoading === player.id ? '...' : 'Unfollow'}
+                                  </span>
+                                  <span className="sm:hidden">Unfollow</span>
+                                </button>
+                              )}
+
+                              <CaretRightIcon className="w-5 h-5 text-gray-500 group-hover:text-white transition" />
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
 
@@ -584,45 +709,14 @@ export default function Profile() {
       {/* MOBILE NAVIGATION */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
-        <button onClick={openPlayMenu} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
+        {/* ✅ ROUTES TO QUIZZES PAGE */}
+        <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
 
-      {/* CHOOSE A CHALLENGE MODAL */}
-      {showPlayMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] flex flex-col">
-            <button onClick={() => setShowPlayMenu(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-gray-400 hover:text-white transition bg-white/5 p-1.5 rounded-lg"><XIcon weight="bold" size={20} /></button>
-            
-            <h2 className="text-xl sm:text-2xl font-bold mb-1">Choose a Challenge</h2>
-            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Select a quiz to play & earn coins.</p>
-            
-            <div className="space-y-2 sm:space-y-3 overflow-y-auto pr-1 flex-1">
-              {loadingQuizzes ? (
-                <p className="text-center text-[#ccff00] font-mono text-xs sm:text-sm py-4 animate-pulse">LOADING...</p>
-              ) : availableQuizzes.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 bg-black/20 rounded-2xl border border-white/5">
-                  <TrophyIcon weight="duotone" className="w-10 h-10 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
-                  <p className="text-gray-400 text-xs sm:text-sm font-bold">All caught up!</p>
-                  <p className="text-gray-500 text-[10px] sm:text-xs mt-1">You've completed all available quizzes for your tier.</p>
-                </div>
-              ) : (
-                availableQuizzes.map((q) => (
-                  <button key={q.id} onClick={() => { setShowPlayMenu(false); navigate(`/play/${q.id}`) }} className="w-full text-left bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 transition group flex justify-between items-center">
-                    <div className="pr-2">
-                      <p className="font-bold text-xs sm:text-sm text-white group-hover:text-[#ccff00] transition line-clamp-1">{q.title}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{q.category}</p>
-                    </div>
-                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-2 sm:px-2.5 py-1 rounded-lg border shrink-0 ${q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>{q.difficulty}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ❌ PLAY MENU MODAL IS COMPLETELY GONE FROM HERE */}
     </div>
   )
 }

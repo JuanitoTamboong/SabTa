@@ -7,10 +7,13 @@ import LandingPage from './pages/LandingPage'
 import AgeSelection from './pages/AgeSelection'
 import UserDashboard from './pages/UserDashboard'
 import QuizGameplay from './pages/QuizGameplay'
-// REMOVED: import QuizResults from './pages/QuizResults'
 import Profile from './pages/Profile'
 import RewardsShop from './pages/RewardsShop'
 import Leaderboard from './pages/Leaderboard'
+import GlobalChat from './pages/GlobalChat'
+import PlayerProfile from './pages/PlayerProfile'
+import Quizzes from './pages/Quizzes'
+import BattleHistory from './pages/BattleHistory' // ✅ IMPORTED BATTLE HISTORY
 
 function AuthCallback() {
   const navigate = useNavigate()
@@ -24,7 +27,6 @@ function AuthCallback() {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // If the profile doesn't exist (deleted from DB), log them out
         if (error || !profile) {
           await supabase.auth.signOut()
           navigate('/')
@@ -129,10 +131,36 @@ function App() {
           } 
         />
 
+        {/* ✅ QUIZZES ROUTE */}
+        <Route 
+          path="/quizzes" 
+          element={
+            session && profile?.age_category ? <Quizzes /> : 
+            <Navigate to="/onboarding" />
+          } 
+        />
+
+        {/* ✅ BATTLE HISTORY ROUTE */}
+        <Route 
+          path="/battles" 
+          element={
+            session && profile?.age_category ? <BattleHistory /> : 
+            <Navigate to="/onboarding" />
+          } 
+        />
+
         <Route 
           path="/profile" 
           element={
             session && profile?.age_category ? <Profile /> : 
+            <Navigate to="/onboarding" />
+          } 
+        />
+
+        <Route 
+          path="/player/:playerId" 
+          element={
+            session && profile?.age_category ? <PlayerProfile /> : 
             <Navigate to="/onboarding" />
           } 
         />
@@ -153,8 +181,6 @@ function App() {
           } 
         />
 
-        {/* REMOVED: The /results route */}
-
         <Route 
           path="/play/:quizId" 
           element={
@@ -165,6 +191,8 @@ function App() {
         
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+
+      {session && profile?.age_category && <GlobalChat />}
     </BrowserRouter>
   )
 }

@@ -1,11 +1,11 @@
 // src/pages/QuizGameplay.tsx
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
   ClockIcon, CheckIcon, XIcon, LightningIcon, 
   ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon,
-  CoinsIcon, TimerIcon 
+  CoinsIcon, TimerIcon, SwordIcon
 } from '@phosphor-icons/react'
 
 // --- SOUND EFFECTS HELPER ---
@@ -51,6 +51,12 @@ export default function QuizGameplay() {
   const navigate = useNavigate()
   const { quizId } = useParams()
   
+  // ✅ BATTLE MODE DETECTION
+  const [searchParams] = useSearchParams()
+  const battleId = searchParams.get('battleId')
+  const isOpponent = searchParams.get('opponent') === 'true'
+  const isBattleMode = !!battleId
+
   // Game State
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQIndex, setCurrentQIndex] = useState(0)
@@ -119,7 +125,7 @@ export default function QuizGameplay() {
         
         if (profileData) setProfile(profileData)
 
-        // ✅ Fetch all equipped items and filter for the quiz theme
+        // Fetch equipped theme
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('cosmetic_items(cosmetic_type, preview_url)')
@@ -127,7 +133,6 @@ export default function QuizGameplay() {
           .eq('is_equipped', true)
 
         if (invData) {
-          // Cast cosmetic_items as any to fix the TypeScript array error
           const themeItem = invData.find((item: any) => 
             (item.cosmetic_items as any)?.cosmetic_type === 'quiz_theme'
           )
@@ -136,18 +141,21 @@ export default function QuizGameplay() {
           }
         }
 
-        const { data: existingAttempt } = await supabase
-          .from('quiz_attempts')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('quiz_id', quizId)
-          .eq('status', 'completed')
-          .maybeSingle()
+        // ✅ BYPASS COMPLETED CHECK IN BATTLE MODE
+        if (!isBattleMode) {
+          const { data: existingAttempt } = await supabase
+            .from('quiz_attempts')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('quiz_id', quizId)
+            .eq('status', 'completed')
+            .maybeSingle()
 
-        if (existingAttempt) {
-          setError("You have already completed this quiz! Please choose another one.")
-          setLoading(false)
-          return
+          if (existingAttempt) {
+            setError("You have already completed this quiz! Please choose another one.")
+            setLoading(false)
+            return
+          }
         }
 
         const { data: quizData, error: quizErr } = await supabase
@@ -192,7 +200,7 @@ export default function QuizGameplay() {
     return () => {
       if (stopwatchRef.current) clearInterval(stopwatchRef.current)
     }
-  }, [navigate, quizId, isFinished])
+  }, [navigate, quizId, isFinished, isBattleMode])
 
   useEffect(() => {
     if (loading || error || isAnswerRevealed || !currentQuestion || showQuitModal || showHintModal || isFinished) return
@@ -225,15 +233,17 @@ export default function QuizGameplay() {
     
     if (isCorrect) {
       playSound('correct')
-      
       setCorrectCount((prev) => prev + 1)
       correctCountRef.current += 1
       coinsEarnedRef.current += 150 
       
-      setProfile((prev: any) => ({ 
-        ...prev, 
-        coins: (prev?.coins || 0) + 150 
-      }))
+      // Only update local coins if NOT in battle mode (battles don't earn coins)
+      if (!isBattleMode) {
+        setProfile((prev: any) => ({ 
+          ...prev, 
+          coins: (prev?.coins || 0) + 150 
+        }))
+      }
     } else {
       playSound('wrong')
     }
@@ -252,6 +262,9 @@ export default function QuizGameplay() {
   }
 
   const handleUseHint = (payWith: 'points' | 'coins') => {
+    // ✅ Disable hints in battle mode to keep it fair
+    if (isBattleMode) return alert("Hints are disabled in Battle Mode!")
+
     if (showHint || isAnswerRevealed) return
     
     if (payWith === 'points') {
@@ -295,28 +308,51 @@ export default function QuizGameplay() {
       const timeTakenSeconds = Math.floor((Date.now() - quizStartTimeRef.current) / 1000)
       setFinalTimeTaken(timeTakenSeconds) 
 
-      const { data, error } = await supabase.rpc('submit_quiz_attempt', {
-        p_quiz_id: quizId,
-        p_correct: finalCorrect,
-        p_incorrect: finalIncorrect, 
-        p_unanswered: unansweredCount, 
-        p_time_taken: timeTakenSeconds,
-        p_points_penalty: finalPointsPenalty,
-        p_coins_earned: coinsEarnedRef.current,
-        p_coins_spent: coinsSpentRef.current
-      })
+      if (isBattleMode) {
+        // ✅ BATTLE MODE: Only update the battle score. No coins/points.
+        const updateField = isOpponent ? 'opponent_score' : 'challenger_score'
+        
+        await supabase
+          .from('quiz_battles')
+          .update({ 
+            [updateField]: finalCorrect, // Using correct answers as the score
+            status: isOpponent ? 'completed' : 'pending'
+          })
+          .eq('id', battleId)
 
-      if (error) throw error
-      
-      if (data) {
         setDbResults({
-          points: data.points_earned,
-          coins: data.coins_earned,
-          accuracy: data.accuracy,
+          points: 0,
+          coins: 0,
+          accuracy: Math.round((finalCorrect / totalQuestions) * 100),
           correct: finalCorrect,
-          new_total_points: data.new_total_points,
-          new_total_coins: data.new_total_coins
+          new_total_points: profile?.points || 0,
+          new_total_coins: profile?.coins || 0
         })
+      } else {
+        // ✅ NORMAL MODE: Award points/coins securely
+        const { data, error } = await supabase.rpc('submit_quiz_attempt', {
+          p_quiz_id: quizId,
+          p_correct: finalCorrect,
+          p_incorrect: finalIncorrect, 
+          p_unanswered: unansweredCount, 
+          p_time_taken: timeTakenSeconds,
+          p_points_penalty: finalPointsPenalty,
+          p_coins_earned: coinsEarnedRef.current,
+          p_coins_spent: coinsSpentRef.current
+        })
+
+        if (error) throw error
+        
+        if (data) {
+          setDbResults({
+            points: data.points_earned,
+            coins: data.coins_earned,
+            accuracy: data.accuracy,
+            correct: finalCorrect,
+            new_total_points: data.new_total_points,
+            new_total_coins: data.new_total_coins
+          })
+        }
       }
       
     } catch (err) {
@@ -356,7 +392,6 @@ export default function QuizGameplay() {
     return (
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative overflow-y-auto">
         
-        {/* APPLY THEME TO RESULTS SCREEN */}
         {equippedTheme && (
           <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
             <img src={equippedTheme} alt="bg" className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
@@ -373,19 +408,19 @@ export default function QuizGameplay() {
             </div>
 
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
-              {isPerfect ? 'Flawless Victory!' : 'Quiz Completed!'}
+              {isBattleMode ? 'Battle Completed!' : (isPerfect ? 'Flawless Victory!' : 'Quiz Completed!')}
             </h1>
             <p className="text-gray-400 text-xs sm:text-sm md:text-base mb-6 sm:mb-8">
-              {isPerfect ? 'You got every single question right. Amazing!' : 'Great effort! Here is your breakdown.'}
+              {isBattleMode ? 'Your score has been submitted. Waiting for the results!' : 'Great effort! Here is your breakdown.'}
             </p>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
               <div className="bg-black/40 border border-[#00f0ff]/30 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
-                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Points</p>
+                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Score</p>
                 <p className="text-xl sm:text-2xl font-bold text-[#00f0ff]">
-                  {dbResults?.points ?? 0}
+                  {dbResults?.correct ?? 0}
                 </p>
               </div>
               
@@ -394,8 +429,8 @@ export default function QuizGameplay() {
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
                 <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Coins</p>
                 <p className="text-xl sm:text-2xl font-bold text-[#ff00a0]">
-                  {(dbResults?.coins ?? 0) > 0 ? '+' : ''}
-                  {dbResults?.coins ?? 0}
+                  {isBattleMode ? '0' : (dbResults?.coins ?? 0) > 0 ? '+' : ''}
+                  {isBattleMode ? '' : dbResults?.coins ?? 0}
                 </p>
               </div>
             </div>
@@ -408,44 +443,7 @@ export default function QuizGameplay() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-2 sm:p-3 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
-                <StarIcon weight="fill" className="text-yellow-300 w-4 h-4 sm:w-5 sm:h-5" />
-                <div className="text-center sm:text-left">
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold">Accuracy</p>
-                  <p className="text-xs sm:text-sm font-bold">{dbResults?.accuracy ?? 0}%</p>
-                </div>
-              </div>
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-2 sm:p-3 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
-                <CheckIcon weight="fill" className="text-green-400 w-4 h-4 sm:w-5 sm:h-5" />
-                <div className="text-center sm:text-left">
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold">Correct</p>
-                  <p className="text-xs sm:text-sm font-bold">{dbResults?.correct ?? 0}/{questions.length}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center bg-black/40 border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8">
-              <div className="flex flex-col items-center flex-1">
-                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">New Total Points</p>
-                <p className="text-base sm:text-lg font-bold text-[#ccff00]">{dbResults?.new_total_points ?? 0}</p>
-              </div>
-              <div className="w-[1px] h-8 bg-white/10 mx-2" />
-              <div className="flex flex-col items-center flex-1">
-                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-1">New Total Coins</p>
-                <p className="text-base sm:text-lg font-bold text-[#ff00a0]">{dbResults?.new_total_coins ?? 0}</p>
-              </div>
-            </div>
-
             <div className="space-y-2 sm:space-y-3">
-              <button 
-                onClick={() => setShowReview(!showReview)} 
-                className="w-full bg-[#00f0ff]/10 text-[#00f0ff] py-3 sm:py-4 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-[#00f0ff]/20 transition border border-[#00f0ff]/20"
-              >
-                {showReview ? <CaretUpIcon weight="bold" /> : <CaretDownIcon weight="bold" />}
-                {showReview ? 'Hide Breakdown' : 'Review Answers'}
-              </button>
-
               <div>
                 <button onClick={() => navigate('/dashboard')} className="w-full bg-[#ccff00] text-black py-3 sm:py-4 rounded-xl text-sm sm:text-base font-bold hover:bg-white transition flex items-center justify-center gap-2">
                   Dashboard <ArrowLeftIcon weight="bold" />
@@ -453,40 +451,6 @@ export default function QuizGameplay() {
               </div>
             </div>
           </div>
-
-          {showReview && (
-            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl sm:rounded-[2rem] p-4 sm:p-6 md:p-8 shadow-2xl">
-              <h3 className="text-base sm:text-lg font-bold mb-4 sm:mb-6 flex items-center gap-2">
-                <TargetIcon className="text-[#ccff00]" /> Answer Breakdown
-              </h3>
-              <div className="space-y-3 sm:space-y-4">
-                {responses.map((r: any, i: number) => (
-                  <div key={i} className="bg-black/40 border border-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                    <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3">
-                      {r.is_correct ? (
-                        <CheckIcon weight="fill" className="text-green-500 w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
-                      ) : (
-                        <XIcon weight="fill" className="text-red-500 w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
-                      )}
-                      <p className="font-bold text-xs sm:text-sm md:text-base leading-tight">{r.question_text}</p>
-                    </div>
-                    <div className="pl-7 sm:pl-9 space-y-1 sm:space-y-2">
-                      <p className="text-[11px] sm:text-xs md:text-sm text-gray-400">
-                        Your Answer: <span className={`font-bold ${r.is_correct ? 'text-green-400' : 'text-red-400'}`}>
-                          {r.selected_answer || 'Skipped'}
-                        </span>
-                      </p>
-                      {!r.is_correct && (
-                        <p className="text-[11px] sm:text-xs md:text-sm text-gray-400">
-                          Correct Answer: <span className="text-green-400 font-bold">{r.correct_answer}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     )
@@ -500,20 +464,14 @@ export default function QuizGameplay() {
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
       
-      {/* ✅ BACKGROUND THEME */}
       {equippedTheme && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img 
-            src={equippedTheme} 
-            alt="theme" 
-            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
-          />
+          <img src={equippedTheme} alt="theme" className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" />
           <div className="absolute inset-0 bg-[#050505]/60 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
         </div>
       )}
 
-      {/* HEADER BAR */}
       <div className="w-full max-w-3xl flex justify-between items-center mb-4 relative z-10">
         <button 
           onClick={() => setShowQuitModal(true)} 
@@ -549,7 +507,7 @@ export default function QuizGameplay() {
 
         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md">{currentQuestion.question_text}</h2>
         
-        {!isAnswerRevealed && (
+        {!isAnswerRevealed && !isBattleMode && (
           <div className="flex justify-center mb-4 sm:mb-6">
             <button 
               onClick={() => setShowHintModal(true)} 
@@ -602,7 +560,6 @@ export default function QuizGameplay() {
         </div>
       </div>
 
-      {/* HINT CHOICE MODAL */}
       {showHintModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
@@ -640,7 +597,6 @@ export default function QuizGameplay() {
         </div>
       )}
 
-      {/* QUIT CONFIRMATION MODAL */}
       {showQuitModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
