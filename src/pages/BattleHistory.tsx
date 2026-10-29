@@ -31,7 +31,7 @@ export default function BattleHistory() {
     if (!user) return navigate('/')
     setUserId(user.id)
 
-    // ✅ Fetch Background with TypeScript fix
+    // ✅ Fetch Background
     const { data: invData } = await supabase
       .from('user_inventory')
       .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
@@ -66,17 +66,14 @@ export default function BattleHistory() {
     setLoading(false)
   }
 
-  // ✅ Open Custom Modal
   const openConfirmModal = (battleId: string, type: 'cancel' | 'decline' | 'delete') => {
     setModalConfig({ isOpen: true, type, battleId })
   }
 
-  // ✅ Close Custom Modal
   const closeConfirmModal = () => {
     setModalConfig({ isOpen: false, type: null, battleId: null })
   }
 
-  // ✅ Handle Actual Deletion
   const confirmAction = async () => {
     if (!modalConfig.battleId) return
     
@@ -89,7 +86,6 @@ export default function BattleHistory() {
 
       if (error) throw error
 
-      // Instantly remove from the list
       setBattles(prev => prev.filter(b => b.id !== modalConfig.battleId))
       closeConfirmModal()
     } catch (err: any) {
@@ -145,11 +141,16 @@ export default function BattleHistory() {
               const isMeChallenger = battle.challenger_id === userId
               const isMeOpponent = battle.opponent_id === userId
               
-              const needsMyAction = isMeOpponent && battle.status === 'pending'
-              const canCancel = isMeChallenger && battle.status === 'pending'
-              
               const myScore = isMeChallenger ? battle.challenger_score : battle.opponent_score
               const theirScore = isMeChallenger ? battle.opponent_score : battle.challenger_score
+
+              // 🔥 FIX: If the score is not null, they have played. No need for the boolean check.
+              const iHavePlayed = myScore !== null && myScore !== undefined
+              const theyHavePlayed = theirScore !== null && theirScore !== undefined
+              
+              const needsMyAction = battle.status === 'pending' && !iHavePlayed
+              const canCancel = isMeChallenger && battle.status === 'pending' && !iHavePlayed
+              const iAmWaiting = battle.status === 'pending' && iHavePlayed && !theyHavePlayed
 
               let actualWinnerId = battle.winner_id
               let isDraw = false
@@ -211,19 +212,21 @@ export default function BattleHistory() {
                       </p>
                     </div>
 
-                    {battle.status === 'pending' && !needsMyAction && !canCancel && (
-                       <div className="flex items-center text-yellow-500 text-xs font-bold bg-yellow-500/10 px-3 py-2 rounded-lg shrink-0">
-                         <ClockIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Waiting...
-                       </div>
+                    {/* 🔥 WAITING STATE: I played, waiting for them */}
+                    {iAmWaiting && (
+                      <div className="flex items-center text-yellow-500 text-xs font-bold bg-yellow-500/10 px-3 py-2 rounded-lg shrink-0">
+                        <ClockIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Waiting...
+                      </div>
                     )}
 
+                    {/* 🔥 YOUR TURN: Show button only if it's your turn */}
                     {needsMyAction && (
-                       <button 
+                      <button 
                         onClick={() => navigate(`/play/${battle.quiz_id}?battleId=${battle.id}&opponent=true`)}
                         className="bg-[#ff00a0] text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl text-xs sm:text-sm font-bold hover:bg-white hover:text-[#ff00a0] transition whitespace-nowrap shadow-[0_0_15px_rgba(255,0,160,0.3)] animate-pulse shrink-0"
-                       >
-                         Play Turn
-                       </button>
+                      >
+                        Play Turn
+                      </button>
                     )}
 
                     {battle.status === 'completed' && (
@@ -263,7 +266,7 @@ export default function BattleHistory() {
                       >
                         <XCircleIcon weight="bold" className="w-5 h-5" />
                       </button>
-                    ) : (
+                    ) : (!needsMyAction && !iAmWaiting && battle.status === 'completed') ? (
                       <button 
                         onClick={() => openConfirmModal(battle.id, 'delete')}
                         disabled={processingId === battle.id}
@@ -272,7 +275,7 @@ export default function BattleHistory() {
                       >
                         <TrashIcon weight="bold" className="w-5 h-5" />
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )

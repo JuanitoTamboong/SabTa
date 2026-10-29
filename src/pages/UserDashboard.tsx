@@ -76,12 +76,14 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
-        // ✅ INCOMING BATTLES FETCH
+        // ✅ FIXED: INCOMING BATTLES FETCH
+        // We only want to show battles where we haven't played yet (opponent_score is null)
         const { data: pendingBattles } = await supabase
           .from('quiz_battles')
-          .select(`id, quiz_id, challenger_id, profiles!challenger_id ( display_name, avatar_url )`)
+          .select(`id, quiz_id, challenger_id, opponent_score, profiles!challenger_id ( display_name, avatar_url )`)
           .eq('opponent_id', user.id)
           .eq('status', 'pending')
+          .is('opponent_score', null) // <--- This prevents the banner from showing after you play
 
         if (pendingBattles) setIncomingBattles(pendingBattles)
 
@@ -189,12 +191,12 @@ export default function UserDashboard() {
     }
   }
 
-  // ✅ NEW: Handles Accepting a Battle (Instantly hides banner)
+  // ✅ Handles Accepting a Battle (Instantly hides banner)
   const handleAcceptBattle = (battleId: string, quizId: string) => {
-    // 1. Immediately remove it from the UI to prevent "waiting..." state
+    // 1. Immediately remove it from the UI to prevent it showing when you return
     setIncomingBattles(prev => prev.filter(b => b.id !== battleId))
     
-    // 2. Navigate to the play screen
+    // 2. Navigate to the play screen (with the opponent flag so the quiz page knows to submit as opponent)
     navigate(`/play/${quizId}?battleId=${battleId}&opponent=true`)
   }
 
@@ -306,14 +308,12 @@ export default function UserDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  {/* ✅ Opens Custom Modal */}
                   <button 
                     onClick={() => openDeclineModal(battle.id)}
                     className="flex-1 sm:flex-none bg-white/10 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-500/20 hover:text-red-400 transition whitespace-nowrap"
                   >
                     Decline
                   </button>
-                  {/* ✅ Instantly Accept & Remove from state via handleAcceptBattle */}
                   <button 
                     onClick={() => handleAcceptBattle(battle.id, battle.quiz_id)}
                     className="flex-1 sm:flex-none bg-[#ff00a0] text-white px-6 py-3 rounded-xl font-bold hover:bg-white hover:text-[#ff00a0] transition whitespace-nowrap shadow-lg"
