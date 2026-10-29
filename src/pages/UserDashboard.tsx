@@ -76,6 +76,7 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(profileData?.avatar_url || googleAvatar || null)
 
+        // ✅ INCOMING BATTLES FETCH
         const { data: pendingBattles } = await supabase
           .from('quiz_battles')
           .select(`id, quiz_id, challenger_id, profiles!challenger_id ( display_name, avatar_url )`)
@@ -186,6 +187,15 @@ export default function UserDashboard() {
     } finally {
       setDeclining(false)
     }
+  }
+
+  // ✅ NEW: Handles Accepting a Battle (Instantly hides banner)
+  const handleAcceptBattle = (battleId: string, quizId: string) => {
+    // 1. Immediately remove it from the UI to prevent "waiting..." state
+    setIncomingBattles(prev => prev.filter(b => b.id !== battleId))
+    
+    // 2. Navigate to the play screen
+    navigate(`/play/${quizId}?battleId=${battleId}&opponent=true`)
   }
 
   const handleLogout = async () => {
@@ -303,8 +313,9 @@ export default function UserDashboard() {
                   >
                     Decline
                   </button>
+                  {/* ✅ Instantly Accept & Remove from state via handleAcceptBattle */}
                   <button 
-                    onClick={() => navigate(`/play/${battle.quiz_id}?battleId=${battle.id}&opponent=true`)}
+                    onClick={() => handleAcceptBattle(battle.id, battle.quiz_id)}
                     className="flex-1 sm:flex-none bg-[#ff00a0] text-white px-6 py-3 rounded-xl font-bold hover:bg-white hover:text-[#ff00a0] transition whitespace-nowrap shadow-lg"
                   >
                     Accept & Play

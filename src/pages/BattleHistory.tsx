@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { SwordIcon, ArrowLeftIcon, TrophyIcon, ClockIcon, TrashIcon, XCircleIcon, WarningIcon } from '@phosphor-icons/react'
+import { SwordIcon, ArrowLeftIcon, TrophyIcon, ClockIcon, TrashIcon, XCircleIcon, WarningIcon, MinusIcon } from '@phosphor-icons/react'
 
 export default function BattleHistory() {
   const navigate = useNavigate()
@@ -152,9 +152,18 @@ export default function BattleHistory() {
               const theirScore = isMeChallenger ? battle.opponent_score : battle.challenger_score
 
               let actualWinnerId = battle.winner_id
-              if (battle.status === 'completed' && actualWinnerId === null) {
-                if (battle.challenger_score > (battle.opponent_score || 0)) actualWinnerId = battle.challenger_id
-                else if ((battle.opponent_score || 0) > battle.challenger_score) actualWinnerId = battle.opponent_id
+              let isDraw = false
+
+              if (battle.status === 'completed') {
+                if (actualWinnerId === null) {
+                  if (battle.challenger_score > (battle.opponent_score || 0)) {
+                    actualWinnerId = battle.challenger_id
+                  } else if ((battle.opponent_score || 0) > battle.challenger_score) {
+                    actualWinnerId = battle.opponent_id
+                  } else {
+                    isDraw = true
+                  }
+                }
               }
 
               return (
@@ -162,7 +171,12 @@ export default function BattleHistory() {
                   
                   {/* Left Side: Players & Quiz */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm sm:text-base text-white mb-2 truncate">{battle.quizzes?.title}</p>
+                    <p className="font-bold text-sm sm:text-base text-white truncate">
+                      {battle.quizzes?.title || "Quiz Battle"}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mb-2">
+                       {new Date(battle.created_at).toLocaleDateString()}
+                    </p>
                     
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-400">
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -216,12 +230,17 @@ export default function BattleHistory() {
                       <div className={`flex items-center text-xs font-bold px-3 py-2 rounded-lg shrink-0 ${
                         actualWinnerId === userId 
                           ? 'text-[#ccff00] bg-[#ccff00]/10' 
-                          : actualWinnerId === null 
-                            ? 'text-gray-400 bg-white/5'
+                          : isDraw 
+                            ? 'text-gray-300 bg-white/10'
                             : 'text-red-400 bg-red-500/10'
                       }`}>
-                        <TrophyIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> 
-                        {actualWinnerId === userId ? 'Victory!' : actualWinnerId === null ? 'Draw' : 'Defeat'}
+                        {actualWinnerId === userId ? (
+                          <><TrophyIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Victory!</>
+                        ) : isDraw ? (
+                          <><MinusIcon weight="bold" className="mr-1.5 w-4 h-4 hidden sm:block" /> Draw</>
+                        ) : (
+                          <><XCircleIcon weight="bold" className="mr-1.5 w-4 h-4 hidden sm:block" /> Defeat</>
+                        )}
                       </div>
                     )}
 
