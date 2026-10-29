@@ -15,6 +15,10 @@ export default function GlobalChat() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [sending, setSending] = useState(false)
   const [onlineCount, setOnlineCount] = useState(1) 
+  const [unreadCount, setUnreadCount] = useState(0)
+  
+  // ✅ 1. Create a ref to hold the current isOpen state for the listener
+  const isOpenRef = useRef(isOpen)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -23,8 +27,15 @@ export default function GlobalChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // ✅ 2. Keep the ref in sync when the UI opens/closes
   useEffect(() => {
-    // ✅ 1. Create a flag to prevent state updates after unmount (Strict Mode)
+    isOpenRef.current = isOpen
+    if (isOpen) {
+      setUnreadCount(0)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
     let isMounted = true
     let channel: any = null
 
@@ -52,8 +63,7 @@ export default function GlobalChat() {
         setTimeout(scrollToBottom, 100)
       }
 
-      // ✅ 2. Build the ENTIRE chain synchronously in one go.
-      // This guarantees postgres_changes is attached BEFORE subscribe() is called.
+      // ✅ 3. Build the chain synchronously and ONLY run this on mount (empty deps)
       channel = supabase
         .channel('global_chat_room', {
           config: {
@@ -75,6 +85,11 @@ export default function GlobalChat() {
                 if (prev.some(m => m.id === newMsg.id)) return prev;
                 return [...prev, newMsg]
               })
+
+              // ✅ 4. Use the ref instead of the state variable here
+              if (!isOpenRef.current && newMsg.user_id !== user.id) {
+                setUnreadCount(prev => prev + 1)
+              }
               
               const container = scrollContainerRef.current
               if (container) {
@@ -109,14 +124,13 @@ export default function GlobalChat() {
 
     initChat()
 
-    // ✅ 3. Cleanup: Remove the channel entirely on unmount
     return () => {
       isMounted = false
       if (channel) {
         supabase.removeChannel(channel)
       }
     }
-  }, [])
+  }, []) // ✅ 5. Empty dependency array - channel is only created once!
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,12 +166,21 @@ export default function GlobalChat() {
 
   return (
     <>
-      {/* ... (Your JSX remains completely unchanged) ... */}
+      {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[90] bg-[#ccff00] text-black p-4 rounded-full shadow-[0_0_20px_rgba(204,255,0,0.4)] hover:scale-110 transition-transform ${isOpen ? 'hidden' : 'flex'}`}
       >
         <ChatCircleDotsIcon weight="fill" className="w-7 h-7" />
+        
+        {/* Unread Badge */}
+        {unreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full border-2 border-[#0f1014] flex items-center justify-center shadow-lg animate-in zoom-in">
+            <span className="text-[10px] font-black text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          </div>
+        )}
       </button>
 
       {isOpen && (
