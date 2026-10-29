@@ -167,7 +167,8 @@ export default function PlayerProfile() {
       {equippedBg?.cosmetic_items?.preview_url && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img src={equippedBg.cosmetic_items.preview_url} className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
-          <div className="absolute inset-0 bg-[#050505]/60 md:bg-transparent" />
+          {/* Changed: Lighter overlay on mobile so the background shows through */}
+          <div className="absolute inset-0 bg-[#050505]/30 md:bg-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505]" />
         </div>
       )}
@@ -179,7 +180,8 @@ export default function PlayerProfile() {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
           
-          <div className="md:col-span-7 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
+          {/* Changed: Lighter background and blur on mobile, darker on desktop */}
+          <div className="md:col-span-7 bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
             
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#00f0ff]/10 to-transparent pointer-events-none" />
 
@@ -254,7 +256,8 @@ export default function PlayerProfile() {
           <div className="md:col-span-5 space-y-4 sm:space-y-6">
             
             <div className="grid grid-cols-1 gap-3">
-              <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+              {/* Changed: Lighter background and blur on mobile */}
+              <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
                 <div>
                   <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Total Points</p>
@@ -264,12 +267,14 @@ export default function PlayerProfile() {
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
+                {/* Changed: Lighter background and blur on mobile */}
+                <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <FireIcon weight="fill" className="text-[#ff00a0] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{player.current_streak}</p>
                   <p className="text-[9px] text-gray-400 uppercase font-bold">Streak</p>
                 </div>
-                <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
+                {/* Changed: Lighter background and blur on mobile */}
+                <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <MedalIcon weight="fill" className="text-[#00f0ff] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{Math.floor(player.points / 100) + 1}</p>
                   <p className="text-[9px] text-gray-400 uppercase font-bold">Level</p>
@@ -277,7 +282,8 @@ export default function PlayerProfile() {
               </div>
             </div>
 
-            <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+            {/* Changed: Lighter background and blur on mobile */}
+            <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                 <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
               </h3>
