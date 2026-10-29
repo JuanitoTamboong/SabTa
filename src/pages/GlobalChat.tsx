@@ -48,11 +48,19 @@ export default function GlobalChat() {
 
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
+      // 🔥 FIX: Include user_inventory and cosmetic_items so we can render borders/bg in chat!
       const { data } = await supabase
         .from('chat_messages')
         .select(`
           id, message, created_at, user_id,
-          profiles ( display_name, avatar_url )
+          profiles ( 
+            display_name, 
+            avatar_url,
+            user_inventory ( 
+              is_equipped, 
+              cosmetic_items ( preview_url, cosmetic_type ) 
+            )
+          )
         `)
         .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: true })
@@ -74,9 +82,20 @@ export default function GlobalChat() {
           'postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
           async (payload: any) => {
+            // 🔥 FIX: Include inventory here too for new incoming messages
             const { data: newMsg } = await supabase
               .from('chat_messages')
-              .select(`id, message, created_at, user_id, profiles ( display_name, avatar_url )`)
+              .select(`
+                id, message, created_at, user_id,
+                profiles ( 
+                  display_name, 
+                  avatar_url,
+                  user_inventory ( 
+                    is_equipped, 
+                    cosmetic_items ( preview_url, cosmetic_type ) 
+                  )
+                )
+              `)
               .eq('id', payload.new.id)
               .single()
 
@@ -207,21 +226,40 @@ export default function GlobalChat() {
             ) : (
               messages.map((msg) => {
                 const isMe = msg.user_id === currentUser?.id
+                
+                // 🔥 FIX: Find the equipped border for this user
+                const equippedBorder = msg.profiles?.user_inventory?.find(
+                  (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
+                )?.cosmetic_items?.preview_url
+
                 return (
                   <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                     
+                    {/* Avatar Container */}
                     <div 
                       onClick={() => { if (!isMe) navigate(`/player/${msg.user_id}`) }}
-                      className={`relative w-8 h-8 rounded-full bg-white/10 shrink-0 flex items-center justify-center overflow-hidden border border-white/10 mt-1 ${!isMe ? 'cursor-pointer hover:border-[#ccff00] transition' : ''}`}
+                      className={`relative w-8 h-8 flex items-center justify-center shrink-0 mt-1 ${!isMe ? 'cursor-pointer group' : ''}`}
                       title={!isMe ? `View ${msg.profiles?.display_name}'s profile` : 'You'}
                     >
-                      {msg.profiles?.avatar_url ? (
-                        <img src={msg.profiles.avatar_url} className="w-full h-full object-cover" />
-                      ) : (
-                        <UserIcon className="w-4 h-4 text-gray-400" />
+                      {/* Inner Avatar Image/Circle */}
+                      <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center overflow-hidden z-10 border border-white/10 group-hover:border-[#ccff00] transition">
+                        {msg.profiles?.avatar_url ? (
+                          <img src={msg.profiles.avatar_url} className="w-full h-full object-cover" />
+                        ) : (
+                          <UserIcon className="w-4 h-4 text-gray-400" />
+                        )}
+                      </div>
+
+                      {/* 🔥 EQUIPPED BORDER OVERLAY */}
+                      {equippedBorder && (
+                        <img 
+                          src={equippedBorder} 
+                          className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" 
+                        />
                       )}
-                      
-                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#0f1014] rounded-full z-10 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
+
+                      {/* Online Status Dot */}
+                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#0f1014] rounded-full z-30 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                     </div>
 
                     <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
