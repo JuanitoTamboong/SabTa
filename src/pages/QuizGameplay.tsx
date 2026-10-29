@@ -84,7 +84,7 @@ export default function QuizGameplay() {
 
   // Results State
   const [isFinished, setIsFinished] = useState(false)
-  const [showReview, setShowReview] = useState(false)
+  const [showReview, setShowReview] = useState(false) // ✅ Added Review Toggle
   
   // Store the exact database numbers and calculated time
   const [dbResults, setDbResults] = useState<{ 
@@ -389,6 +389,60 @@ export default function QuizGameplay() {
   if (isFinished) {
     const isPerfect = (dbResults?.correct ?? 0) === questions.length && questions.length > 0
 
+    // ✅ ADDED REVIEW SCREEN
+    if (showReview) {
+      return (
+        <div className="min-h-screen bg-[#050505] text-white p-4 sm:p-6 flex flex-col items-center">
+          <div className="w-full max-w-3xl py-6 relative z-10">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-xl sm:text-2xl font-bold">Review Answers</h1>
+              <button 
+                onClick={() => setShowReview(false)} 
+                className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2"
+              >
+                <ArrowLeftIcon weight="bold" /> Back to Results
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {responses.map((res, index) => (
+                <div key={index} className={`p-4 rounded-2xl border ${res.is_correct ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                  <div className="flex gap-2 items-start mb-3">
+                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${res.is_correct ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
+                      {index + 1}
+                    </span>
+                    <p className="font-semibold text-sm sm:text-base">{res.question_text}</p>
+                  </div>
+                  
+                  <div className="ml-8 space-y-2 text-sm">
+                    <div className="flex gap-2">
+                      <span className="text-gray-400">Your Answer:</span>
+                      <span className={res.is_correct ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
+                        {res.selected_answer || 'Unanswered'}
+                      </span>
+                    </div>
+                    {!res.is_correct && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-400">Correct Answer:</span>
+                        <span className="text-green-400 font-bold">{res.correct_answer}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <button 
+              onClick={() => navigate('/dashboard')} 
+              className="w-full mt-8 bg-[#ccff00] text-black py-4 rounded-xl font-bold hover:bg-white transition"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative overflow-y-auto">
         
@@ -424,6 +478,7 @@ export default function QuizGameplay() {
                 </p>
               </div>
               
+              {/* ✅ FIXED COINS UI TO SHOW SPENT AND EARNED */}
               <div className="bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
@@ -432,8 +487,28 @@ export default function QuizGameplay() {
                   {isBattleMode ? '0' : (dbResults?.coins ?? 0) > 0 ? '+' : ''}
                   {isBattleMode ? '' : dbResults?.coins ?? 0}
                 </p>
+                {/* ✅ Show spent coins explicitly below the net total */}
+                {!isBattleMode && coinsSpentRef.current > 0 && (
+                  <p className="text-[10px] text-red-400 font-bold mt-1">(-{coinsSpentRef.current} Hints)</p>
+                )}
               </div>
             </div>
+
+            {/* ✅ ADDED POINTS DISPLAY WITH DEDUCTIONS */}
+            {!isBattleMode && (
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 mb-3 sm:mb-4 relative overflow-hidden">
+                 <div className="flex items-center gap-2">
+                   <StarIcon weight="fill" className="text-yellow-400 w-5 h-5" />
+                   <p className="text-[10px] text-gray-500 uppercase font-bold">Points</p>
+                 </div>
+                 <p className="text-lg sm:text-xl font-bold text-white">
+                   {dbResults?.points ?? 0} PTS
+                 </p>
+                 {pointsSpentRef.current > 0 && (
+                  <p className="text-[10px] text-red-400 font-bold">(-{pointsSpentRef.current} Hints)</p>
+                 )}
+              </div>
+            )}
 
             <div className="bg-black/40 border border-[#ccff00]/30 rounded-2xl p-3 sm:p-4 flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4 relative overflow-hidden">
               <TimerIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8" />
@@ -444,6 +519,12 @@ export default function QuizGameplay() {
             </div>
 
             <div className="space-y-2 sm:space-y-3">
+              {/* ✅ ADDED REVIEW BUTTON */}
+              {!isBattleMode && (
+                <button onClick={() => setShowReview(true)} className="w-full bg-white/10 text-white py-3 sm:py-4 rounded-xl text-sm sm:text-base font-bold hover:bg-white/20 transition flex items-center justify-center gap-2 border border-white/10">
+                  Review Answers
+                </button>
+              )}
               <div>
                 <button onClick={() => navigate('/dashboard')} className="w-full bg-[#ccff00] text-black py-3 sm:py-4 rounded-xl text-sm sm:text-base font-bold hover:bg-white transition flex items-center justify-center gap-2">
                   Dashboard <ArrowLeftIcon weight="bold" />
