@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 
@@ -33,7 +33,6 @@ function AuthCallback() {
           return
         }
 
-        // ✅ FIX 1: Block Admins at the callback level
         if (profile.role === 'admin') {
           await supabase.auth.signOut()
           alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
@@ -59,64 +58,15 @@ function AuthCallback() {
   )
 }
 
-function App() {
-  const [session, setSession] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else {
-        setProfile(null)
-        setLoading(false)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-    
-    if (error || !data) {
-      console.warn("Profile not found, logging out.")
-      await supabase.auth.signOut()
-      setProfile(null)
-    } else {
-      // ✅ FIX 2: Block Admins globally if they try to load the app
-      if (data.role === 'admin') {
-        await supabase.auth.signOut()
-        setProfile(null)
-        alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
-      } else {
-        setProfile(data)
-      }
-    }
-    setLoading(false)
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        SYSTEM INITIALIZING...
-      </div>
-    )
-  }
+// ✅ Create an inner component so we can use useLocation()
+function AppRoutes({ session, profile }: { session: any, profile: any }) {
+  const location = useLocation();
+  
+  // ✅ Check if we are currently on the quizzes list or actively playing a quiz
+  const isQuizRoute = location.pathname.startsWith('/quizzes') || location.pathname.startsWith('/play');
 
   return (
-    <BrowserRouter>
+    <>
       <Routes>
         <Route 
           path="/" 
@@ -205,7 +155,71 @@ function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      {session && profile?.age_category && <GlobalChat />}
+      {/* ✅ Only show GlobalChat if logged in AND we are not on a quiz route */}
+      {session && profile?.age_category && !isQuizRoute && <GlobalChat />}
+    </>
+  )
+}
+
+function App() {
+  const [session, setSession] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session) fetchProfile(session.user.id)
+      else setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) fetchProfile(session.user.id)
+      else {
+        setProfile(null)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+    
+    if (error || !data) {
+      console.warn("Profile not found, logging out.")
+      await supabase.auth.signOut()
+      setProfile(null)
+    } else {
+      if (data.role === 'admin') {
+        await supabase.auth.signOut()
+        setProfile(null)
+        alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
+      } else {
+        setProfile(data)
+      }
+    }
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
+        SYSTEM INITIALIZING...
+      </div>
+    )
+  }
+
+  return (
+    <BrowserRouter>
+      {/* ✅ Wrapped in a component so we can use useLocation */}
+      <AppRoutes session={session} profile={profile} />
     </BrowserRouter>
   )
 }
