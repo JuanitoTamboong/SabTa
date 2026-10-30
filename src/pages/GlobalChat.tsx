@@ -294,12 +294,12 @@ export default function GlobalChat() {
                         <span className="text-[9px] text-gray-600">{formatTime(msg.created_at)}</span>
                       </div>
 
-                      {/* 🔧 MESSAGE BUBBLE (Now Clickable for Reactions) */}
+                      {/* 🔧 MESSAGE BUBBLE WITH PRESS & HOLD */}
                       <div className="relative group">
                         
-                        {/* The Reaction Menu Popup (Visual) */}
+                        {/* The Reaction Menu Popup */}
                         {showReactionMenu === msg.id && (
-                          <div className="absolute -top-10 left-0 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95">
+                          <div className={`absolute -top-12 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95 ${isMe ? 'right-0' : 'left-0'}`}>
                             {['👍', '😂', '❤️', '😢', '😮', '😡'].map(emoji => (
                               <button 
                                 key={emoji} 
@@ -316,8 +316,24 @@ export default function GlobalChat() {
                         )}
 
                         <div 
-                          onDoubleClick={() => setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id)}
-                          className={`relative flex items-center rounded-2xl text-sm cursor-pointer ${
+                          // 🔧 PRESS AND HOLD LOGIC
+                          onMouseDown={(e) => {
+                            const target = e.currentTarget;
+                            target.dataset.timer = setTimeout(() => {
+                              setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id);
+                            }, 500)?.toString();
+                          }}
+                          onMouseUp={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
+                          onMouseLeave={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
+                          onTouchStart={(e) => {
+                            const target = e.currentTarget;
+                            target.dataset.timer = setTimeout(() => {
+                              setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id);
+                            }, 500)?.toString();
+                          }}
+                          onTouchEnd={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
+
+                          className={`relative flex items-center rounded-2xl text-sm cursor-pointer select-none ${
                           isMe 
                             ? 'bg-[#ccff00] text-black rounded-tr-none pl-3 pr-8 py-2' 
                             : 'bg-white/10 text-white rounded-tl-none px-3 py-2'
