@@ -104,7 +104,6 @@ export default function PlayerProfile() {
 
       if (bet) {
         setExistingBet(bet)
-        // ✅ Detect my submission regardless of pending/accepted
         const isMeChallenger = bet.challenger_id === user.id
         const mySubmitted = isMeChallenger ? bet.challenger_submitted : bet.opponent_submitted
         setHasPlayedBet(!!mySubmitted)
@@ -127,15 +126,13 @@ export default function PlayerProfile() {
         await supabase.from('follows').insert({ follower_id: myProfile.id, following_id: playerId })
         setIsFollowing(true)
       }
-    } catch (err) {
-      console.error(err)
+    } catch {
       setAlertData({ title: 'Action Failed', message: 'Could not update follow status.', type: 'error' })
     } finally {
       setFollowLoading(false)
     }
   }
 
-  // ── Load available quizzes (shared by both modals) ──
   const loadQuizzes = async () => {
     if (!myProfile?.age_category) return
     const { data } = await supabase
@@ -147,26 +144,22 @@ export default function PlayerProfile() {
     if (data) setAvailableQuizzes(data)
   }
 
-  // ── Open type selector ──
   const handleChallengeClick = () => {
     setShowChallengeTypeModal(true)
   }
 
-  // ── Open friendly modal ──
   const openChallengeModal = async () => {
     setShowChallengeTypeModal(false)
     setShowChallengeModal(true)
     await loadQuizzes()
   }
 
-  // ── Open bet modal ──
   const openBetModal = async () => {
     setShowChallengeTypeModal(false)
     setShowBetModal(true)
     await loadQuizzes()
   }
 
-  // ── Create friendly battle ──
   const handleCreateBattle = async (quizId: string) => {
     setCreatingBattle(true)
     try {
@@ -180,8 +173,7 @@ export default function PlayerProfile() {
 
       if (error) throw error
       navigate(`/play/${quizId}?battleId=${data.id}`)
-    } catch (err) {
-      console.error(err)
+    } catch {
       setAlertData({ title: 'Action Failed', message: 'Failed to create friendly battle.', type: 'error' })
       setCreatingBattle(false)
     }
@@ -193,9 +185,6 @@ export default function PlayerProfile() {
     }
   }
 
-  // ── BET BATTLE HANDLERS ──
-
-  // ✅ NEW: Create bet → do NOT navigate. Show "waiting for opponent" + cancel.
   const handleCreateBet = async (quizId: string, finalWager: number) => {
     if (finalWager < 1) return setAlertData({ title: 'Invalid Wager', message: 'Minimum wager is 1 coin.', type: 'error' })
     if ((myProfile?.coins || 0) < finalWager) return setAlertData({ title: 'Not Enough Coins', message: "You don't have enough coins for this bet.", type: 'error' })
@@ -210,11 +199,9 @@ export default function PlayerProfile() {
       })
       if (error) throw error
 
-      // Deduct coins locally
       setMyProfile((p: any) => ({ ...p, coins: p.coins - finalWager }))
       setShowBetModal(false)
 
-      // ✅ Set local state so the UI immediately shows "Waiting for Opponent"
       setExistingBet({
         id: data.battle_id,
         quiz_id: quizId,
@@ -235,14 +222,12 @@ export default function PlayerProfile() {
         type: 'success',
       })
     } catch (err: any) {
-      console.error(err)
       setAlertData({ title: 'Action Failed', message: err.message || 'Failed to create bet battle.', type: 'error' })
     } finally {
       setCreatingBet(false)
     }
   }
 
-  // ✅ Opponent accepts → navigate into the quiz
   const handleAcceptBet = async () => {
     if (!existingBet) return
     setBetActionLoading(true)
@@ -254,10 +239,8 @@ export default function PlayerProfile() {
       setMyProfile((p: any) => ({ ...p, coins: p.coins - existingBet.wager_amount }))
       setExistingBet({ ...existingBet, status: 'accepted' })
 
-      // Navigate straight into the quiz
       navigate(`/play/${existingBet.quiz_id}?betBattleId=${existingBet.id}`)
     } catch (err: any) {
-      console.error(err)
       setAlertData({ title: 'Action Failed', message: err.message || 'Failed to accept bet.', type: 'error' })
       setBetActionLoading(false)
     }
@@ -272,7 +255,6 @@ export default function PlayerProfile() {
       setExistingBet(null)
       setAlertData({ title: 'Bet Declined', message: 'Challenger has been refunded.', type: 'success' })
     } catch (err: any) {
-      console.error(err)
       setAlertData({ title: 'Action Failed', message: err.message || 'Failed to decline bet.', type: 'error' })
     } finally {
       setBetActionLoading(false)
@@ -289,7 +271,6 @@ export default function PlayerProfile() {
       setExistingBet(null)
       setAlertData({ title: 'Bet Cancelled', message: 'Your coins have been refunded.', type: 'success' })
     } catch (err: any) {
-      console.error(err)
       setAlertData({ title: 'Action Failed', message: err.message || 'Failed to cancel bet.', type: 'error' })
     } finally {
       setBetActionLoading(false)
@@ -302,7 +283,6 @@ export default function PlayerProfile() {
     }
   }
 
-  // Helper for the input to handle typing smoothly
   const handleWagerChange = (val: string) => {
     if (val === '') {
       setBetWager('')
@@ -337,20 +317,12 @@ export default function PlayerProfile() {
   const totalBgs = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'background').length
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
 
-  // ── Bet derived flags ──
   const amIBetChallenger = existingBet?.challenger_id === myProfile?.id
   const amIBetOpponent = existingBet?.opponent_id === myProfile?.id
 
-  // Challenger: pending + not yet played → "Waiting for opponent to accept" + Cancel
   const challengerWaiting = existingBet?.status === 'pending' && amIBetChallenger
-
-  // Opponent: pending → Accept / Decline
   const canAcceptBet = existingBet?.status === 'pending' && amIBetOpponent
-
-  // Accepted + haven't played → Play Bet (both players)
   const canPlayBet = existingBet?.status === 'accepted' && !hasPlayedBet
-
-  // Accepted + already played → Waiting for opponent to play
   const waitingOnBetOpponent = existingBet?.status === 'accepted' && hasPlayedBet
 
   return (
@@ -406,7 +378,6 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            {/* ── ACTION BUTTONS ── */}
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <button 
                 onClick={handleFollow}
@@ -420,7 +391,6 @@ export default function PlayerProfile() {
                 {followButtonIcon} {followButtonLabel}
               </button>
 
-              {/* ── CHALLENGE (unified) ── */}
               {existingPendingBattle ? (
                 hasAlreadyPlayed ? (
                   <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
@@ -444,11 +414,8 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            {/* ── EXISTING BET BATTLE STATUS ROW ── */}
             {existingBet && (
               <div className="mt-2">
-
-                {/* ✅ CHALLENGER: pending → Waiting + Cancel */}
                 {challengerWaiting && (
                   <div className="flex gap-2">
                     <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
@@ -465,7 +432,6 @@ export default function PlayerProfile() {
                   </div>
                 )}
 
-                {/* ✅ OPPONENT: pending → Accept / Decline */}
                 {canAcceptBet && (
                   <div className="flex gap-2">
                     <button
@@ -486,7 +452,6 @@ export default function PlayerProfile() {
                   </div>
                 )}
 
-                {/* ✅ ACCEPTED + not played → Play Bet (both players) */}
                 {canPlayBet && (
                   <button
                     onClick={handlePlayBet}
@@ -497,7 +462,6 @@ export default function PlayerProfile() {
                   </button>
                 )}
 
-                {/* ✅ ACCEPTED + already played → Waiting for opponent to play */}
                 {waitingOnBetOpponent && (
                   <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed">
                     <ClockIcon weight="bold" className="w-4 h-4" />
@@ -619,7 +583,6 @@ export default function PlayerProfile() {
             <h2 className="text-xl font-black mb-1">Challenge {player.display_name}</h2>
             <p className="text-gray-400 text-xs mb-5">Choose how you want to battle.</p>
 
-            {/* Friendly option */}
             <button
               onClick={openChallengeModal}
               className="w-full text-left bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-4 mb-3 hover:border-[#ff00a0] hover:bg-[#ff00a0]/5 transition group"
@@ -635,7 +598,6 @@ export default function PlayerProfile() {
               </div>
             </button>
 
-            {/* Bet option */}
             <button
               onClick={openBetModal}
               disabled={(myProfile?.coins || 0) < 1}
@@ -738,7 +700,6 @@ export default function PlayerProfile() {
             </h2>
             <p className="text-gray-400 text-xs mb-4">Winner takes the pot. Loser loses their wager.</p>
 
-            {/* Wager Selector */}
             <div className="bg-black/40 rounded-xl p-3 mb-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] text-gray-400 uppercase font-bold">Your Coins</p>
