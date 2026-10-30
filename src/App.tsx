@@ -13,11 +13,14 @@ import Leaderboard from './pages/Leaderboard'
 import GlobalChat from './pages/GlobalChat'
 import PlayerProfile from './pages/PlayerProfile'
 import Quizzes from './pages/Quizzes'
-import BattleHistory from './pages/BattleHistory' 
+import BattleHistory from './pages/BattleHistory'
+
+import { NotificationsProvider } from './pages/notifications/NotificationsProvider'
+import NotificationsHost from './pages/notifications/NotificationsHost'
 
 function AuthCallback() {
   const navigate = useNavigate()
-  
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
@@ -58,104 +61,104 @@ function AuthCallback() {
   )
 }
 
-// ✅ Create an inner component so we can use useLocation()
 function AppRoutes({ session, profile }: { session: any, profile: any }) {
-  const location = useLocation();
-  
-  // ✅ Check if we are currently on the quizzes list or actively playing a quiz
-  const isQuizRoute = location.pathname.startsWith('/quizzes') || location.pathname.startsWith('/play');
+  const location = useLocation()
+  const isQuizRoute = location.pathname.startsWith('/quizzes') || location.pathname.startsWith('/play')
 
   return (
     <>
       <Routes>
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            !session ? <LandingPage /> : 
-            !profile?.age_category ? <Navigate to="/onboarding" /> : 
+            !session ? <LandingPage /> :
+            !profile?.age_category ? <Navigate to="/onboarding" /> :
             <Navigate to="/dashboard" />
-          } 
+          }
         />
-        
+
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        <Route 
-          path="/onboarding" 
+        <Route
+          path="/onboarding"
           element={
-            session && profile && !profile?.age_category ? <AgeSelection /> : 
-            session && profile?.age_category ? <Navigate to="/dashboard" /> : 
+            session && profile && !profile?.age_category ? <AgeSelection /> :
+            session && profile?.age_category ? <Navigate to="/dashboard" /> :
             <Navigate to="/" />
-          } 
+          }
         />
 
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
-            session && profile?.age_category ? <UserDashboard /> : 
-            <Navigate to="/onboarding" />
-          } 
+            session && profile?.age_category ? (
+              // 🔧 FIX: Added key={location.key} back to force a completely fresh mount on navigation
+              <UserDashboard key={location.key} />
+            ) : (
+              <Navigate to="/onboarding" />
+            )
+          }
         />
 
-        <Route 
-          path="/quizzes" 
+        <Route
+          path="/quizzes"
           element={
-            session && profile?.age_category ? <Quizzes /> : 
+            session && profile?.age_category ? <Quizzes /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/battles" 
+        <Route
+          path="/battles"
           element={
-            session && profile?.age_category ? <BattleHistory /> : 
+            session && profile?.age_category ? <BattleHistory /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/profile" 
+        <Route
+          path="/profile"
           element={
-            session && profile?.age_category ? <Profile /> : 
+            session && profile?.age_category ? <Profile /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/player/:playerId" 
+        <Route
+          path="/player/:playerId"
           element={
-            session && profile?.age_category ? <PlayerProfile /> : 
+            session && profile?.age_category ? <PlayerProfile /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/leaderboard" 
+        <Route
+          path="/leaderboard"
           element={
-            session && profile?.age_category ? <Leaderboard /> : 
+            session && profile?.age_category ? <Leaderboard /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/rewards" 
+        <Route
+          path="/rewards"
           element={
-            session && profile?.age_category ? <RewardsShop /> : 
+            session && profile?.age_category ? <RewardsShop /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
 
-        <Route 
-          path="/play/:quizId" 
+        <Route
+          path="/play/:quizId"
           element={
-            session && profile?.age_category ? <QuizGameplay /> : 
+            session && profile?.age_category ? <QuizGameplay /> :
             <Navigate to="/onboarding" />
-          } 
+          }
         />
-        
+
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      {/* ✅ Only show GlobalChat if logged in AND we are not on a quiz route */}
       {session && profile?.age_category && !isQuizRoute && <GlobalChat />}
     </>
   )
@@ -191,7 +194,7 @@ function App() {
       .select('*')
       .eq('id', userId)
       .maybeSingle()
-    
+
     if (error || !data) {
       console.warn("Profile not found, logging out.")
       await supabase.auth.signOut()
@@ -218,8 +221,11 @@ function App() {
 
   return (
     <BrowserRouter>
-      {/* ✅ Wrapped in a component so we can use useLocation */}
-      <AppRoutes session={session} profile={profile} />
+      <NotificationsProvider>
+        <AppRoutes session={session} profile={profile} />
+        
+        {session && profile?.age_category && <NotificationsHost />}
+      </NotificationsProvider>
     </BrowserRouter>
   )
 }

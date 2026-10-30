@@ -108,7 +108,6 @@ export default function QuizGameplay() {
   const correctCountRef = useRef(0)
   const pointsSpentRef = useRef(0)
   const coinsSpentRef = useRef(0)
-  const coinsEarnedRef = useRef(0)
   const quizStartTimeRef = useRef<number>(0)
 
   const currentQuestion = questions[currentQIndex]
@@ -239,15 +238,9 @@ export default function QuizGameplay() {
       playSound('correct')
       setCorrectCount((prev) => prev + 1)
       correctCountRef.current += 1
-      coinsEarnedRef.current += 150 
-      
-      // Only update local coins if NOT in battle mode (battles don't earn coins)
-      if (!isBattleMode) {
-        setProfile((prev: any) => ({ 
-          ...prev, 
-          coins: (prev?.coins || 0) + 150 
-        }))
-      }
+      // ✅ REMOVED: coinsEarnedRef.current += 150. 
+      // The database will calculate this now. We don't update local UI coins here anymore 
+      // because the real amount is only revealed at the end screen.
     } else {
       playSound('wrong')
     }
@@ -322,7 +315,6 @@ export default function QuizGameplay() {
 
           if (error) throw error
           console.log("Bet battle result:", data) 
-          // data will be { status: 'waiting' } or { status: 'completed', winner_id: ... } or { draw: true }
           
         } else {
           const { data, error } = await supabase.rpc('submit_pvp_score', {
@@ -343,7 +335,7 @@ export default function QuizGameplay() {
           new_total_coins: profile?.coins || 0
         })
       } else {
-        // ✅ NORMAL MODE: Award points/coins securely
+        // ✅ NORMAL MODE: Database handles coins securely. Removed p_coins_earned.
         const { data, error } = await supabase.rpc('submit_quiz_attempt', {
           p_quiz_id: quizId,
           p_correct: finalCorrect,
@@ -351,7 +343,6 @@ export default function QuizGameplay() {
           p_unanswered: unansweredCount, 
           p_time_taken: timeTakenSeconds,
           p_points_penalty: finalPointsPenalty,
-          p_coins_earned: coinsEarnedRef.current,
           p_coins_spent: coinsSpentRef.current
         })
 
@@ -486,13 +477,12 @@ export default function QuizGameplay() {
               <div className="bg-black/40 border border-[#00f0ff]/30 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#00f0ff]/10 rounded-bl-full" />
                 <TargetIcon weight="duotone" className="text-[#00f0ff] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
-                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Score</p>
+                <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-bold mb-0.5 sm:mb-1">Correct Answers</p>
                 <p className="text-xl sm:text-2xl font-bold text-[#00f0ff]">
                   {dbResults?.correct ?? 0}
                 </p>
               </div>
               
-              {/* ✅ FIXED COINS UI TO SHOW SPENT AND EARNED */}
               <div className="bg-black/40 border border-[#ff00a0]/30 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full" />
                 <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-2" />

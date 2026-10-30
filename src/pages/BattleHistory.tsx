@@ -191,20 +191,13 @@ export default function BattleHistory() {
       : battle.status === 'completed' || bothPlayed
 
     // ── BET action flags (aligned with new flow) ──
-    // Challenger: pending → Waiting + Cancel (only BEFORE acceptance)
     const challengerWaitingAccept = isBetPending && isMeChallenger
     const canCancelBet = challengerWaitingAccept
-
-    // Opponent: pending → Accept (on profile/dashboard) or Decline
     const canDeclineBet = isBetPending && isMeOpponent
-
-    // Play only after accepted (both roles)
     const canPlayBet = isBetAccepted && !iHavePlayed
-
-    // Accepted + already played → waiting for opponent to play
     const iAmWaitingBet = isBetAccepted && iHavePlayed && !theyHavePlayed
 
-    // ── FRIENDLY action flags (unchanged) ──
+    // ── FRIENDLY action flags ──
     const needsMyAction = !isBet && !isCompleted && !iHavePlayed
     const canCancelFriendly = !isBet && isMeChallenger && !isCompleted && !iHavePlayed
     const iAmWaitingFriendly = !isBet && !isCompleted && iHavePlayed && !theyHavePlayed
@@ -223,7 +216,6 @@ export default function BattleHistory() {
 
     const renderActionButtons = () => {
       if (isBet) {
-        // Cancel — challenger, pending only
         if (canCancelBet) {
           return (
             <button
@@ -236,7 +228,6 @@ export default function BattleHistory() {
             </button>
           )
         }
-        // Decline — opponent, pending only
         if (canDeclineBet) {
           return (
             <button
@@ -249,7 +240,6 @@ export default function BattleHistory() {
             </button>
           )
         }
-        // Delete — completed or terminal
         if (isCompleted || isBetTerminal) {
           return (
             <button
@@ -361,16 +351,23 @@ export default function BattleHistory() {
         {/* Right Side */}
         <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0 shrink-0">
 
-          {/* Score / Pot (skip for terminal bet states) */}
+          {/* ✅ SCORE / POT (Fixed to show score once played) */}
           {!(isBet && isBetTerminal) && (
             <div className="text-center shrink-0">
               <p className="text-[10px] text-gray-500 uppercase font-bold">
-                {isBet ? 'Pot' : 'Score'}
+                {isBet && (iHavePlayed || theyHavePlayed) ? 'Score' : isBet ? 'Pot' : 'Score'}
               </p>
+              
               {isBet ? (
-                <p className="text-sm font-bold text-yellow-400 flex items-center justify-center gap-1">
-                  {battle.wager_amount * 2} <CoinsIcon weight="fill" className="w-3 h-3" />
-                </p>
+                (iHavePlayed || theyHavePlayed) ? (
+                  <p className="text-sm font-bold text-[#ccff00]">
+                    {myScore !== null && myScore !== undefined ? myScore : '-'} - {theirScore !== null && theirScore !== undefined ? theirScore : '-'}
+                  </p>
+                ) : (
+                  <p className="text-sm font-bold text-yellow-400 flex items-center justify-center gap-1">
+                    {battle.wager_amount * 2} <CoinsIcon weight="fill" className="w-3 h-3" />
+                  </p>
+                )
               ) : (
                 <p className="text-sm font-bold text-[#ccff00]">
                   {myScore !== null ? myScore : '-'} - {theirScore !== null ? theirScore : '-'}
@@ -379,14 +376,14 @@ export default function BattleHistory() {
             </div>
           )}
 
-          {/* BET — challenger pending → "Awaiting Accept" (not playing) */}
+          {/* BET — challenger pending → "Awaiting Accept" */}
           {challengerWaitingAccept && (
             <div className="flex items-center text-yellow-500 text-xs font-bold bg-yellow-500/10 px-3 py-2 rounded-lg shrink-0">
               <ClockIcon className="mr-1.5 w-4 h-4 hidden sm:block" /> Awaiting Accept
             </div>
           )}
 
-          {/* BET — opponent pending → Review / Go to profile to accept */}
+          {/* BET — opponent pending → Review */}
           {isBet && isBetPending && isMeOpponent && (
             <button
               onClick={() => navigate(`/profile/${battle.challenger_id}`)}
@@ -396,7 +393,7 @@ export default function BattleHistory() {
             </button>
           )}
 
-          {/* BET — accepted + haven't played → Play Bet (both roles) */}
+          {/* BET — accepted + haven't played → Play Bet */}
           {canPlayBet && (
             <button
               onClick={() => navigate(`/play/${battle.quiz_id}?betBattleId=${battle.id}`)}
