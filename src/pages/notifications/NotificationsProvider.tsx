@@ -15,6 +15,20 @@ type AlertData = {
   type: 'success' | 'error'
 } | null
 
+type SeasonTopPlayer = {
+  rank: number
+  user_id: string
+  display_name: string
+  avatar_url: string | null
+  final_points: number
+  reward_coins: number
+}
+
+export type SeasonAnnouncement = {
+  seasonNumber: number
+  topPlayers: SeasonTopPlayer[]
+} | null
+
 interface NotificationsContextType {
   profile: any
   setProfile: React.Dispatch<React.SetStateAction<any>>
@@ -34,6 +48,8 @@ interface NotificationsContextType {
   alertData: AlertData
   setAlertData: (a: AlertData) => void
   checkAndShowDailyChallenge: () => Promise<void>
+  seasonAnnouncement: SeasonAnnouncement
+  dismissSeasonAnnouncement: () => Promise<void>
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null)
@@ -48,6 +64,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [showNewContentBanner, setShowNewContentBanner] = useState(false)
   const [newContentCount, setNewContentCount] = useState(0)
   const [alertData, setAlertData] = useState<AlertData>(null)
+  const [seasonAnnouncement, setSeasonAnnouncement] = useState<SeasonAnnouncement>(null)
 
   const refreshIncomingBattles = useCallback(async (userId: string) => {
     try {
@@ -79,9 +96,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const checkAndShowDailyChallenge = async () => {
     try {
       const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
-      
-      // 🔧 FIX: ONLY show the modal if the RPC just awarded the points right now.
-      // If they already claimed it earlier today, challengeResult.claimed is false.
       if (challengeResult?.claimed) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -92,13 +106,57 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             .single()
           if (pData) setProfile(pData)
         }
-        
-        setTimeout(() => {
-          setShowDailyBonusModal(true)
-        }, 100)
+        setTimeout(() => setShowDailyBonusModal(true), 100)
       }
     } catch (error) {
       console.error('Error checking daily challenge:', error)
+    }
+  }
+
+  const checkSeasonAnnouncement = async () => {
+    try {
+      // 1. Find the latest season that has results
+      const { data: latestSeason } = await supabase
+        .from('season_results')
+        .select('season_number')
+        .order('season_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!latestSeason) return
+
+      // 2. Check if the current user needs to see it
+      const { data, error } = await supabase.rpc('get_season_announcement', {
+        p_season_number: latestSeason.season_number,
+      })
+
+      if (error) {
+        console.error('Season announcement RPC error:', error)
+        return
+      }
+
+      if (data?.should_show && data.top_players?.length) {
+        setSeasonAnnouncement({
+          seasonNumber: data.season_number,
+          topPlayers: data.top_players,
+        })
+      }
+    } catch (err) {
+      console.error('Error checking season announcement:', err)
+    }
+  }
+
+  const dismissSeasonAnnouncement = async () => {
+    try {
+      if (seasonAnnouncement) {
+        await supabase.rpc('mark_season_announcement_seen', {
+          p_season_number: seasonAnnouncement.seasonNumber,
+        })
+      }
+    } catch (err) {
+      console.error('Error marking season announcement seen:', err)
+    } finally {
+      setSeasonAnnouncement(null)
     }
   }
 
@@ -121,11 +179,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         if (!profileCheck?.age_category) return
 
-        // 1. CLAIM REWARDS FIRST
         const { data: streakResult } = await supabase.rpc('claim_daily_streak')
         const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
 
-        // 2. FETCH FRESH PROFILE
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -136,10 +192,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         setProfile(profileData)
 
-        // 3. TRIGGER MODALS SAFELY
         setTimeout(() => {
           if (!isMounted) return
-          
+
           if (streakResult && streakResult.status === 'success') {
             setStreakReward({
               coins: streakResult.coins,
@@ -148,18 +203,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             setShowStreakModal(true)
           }
 
-          // 🔧 FIX: ONLY show if the RPC just claimed it right now.
-          // Removed the profileData.last_challenge_date check so it doesn't
-          // pop up again when you refresh the page.
           if (challengeResult?.claimed) {
             setShowDailyBonusModal(true)
           }
         }, 50)
 
-        // 4. INCOMING BATTLES
         await refreshIncomingBattles(user.id)
 
-        // 5. NEW CONTENT BANNER
+        if (isMounted) {
+          await checkSeasonAnnouncement()
+        }
+
         if (profileData.age_category && isMounted) {
           const lastSeen = localStorage.getItem('last_seen_banner_date')
           const today = new Date().toISOString().split('T')[0]
@@ -215,7 +269,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshIncomingBattles])
 
-  // Polling for battles
   useEffect(() => {
     if (!profile?.id) return
     const interval = setInterval(() => {
@@ -224,7 +277,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [profile?.id, refreshIncomingBattles])
 
-  // Auto-dismiss new content banner
   useEffect(() => {
     if (!showNewContentBanner) return
     const timer = setTimeout(() => {
@@ -260,6 +312,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         alertData,
         setAlertData,
         checkAndShowDailyChallenge,
+        seasonAnnouncement,
+        dismissSeasonAnnouncement,
       }}
     >
       {children}

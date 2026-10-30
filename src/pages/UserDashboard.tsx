@@ -18,23 +18,31 @@ import {
   CheckCircleIcon,
   CoinsIcon,
   SwordIcon,
-  HourglassIcon, // 🔧 Added Hourglass for season timer
+  HourglassIcon,
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 import { useNotifications } from './notifications/NotificationsProvider'
+import SeasonEndModal from './notifications/SeasonEndModal'
+
+type SeasonInfo = {
+  seasonNumber: number
+  name: string
+  daysLeft: number
+  endDate: string | null
+} | null
 
 export default function UserDashboard() {
   const navigate = useNavigate()
   const { profile, setProfile, checkAndShowDailyChallenge } = useNotifications()
-  
+
   const [loading, setLoading] = useState(true)
-  
+  const [season, setSeason] = useState<SeasonInfo>(null)
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
-  // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
   const [stats, setStats] = useState({
@@ -42,7 +50,7 @@ export default function UserDashboard() {
     bestScore: 0,
     accuracy: 0,
     level: 1,
-    quizzesToday: 0, 
+    quizzesToday: 0,
   })
 
   const [recentActivity, setRecentActivity] = useState<any[]>([])
@@ -56,20 +64,32 @@ export default function UserDashboard() {
     return 'Good evening'
   }
 
-  // 🔧 Calculate Days Left in Season (End of Month)
-  const getSeasonDaysLeft = () => {
-    const now = new Date()
-    // Get the last day of the current month
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    
-    // Calculate difference in days
-    const diffTime = lastDay.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    return diffDays
-  }
+  // 🔧 Load current season info from database
+  useEffect(() => {
+    let cancelled = false
+    const loadSeason = async () => {
+      const { data, error } = await supabase.rpc('get_current_season')
+      if (cancelled || error || !data?.has_season) return
 
-  const daysLeft = getSeasonDaysLeft()
+      const end = data.end_date ? new Date(data.end_date).getTime() : null
+      const daysLeft = end
+        ? Math.max(0, Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 0
+
+      setSeason({
+        seasonNumber: data.season_number,
+        name: data.name,
+        daysLeft,
+        endDate: data.end_date ?? null,
+      })
+    }
+    loadSeason()
+    const id = setInterval(loadSeason, 5 * 60 * 1000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [])
 
   // Fetch Top Players
   useEffect(() => {
@@ -107,11 +127,9 @@ export default function UserDashboard() {
           return
         }
 
-        // 🔧 Fetch Badges
         const badgesData = await fetchAllBadges()
         setAllBadges(badgesData)
 
-        // 1. Fetch FRESH Profile Data directly from DB
         const { data: freshProfile } = await supabase
           .from('profiles')
           .select('*')
@@ -125,7 +143,6 @@ export default function UserDashboard() {
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
         setAvatarUrl(freshProfile?.avatar_url || googleAvatar || null)
 
-        // 2. Fetch Cosmetics (Inventory)
         const { data: invData } = await supabase
           .from('user_inventory')
           .select('*, cosmetic_items(*)')
@@ -140,7 +157,6 @@ export default function UserDashboard() {
           if (bg?.cosmetic_items?.preview_url) setEquippedBackground(bg.cosmetic_items.preview_url)
         }
 
-        // 3. Fetch Attempts
         const { data: attempts } = await supabase
           .from('quiz_attempts')
           .select('*')
@@ -149,18 +165,14 @@ export default function UserDashboard() {
 
         let quizzesToday = 0
         if (attempts) {
-          // Use Asia/Manila timezone to match the database
           const today = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }).split(',')[0]
-          
           const totalCompletedToday = attempts.filter((a) => {
             if (a.status !== 'completed') return false
             const attemptDate = new Date(a.created_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }).split(',')[0]
             return attemptDate === today
           }).length
-          
-          quizzesToday = Math.min(totalCompletedToday, 3) 
 
-          // Immediately update progress bar
+          quizzesToday = Math.min(totalCompletedToday, 3)
           setStats(prev => ({ ...prev, quizzesToday }))
 
           if (totalCompletedToday >= 3) {
@@ -187,7 +199,6 @@ export default function UserDashboard() {
           const attemptsWithData = recentAttempts.map((attempt) => {
             const coinTx = transactions?.find(t => t.reference_id === attempt.id)
             const quizData = quizzes?.find((q) => q.id === attempt.quiz_id)
-            
             return {
               ...attempt,
               category_name: quizData?.category || 'Unknown Category',
@@ -202,7 +213,7 @@ export default function UserDashboard() {
             (acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0
           )
           const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
-          
+
           const currentPoints = freshProfile?.points ?? 0
           const level = Math.floor(currentPoints / 100) + 1
 
@@ -219,7 +230,7 @@ export default function UserDashboard() {
         }
 
       } catch {
-        // Silently catch errors to prevent UI crashes
+        // Silently catch errors
       } finally {
         setLoading(false)
       }
@@ -227,7 +238,7 @@ export default function UserDashboard() {
 
     fetchData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) 
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -242,11 +253,13 @@ export default function UserDashboard() {
     )
   }
 
-  // 🔧 Get current badge for header
   const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
+      {/* 🔧 SEASON END POPUP */}
+      <SeasonEndModal />
+
       {equippedBackground && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img
@@ -322,12 +335,11 @@ export default function UserDashboard() {
                 {profile?.display_name?.split(' ')[0] || 'Player'}
               </span>
               !
-              
-              {/* 🔧 BADGE NEXT TO NAME */}
+
               {currentBadge && (
-                <img 
-                  src={currentBadge.image_url} 
-                  alt={currentBadge.name} 
+                <img
+                  src={currentBadge.image_url}
+                  alt={currentBadge.name}
                   title={`${currentBadge.name} Tier`}
                   className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-md"
                 />
@@ -344,10 +356,25 @@ export default function UserDashboard() {
               </p>
 
               {/* 🔧 SEASON TIMER INDICATOR */}
-              <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${daysLeft <= 7 ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse' : 'bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff]/20'}`}>
-                <HourglassIcon weight="fill" />
-                {daysLeft <= 0 ? 'Season Ends Today!' : `Season Ends in ${daysLeft} Day${daysLeft > 1 ? 's' : ''}`}
-              </div>
+              {season && (
+                <div
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    season.daysLeft <= 7
+                      ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse'
+                      : 'bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff]/20'
+                  }`}
+                  title={
+                    season.endDate
+                      ? `Ends on ${new Date(season.endDate).toLocaleDateString()}`
+                      : undefined
+                  }
+                >
+                  <HourglassIcon weight="fill" />
+                  {season.daysLeft <= 0
+                    ? `${season.name} Ends Today!`
+                    : `${season.name} • ${season.daysLeft} Day${season.daysLeft > 1 ? 's' : ''} Left`}
+                </div>
+              )}
             </div>
           </div>
 
@@ -594,7 +621,6 @@ export default function UserDashboard() {
                 </div>
               ) : (
                 topPlayers.map((player, idx) => {
-                  // 🔧 Calculate the badge for this specific top player
                   const topPlayerBadge = getPlayerBadge(player.points || 0, allBadges)
 
                   return (
@@ -637,14 +663,13 @@ export default function UserDashboard() {
                           <p className="text-[11px] sm:text-xs font-bold truncate">
                             {player.display_name}
                           </p>
-                          
-                          {/* 🔧 RENDER TOP PLAYER BADGE HERE */}
+
                           {topPlayerBadge && (
-                            <img 
-                              src={topPlayerBadge.image_url} 
-                              alt={topPlayerBadge.name} 
+                            <img
+                              src={topPlayerBadge.image_url}
+                              alt={topPlayerBadge.name}
                               title={topPlayerBadge.name}
-                              className="w-4 h-4 object-contain shrink-0" 
+                              className="w-4 h-4 object-contain shrink-0"
                             />
                           )}
                         </div>
