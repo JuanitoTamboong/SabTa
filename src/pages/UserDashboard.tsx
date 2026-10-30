@@ -60,7 +60,7 @@ export default function UserDashboard() {
 
     const fetchTopPlayers = async () => {
       setTopPlayersLoading(true)
-      const { data: topProfiles, error: topError } = await supabase.rpc(
+      const { data: topProfiles } = await supabase.rpc(
         'get_top_players',
         {
           p_age_category: profile.age_category,
@@ -68,9 +68,7 @@ export default function UserDashboard() {
         }
       )
 
-      if (topError) {
-        console.error('TOP PLAYERS ERROR:', topError)
-      } else if (topProfiles) {
+      if (topProfiles) {
         setTopPlayers(topProfiles)
       }
       setTopPlayersLoading(false)
@@ -127,7 +125,7 @@ export default function UserDashboard() {
 
         let quizzesToday = 0
         if (attempts) {
-          // 🔧 FIX: Use Asia/Manila timezone to match the database
+          // Use Asia/Manila timezone to match the database
           const today = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }).split(',')[0]
           
           const totalCompletedToday = attempts.filter((a) => {
@@ -196,8 +194,8 @@ export default function UserDashboard() {
           setStats(prev => ({ ...prev, quizzesToday: 0 }))
         }
 
-      } catch (error) {
-        console.error('Dashboard fetch error:', error)
+      } catch {
+        // Silently catch errors to prevent UI crashes
       } finally {
         setLoading(false)
       }
