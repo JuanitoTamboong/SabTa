@@ -18,8 +18,9 @@ import {
   CheckCircleIcon,
   CoinsIcon,
   SwordIcon,
+  HourglassIcon, // 🔧 Added Hourglass for season timer
 } from '@phosphor-icons/react'
-import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 import { useNotifications } from './notifications/NotificationsProvider'
 
@@ -54,6 +55,21 @@ export default function UserDashboard() {
     if (hour < 18) return 'Good afternoon'
     return 'Good evening'
   }
+
+  // 🔧 Calculate Days Left in Season (End of Month)
+  const getSeasonDaysLeft = () => {
+    const now = new Date()
+    // Get the last day of the current month
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    
+    // Calculate difference in days
+    const diffTime = lastDay.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    return diffDays
+  }
+
+  const daysLeft = getSeasonDaysLeft()
 
   // Fetch Top Players
   useEffect(() => {
@@ -317,14 +333,22 @@ export default function UserDashboard() {
                 />
               )}
             </h1>
-            <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5 mt-1">
-              <FireIcon weight="fill" className="text-[#ff00a0]" />
-              <span className="font-bold text-white">
-                {profile?.current_streak || 0} Day Streak
-              </span>
-              <span>•</span> Level {stats.level}
-              <span>•</span> {profile?.age_category?.toUpperCase()} Tier
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5">
+                <FireIcon weight="fill" className="text-[#ff00a0]" />
+                <span className="font-bold text-white">
+                  {profile?.current_streak || 0} Day Streak
+                </span>
+                <span>•</span> Level {stats.level}
+                <span>•</span> {profile?.age_category?.toUpperCase()} Tier
+              </p>
+
+              {/* 🔧 SEASON TIMER INDICATOR */}
+              <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${daysLeft <= 7 ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse' : 'bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff]/20'}`}>
+                <HourglassIcon weight="fill" />
+                {daysLeft <= 0 ? 'Season Ends Today!' : `Season Ends in ${daysLeft} Day${daysLeft > 1 ? 's' : ''}`}
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
