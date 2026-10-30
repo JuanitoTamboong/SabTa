@@ -226,7 +226,7 @@ export default function UserDashboard() {
     )
   }
 
-  // 🔧 Get current badge
+  // 🔧 Get current badge for header
   const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
 
   return (
@@ -569,60 +569,77 @@ export default function UserDashboard() {
                   No players yet.
                 </div>
               ) : (
-                topPlayers.map((player, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 sm:gap-3"
-                  >
-                    <span
-                      className={`text-[10px] sm:text-xs font-bold w-3 sm:w-4 ${
-                        idx === 0
-                          ? 'text-[#ccff00]'
-                          : idx === 1
-                          ? 'text-gray-300'
-                          : 'text-[#cd7f32]'
-                      }`}
+                topPlayers.map((player, idx) => {
+                  // 🔧 Calculate the badge for this specific top player
+                  const topPlayerBadge = getPlayerBadge(player.points || 0, allBadges)
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 sm:gap-3"
                     >
-                      #{idx + 1}
-                    </span>
-                    <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center">
-                      <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[9px] sm:text-[10px] font-bold uppercase overflow-hidden z-10">
-                        {player.avatar_url ? (
+                      <span
+                        className={`text-[10px] sm:text-xs font-bold w-3 sm:w-4 ${
+                          idx === 0
+                            ? 'text-[#ccff00]'
+                            : idx === 1
+                            ? 'text-gray-300'
+                            : 'text-[#cd7f32]'
+                        }`}
+                      >
+                        #{idx + 1}
+                      </span>
+                      <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center">
+                        <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[9px] sm:text-[10px] font-bold uppercase overflow-hidden z-10">
+                          {player.avatar_url ? (
+                            <img
+                              src={player.avatar_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            player.display_name?.charAt(0) || 'P'
+                          )}
+                        </div>
+                        {player.border_url && (
                           <img
-                            src={player.avatar_url}
-                            alt=""
-                            className="w-full h-full object-cover"
+                            src={player.border_url}
+                            className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
                           />
-                        ) : (
-                          player.display_name?.charAt(0) || 'P'
                         )}
                       </div>
-                      {player.border_url && (
-                        <img
-                          src={player.border_url}
-                          className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
-                        />
-                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[11px] sm:text-xs font-bold truncate">
+                            {player.display_name}
+                          </p>
+                          
+                          {/* 🔧 RENDER TOP PLAYER BADGE HERE */}
+                          {topPlayerBadge && (
+                            <img 
+                              src={topPlayerBadge.image_url} 
+                              alt={topPlayerBadge.name} 
+                              title={topPlayerBadge.name}
+                              className="w-4 h-4 object-contain shrink-0" 
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-[#ccff00]">
+                          {player.points} pts
+                        </span>
+                        <span className="text-[8px] sm:text-[9px] font-bold text-[#ff00a0] flex items-center gap-0.5">
+                          <CoinsIcon
+                            weight="fill"
+                            className="w-2 h-2 sm:w-2.5 sm:h-2.5"
+                          />
+                          {player.coins || 0}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-[11px] sm:text-xs font-bold truncate">
-                        {player.display_name}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[9px] sm:text-[10px] font-bold text-[#ccff00]">
-                        {player.points} pts
-                      </span>
-                      <span className="text-[8px] sm:text-[9px] font-bold text-[#ff00a0] flex items-center gap-0.5">
-                        <CoinsIcon
-                          weight="fill"
-                          className="w-2 h-2 sm:w-2.5 sm:h-2.5"
-                        />
-                        {player.coins || 0}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
             <button

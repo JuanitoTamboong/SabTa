@@ -6,6 +6,7 @@ import {
   ChatCircleDotsIcon, XIcon, PaperPlaneRightIcon, 
   UserIcon, TrashIcon 
 } from '@phosphor-icons/react'
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
 
 export default function GlobalChat() {
   const navigate = useNavigate()
@@ -17,7 +18,10 @@ export default function GlobalChat() {
   const [onlineCount, setOnlineCount] = useState(1) 
   const [unreadCount, setUnreadCount] = useState(0)
   
-  // ✅ 1. Create a ref to hold the current isOpen state for the listener
+  // 🔧 Badge State
+  const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
+
+  // Create a ref to hold the current isOpen state for the listener
   const isOpenRef = useRef(isOpen)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -27,7 +31,7 @@ export default function GlobalChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // ✅ 2. Keep the ref in sync when the UI opens/closes
+  // Keep the ref in sync when the UI opens/closes
   useEffect(() => {
     isOpenRef.current = isOpen
     if (isOpen) {
@@ -46,9 +50,12 @@ export default function GlobalChat() {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (isMounted) setCurrentUser(profile)
 
+      // 🔧 Fetch Badges
+      const badgesData = await fetchAllBadges()
+      if (isMounted) setAllBadges(badgesData)
+
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-      // 🔥 FIX: Include user_inventory and cosmetic_items so we can render borders/bg in chat!
       const { data } = await supabase
         .from('chat_messages')
         .select(`
@@ -56,6 +63,7 @@ export default function GlobalChat() {
           profiles ( 
             display_name, 
             avatar_url,
+            points,
             user_inventory ( 
               is_equipped, 
               cosmetic_items ( preview_url, cosmetic_type ) 
@@ -71,7 +79,7 @@ export default function GlobalChat() {
         setTimeout(scrollToBottom, 100)
       }
 
-      // ✅ 3. Build the chain synchronously and ONLY run this on mount (empty deps)
+      // Build the chain synchronously and ONLY run this on mount (empty deps)
       channel = supabase
         .channel('global_chat_room', {
           config: {
@@ -82,7 +90,6 @@ export default function GlobalChat() {
           'postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
           async (payload: any) => {
-            // 🔥 FIX: Include inventory here too for new incoming messages
             const { data: newMsg } = await supabase
               .from('chat_messages')
               .select(`
@@ -90,6 +97,7 @@ export default function GlobalChat() {
                 profiles ( 
                   display_name, 
                   avatar_url,
+                  points,
                   user_inventory ( 
                     is_equipped, 
                     cosmetic_items ( preview_url, cosmetic_type ) 
@@ -105,7 +113,6 @@ export default function GlobalChat() {
                 return [...prev, newMsg]
               })
 
-              // ✅ 4. Use the ref instead of the state variable here
               if (!isOpenRef.current && newMsg.user_id !== user.id) {
                 setUnreadCount(prev => prev + 1)
               }
@@ -149,7 +156,7 @@ export default function GlobalChat() {
         supabase.removeChannel(channel)
       }
     }
-  }, []) // ✅ 5. Empty dependency array - channel is only created once!
+  }, []) 
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -192,7 +199,6 @@ export default function GlobalChat() {
       >
         <ChatCircleDotsIcon weight="fill" className="w-7 h-7" />
         
-        {/* Unread Badge */}
         {unreadCount > 0 && (
           <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full border-2 border-[#0f1014] flex items-center justify-center shadow-lg animate-in zoom-in">
             <span className="text-[10px] font-black text-white">
@@ -227,21 +233,21 @@ export default function GlobalChat() {
               messages.map((msg) => {
                 const isMe = msg.user_id === currentUser?.id
                 
-                // 🔥 FIX: Find the equipped border for this user
                 const equippedBorder = msg.profiles?.user_inventory?.find(
                   (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
                 )?.cosmetic_items?.preview_url
 
+                // 🔧 Get the badge for the sender
+                const senderBadge = getPlayerBadge(msg.profiles?.points || 0, allBadges)
+
                 return (
                   <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                     
-                    {/* Avatar Container */}
                     <div 
                       onClick={() => { if (!isMe) navigate(`/player/${msg.user_id}`) }}
                       className={`relative w-8 h-8 flex items-center justify-center shrink-0 mt-1 ${!isMe ? 'cursor-pointer group' : ''}`}
                       title={!isMe ? `View ${msg.profiles?.display_name}'s profile` : 'You'}
                     >
-                      {/* Inner Avatar Image/Circle */}
                       <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center overflow-hidden z-10 border border-white/10 group-hover:border-[#ccff00] transition">
                         {msg.profiles?.avatar_url ? (
                           <img src={msg.profiles.avatar_url} className="w-full h-full object-cover" />
@@ -250,7 +256,6 @@ export default function GlobalChat() {
                         )}
                       </div>
 
-                      {/* 🔥 EQUIPPED BORDER OVERLAY */}
                       {equippedBorder && (
                         <img 
                           src={equippedBorder} 
@@ -258,7 +263,6 @@ export default function GlobalChat() {
                         />
                       )}
 
-                      {/* Online Status Dot */}
                       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#0f1014] rounded-full z-30 shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                     </div>
 
@@ -270,6 +274,17 @@ export default function GlobalChat() {
                         >
                           {msg.profiles?.display_name || 'Player'}
                         </span>
+                        
+                        {/* 🔧 RENDER SENDER BADGE */}
+                        {senderBadge && (
+                          <img 
+                            src={senderBadge.image_url} 
+                            alt={senderBadge.name} 
+                            title={senderBadge.name}
+                            className="w-3.5 h-3.5 object-contain" 
+                          />
+                        )}
+
                         <span className="text-[9px] text-gray-600">{formatTime(msg.created_at)}</span>
                       </div>
                       <div className={`px-3 py-2 rounded-2xl text-sm relative group ${
