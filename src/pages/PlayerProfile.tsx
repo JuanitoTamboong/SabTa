@@ -7,6 +7,7 @@ import {
   TrophyIcon, LightningIcon, MedalIcon, TargetIcon, XIcon, ClockIcon, 
   PaletteIcon, ImageIcon, StarIcon, FireIcon, CoinsIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
 
 export default function PlayerProfile() {
   const { playerId } = useParams()
@@ -16,6 +17,9 @@ export default function PlayerProfile() {
   const [myProfile, setMyProfile] = useState<any>(null)
   const [player, setPlayer] = useState<any>(null)
   
+  // 🔧 Badge State
+  const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
+
   // Follow State
   const [isFollowing, setIsFollowing] = useState(false)
   const [isFollowedByThem, setIsFollowedByThem] = useState(false)
@@ -50,6 +54,10 @@ export default function PlayerProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
       if (user.id === playerId) return navigate('/profile')
+
+      // 🔧 Fetch Badges
+      const badgesData = await fetchAllBadges()
+      setAllBadges(badgesData)
 
       // 1. Fetch my profile
       const { data: me } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -325,6 +333,9 @@ export default function PlayerProfile() {
   const canPlayBet = existingBet?.status === 'accepted' && !hasPlayedBet
   const waitingOnBetOpponent = existingBet?.status === 'accepted' && hasPlayedBet
 
+  // 🔧 Get Current Badge for the player
+  const playerBadge = getPlayerBadge(player.points || 0, allBadges)
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
       
@@ -357,6 +368,18 @@ export default function PlayerProfile() {
               </div>
               {equippedBorder?.cosmetic_items?.preview_url && (
                 <img src={equippedBorder.cosmetic_items.preview_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-md" />
+              )}
+            </div>
+
+            {/* 🔧 BADGE BETWEEN AVATAR AND NAME */}
+            <div className="relative w-full flex justify-center mt-2 mb-4 z-30">
+              {playerBadge && (
+                <img 
+                  src={playerBadge.image_url} 
+                  alt={playerBadge.name}
+                  title={`${playerBadge.name} Tier`}
+                  className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-[0_0_20px_rgba(0,0,0,0.9)] animate-in zoom-in-50 duration-500"
+                />
               )}
             </div>
 

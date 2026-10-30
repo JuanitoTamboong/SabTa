@@ -8,6 +8,7 @@ import {
   CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon,
   CameraIcon, UsersIcon, CaretRightIcon, UserPlusIcon, UserMinusIcon
 } from '@phosphor-icons/react'
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
 export default function Profile() {
@@ -20,6 +21,9 @@ export default function Profile() {
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   
+  // 🔧 Badge State
+  const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
+
   // Edit State
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -48,6 +52,10 @@ export default function Profile() {
     const fetchProfileData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
+
+      // 🔧 Fetch Badges
+      const badgesData = await fetchAllBadges()
+      setAllBadges(badgesData)
 
       // 1. Fetch Profile first
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
@@ -107,13 +115,11 @@ export default function Profile() {
       .select(`following_id, profiles!following_id ( id, display_name, avatar_url, points )`)
       .eq('follower_id', userId)
 
-    // Supabase sometimes returns nested relations as an array [ { ... } ]. We handle both.
     const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
 
     const validFollowing = (followingData || []).filter(f => normalizeProfile(f.profiles) !== null);
     const followingIds = new Set(validFollowing.map(f => normalizeProfile(f.profiles).id));
 
-    // ✅ FILTER LOGIC: Only keep followers who you are NOT following back
     const enrichedFollowers = (followersData || [])
       .map(f => {
         const profile = normalizeProfile(f.profiles);
@@ -121,7 +127,6 @@ export default function Profile() {
         const isMutual = followingIds.has(profile.id);
         return { ...f, profiles: profile, isMutual };
       })
-      // Hide them from the Followers tab if you already follow them back
       .filter(f => f !== null && f.isMutual === false); 
 
     setFollowers(enrichedFollowers)
@@ -158,8 +163,6 @@ export default function Profile() {
         .eq('following_id', targetId)
       
       if (error) throw error
-      
-      // Refresh to instantly update both lists
       await refreshFriends(profile.id)
     } catch (err: any) {
       alert(err.message || 'Failed to unfollow.')
@@ -346,6 +349,9 @@ export default function Profile() {
   const equippedBorder = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'avatar_border')
   const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'background')
 
+  // 🔧 Get Current Badge
+  const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       
@@ -400,6 +406,8 @@ export default function Profile() {
               
               <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && fileInputRef.current?.click()} title="Click to change profile picture">
                 <div className="relative w-36 h-36 md:w-40 md:h-40 flex items-center justify-center">
+                  
+                  {/* Avatar Image */}
                   <div className="absolute inset-[18%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
                     {uploadingAvatar ? (
                       <div className="text-xs text-[#ccff00] font-mono animate-pulse">UPLOADING...</div>
@@ -410,10 +418,12 @@ export default function Profile() {
                     )}
                   </div>
 
+                  {/* Avatar Border Overlay */}
                   {equippedBorder?.cosmetic_items?.preview_url && (
                     <img src={equippedBorder.cosmetic_items.preview_url} alt="Border" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
                   )}
 
+                  {/* Camera Hover Overlay */}
                   <div className="hidden md:flex absolute inset-[18%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
                     <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
                     <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
@@ -425,7 +435,19 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div className="mt-5 mb-2 relative z-10 w-full flex flex-col items-center">
+              {/* 🔧 BADGE LOWERED SLIGHTLY FOR BREATHING ROOM */}
+              <div className="relative w-full flex justify-center mt-2 mb-4 z-30">
+                {currentBadge && (
+                  <img 
+                    src={currentBadge.image_url} 
+                    alt={currentBadge.name}
+                    title={`${currentBadge.name} Tier`}
+                    className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-[0_0_20px_rgba(0,0,0,0.9)] animate-in zoom-in-50 duration-500"
+                  />
+                )}
+              </div>
+
+              <div className="mt-2 mb-2 relative z-10 w-full flex flex-col items-center">
                 {isEditing ? (
                   <div className="w-full max-w-[200px]">
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-2 text-center text-lg font-bold focus:outline-none focus:border-[#ccff00] mb-3 text-white" maxLength={20} autoFocus />
@@ -436,7 +458,7 @@ export default function Profile() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center justify-center gap-2 mb-2 flex-wrap">
                       <h2 className="text-2xl font-bold text-white">{profile?.display_name || 'Player'}</h2>
                       <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-[#ccff00] transition" title="Edit name">
                         <PencilSimpleIcon weight="bold" className="w-4 h-4" />
@@ -499,7 +521,6 @@ export default function Profile() {
               <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4">
                 <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History</button>
                 <button onClick={() => setActiveTab('inventory')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'inventory' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>My Inventory</button>
-                {/* ✅ REPLACED "Connections" with "Friends" */}
                 <button onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Friends</button>
               </div>
 
@@ -625,6 +646,8 @@ export default function Profile() {
                       (friendTab === 'followers' ? followers : following).map((connection) => {
                         const player = connection.profiles
                         if (!player) return null
+                        
+                        const friendBadge = getPlayerBadge(player.points || 0, allBadges)
 
                         return (
                           <div 
@@ -643,6 +666,9 @@ export default function Profile() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-bold text-white text-sm sm:text-base group-hover:text-[#ccff00] transition truncate">{player.display_name}</p>
+                                  {friendBadge && (
+                                    <img src={friendBadge.image_url} alt={friendBadge.name} title={friendBadge.name} className="w-5 h-5 object-contain" />
+                                  )}
                                 </div>
                                 <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1">
                                   <LightningIcon weight="fill" className="text-[#ccff00]" /> {player.points} PTS
@@ -650,7 +676,6 @@ export default function Profile() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {/* Show Follow Back in the Followers tab */}
                               {friendTab === 'followers' && (
                                 <button
                                   onClick={(e) => {
@@ -668,7 +693,6 @@ export default function Profile() {
                                 </button>
                               )}
                               
-                              {/* Show Unfollow in the Following tab */}
                               {friendTab === 'following' && (
                                 <button
                                   onClick={(e) => {

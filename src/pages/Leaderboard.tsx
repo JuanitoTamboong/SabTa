@@ -8,6 +8,7 @@ import {
   MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon,
   CoinsIcon 
 } from '@phosphor-icons/react'
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
 export default function Leaderboard() {
@@ -17,6 +18,9 @@ export default function Leaderboard() {
   const [players, setPlayers] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
   
+  // 🔧 Badge State
+  const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
+
   // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
@@ -33,6 +37,10 @@ export default function Leaderboard() {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
+
+      // 🔧 Fetch Badges
+      const badgesData = await fetchAllBadges()
+      setAllBadges(badgesData)
 
       // 1. Fetch Profile & Equipped Background
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
@@ -284,7 +292,16 @@ export default function Leaderboard() {
                   </div>
                   <div className="bg-gradient-to-t from-[#1a1c23]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-gray-500/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(255,255,255,0.02)] group-hover:border-gray-400 transition-colors">
                     <MedalIcon weight="fill" className="text-gray-400 w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
-                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[1].display_name}</p>
+                    
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[1].display_name}</p>
+                      {/* 🔧 BADGE 2ND */}
+                      {(() => {
+                        const b = getPlayerBadge(players[1].points, allBadges);
+                        return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain" /> : null;
+                      })()}
+                    </div>
+
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[1].age_category}</p>}
                     <p className="text-[10px] sm:text-xs text-gray-300 font-black mt-1 sm:mt-2">{players[1].points} PTS</p>
                   </div>
@@ -314,7 +331,16 @@ export default function Leaderboard() {
                   <div className="bg-gradient-to-t from-[#1a2210]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#ccff00]/40 p-3 sm:p-5 text-center pb-10 sm:pb-12 relative overflow-hidden shadow-[0_-10px_30px_rgba(204,255,0,0.1)] group-hover:border-[#ccff00] transition-colors">
                     <div className="absolute inset-0 bg-[#ccff00]/5 pointer-events-none" />
                     <StarIcon weight="fill" className="text-[#ccff00] w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 relative z-10 drop-shadow-md" />
-                    <p className="text-xs sm:text-base font-black truncate text-white relative z-10">{players[0].display_name}</p>
+                    
+                    <div className="flex items-center justify-center gap-1 mb-1 relative z-10">
+                      <p className="text-xs sm:text-base font-black truncate text-white">{players[0].display_name}</p>
+                      {/* 🔧 BADGE 1ST */}
+                      {(() => {
+                        const b = getPlayerBadge(players[0].points, allBadges);
+                        return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-4 h-4 sm:w-5 sm:h-5 object-contain" /> : null;
+                      })()}
+                    </div>
+
                     {activeTab === 'global' && <p className="text-[8px] sm:text-[10px] text-[#ccff00]/80 uppercase font-bold tracking-widest relative z-10 mt-0.5">{players[0].age_category}</p>}
                     <p className="text-[11px] sm:text-sm text-[#ccff00] font-black relative z-10 mt-1 sm:mt-2">{players[0].points} PTS</p>
                   </div>
@@ -342,7 +368,16 @@ export default function Leaderboard() {
                   </div>
                   <div className="bg-gradient-to-t from-[#1c1512]/90 to-[#0f1014]/90 backdrop-blur-md w-full rounded-t-2xl border-t border-x border-[#cd7f32]/30 p-2 sm:p-4 text-center pb-6 sm:pb-8 relative shadow-[0_-10px_20px_rgba(205,127,50,0.05)] group-hover:border-[#cd7f32] transition-colors">
                     <MedalIcon weight="fill" className="text-[#cd7f32] w-5 h-5 sm:w-7 sm:h-7 mx-auto mb-1 sm:mb-2" />
-                    <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[2].display_name}</p>
+                    
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[2].display_name}</p>
+                      {/* 🔧 BADGE 3RD */}
+                      {(() => {
+                        const b = getPlayerBadge(players[2].points, allBadges);
+                        return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain" /> : null;
+                      })()}
+                    </div>
+
                     {activeTab === 'global' && <p className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">{players[2].age_category}</p>}
                     <p className="text-[10px] sm:text-xs text-[#cd7f32] font-black mt-1 sm:mt-2">{players[2].points} PTS</p>
                   </div>
@@ -361,6 +396,9 @@ export default function Leaderboard() {
                 {players.slice(3).map((player, idx) => {
                   const rank = idx + 4
                   const isMe = player.id === profile?.id
+                  
+                  // 🔧 Get badge for row
+                  const rowBadge = getPlayerBadge(player.points, allBadges)
 
                   return (
                     <div 
@@ -386,12 +424,17 @@ export default function Leaderboard() {
                           )}
                         </div>
 
-                        <div className="truncate">
-                          <span className={`font-bold text-xs sm:text-sm md:text-base truncate block group-hover:text-[#ccff00] transition-colors ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
+                        <div className="truncate flex items-center gap-1.5">
+                          <span className={`font-bold text-xs sm:text-sm md:text-base truncate group-hover:text-[#ccff00] transition-colors ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
                             {player.display_name} {isMe && '(You)'}
                           </span>
+                          {/* 🔧 ROW BADGE */}
+                          {rowBadge && (
+                            <img src={rowBadge.image_url} alt={rowBadge.name} title={rowBadge.name} className="w-4 h-4 object-contain" />
+                          )}
+                          
                           {activeTab === 'global' && (
-                            <span className="text-[8px] sm:text-[9px] uppercase font-bold text-gray-500">{player.age_category}</span>
+                            <span className="text-[8px] sm:text-[9px] uppercase font-bold text-gray-500 ml-1">{player.age_category}</span>
                           )}
                         </div>
                       </div>
@@ -431,7 +474,14 @@ export default function Leaderboard() {
                     )}
                   </div>
 
-                  <span className="font-bold text-xs sm:text-base truncate max-w-[100px] sm:max-w-none">{profile?.display_name} (You)</span>
+                  <div className="flex items-center gap-1.5 truncate max-w-[100px] sm:max-w-none">
+                    <span className="font-bold text-xs sm:text-base truncate">{profile?.display_name} (You)</span>
+                    {/* 🔧 Sticky Footer Badge */}
+                    {(() => {
+                      const myBadge = getPlayerBadge(profile?.points || 0, allBadges)
+                      return myBadge ? <img src={myBadge.image_url} alt="my-badge" className="w-4 h-4 object-contain" /> : null;
+                    })()}
+                  </div>
                 </div>
                 <span className="font-bold flex items-center gap-1 text-xs sm:text-base">
                   <LightningIcon weight="fill" /> {currentUserPoints}

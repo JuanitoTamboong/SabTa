@@ -19,6 +19,7 @@ import {
   CoinsIcon,
   SwordIcon,
 } from '@phosphor-icons/react'
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 import { useNotifications } from './notifications/NotificationsProvider'
 
@@ -31,6 +32,9 @@ export default function UserDashboard() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
+
+  // 🔧 Badge State
+  const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -86,6 +90,10 @@ export default function UserDashboard() {
           navigate('/')
           return
         }
+
+        // 🔧 Fetch Badges
+        const badgesData = await fetchAllBadges()
+        setAllBadges(badgesData)
 
         // 1. Fetch FRESH Profile Data directly from DB
         const { data: freshProfile } = await supabase
@@ -218,6 +226,9 @@ export default function UserDashboard() {
     )
   }
 
+  // 🔧 Get current badge
+  const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
       {equippedBackground && (
@@ -289,12 +300,22 @@ export default function UserDashboard() {
 
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 relative z-10 gap-4">
           <div>
-            <h1 className="text-xl md:text-3xl font-bold mb-1 leading-tight">
+            <h1 className="text-xl md:text-3xl font-bold mb-1 leading-tight flex items-center gap-2 flex-wrap">
               {getGreeting()}, <br className="hidden sm:block" />
               <span className="text-[#ccff00]">
                 {profile?.display_name?.split(' ')[0] || 'Player'}
               </span>
               !
+              
+              {/* 🔧 BADGE NEXT TO NAME */}
+              {currentBadge && (
+                <img 
+                  src={currentBadge.image_url} 
+                  alt={currentBadge.name} 
+                  title={`${currentBadge.name} Tier`}
+                  className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-md"
+                />
+              )}
             </h1>
             <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5 mt-1">
               <FireIcon weight="fill" className="text-[#ff00a0]" />
