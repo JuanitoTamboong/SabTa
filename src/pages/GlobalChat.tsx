@@ -6,7 +6,7 @@ import {
   ChatCircleDotsIcon, XIcon, PaperPlaneRightIcon, 
   UserIcon, TrashIcon 
 } from '@phosphor-icons/react'
-import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 
 export default function GlobalChat() {
   const navigate = useNavigate()
@@ -21,9 +21,7 @@ export default function GlobalChat() {
   // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
-  // Create a ref to hold the current isOpen state for the listener
   const isOpenRef = useRef(isOpen)
-  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -31,7 +29,6 @@ export default function GlobalChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Keep the ref in sync when the UI opens/closes
   useEffect(() => {
     isOpenRef.current = isOpen
     if (isOpen) {
@@ -79,7 +76,6 @@ export default function GlobalChat() {
         setTimeout(scrollToBottom, 100)
       }
 
-      // Build the chain synchronously and ONLY run this on mount (empty deps)
       channel = supabase
         .channel('global_chat_room', {
           config: {
@@ -192,7 +188,6 @@ export default function GlobalChat() {
 
   return (
     <>
-      {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[90] bg-[#ccff00] text-black p-4 rounded-full shadow-[0_0_20px_rgba(204,255,0,0.4)] hover:scale-110 transition-transform ${isOpen ? 'hidden' : 'flex'}`}
@@ -237,7 +232,6 @@ export default function GlobalChat() {
                   (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
                 )?.cosmetic_items?.preview_url
 
-                // 🔧 Get the badge for the sender
                 const senderBadge = getPlayerBadge(msg.profiles?.points || 0, allBadges)
 
                 return (
@@ -275,7 +269,6 @@ export default function GlobalChat() {
                           {msg.profiles?.display_name || 'Player'}
                         </span>
                         
-                        {/* 🔧 RENDER SENDER BADGE */}
                         {senderBadge && (
                           <img 
                             src={senderBadge.image_url} 
@@ -287,20 +280,22 @@ export default function GlobalChat() {
 
                         <span className="text-[9px] text-gray-600">{formatTime(msg.created_at)}</span>
                       </div>
-                      <div className={`px-3 py-2 rounded-2xl text-sm relative group ${
+
+                      {/* 🔧 MESSAGE BUBBLE WITH PADDING FIX */}
+                      <div className={`relative flex items-center rounded-2xl text-sm group ${
                         isMe 
-                          ? 'bg-[#ccff00] text-black rounded-tr-none' 
-                          : 'bg-white/10 text-white rounded-tl-none'
+                          ? 'bg-[#ccff00] text-black rounded-tr-none pl-3 pr-8 py-2' // Extra right padding if me
+                          : 'bg-white/10 text-white rounded-tl-none px-3 py-2'
                       }`}>
-                        {msg.message}
+                        <span className="break-words">{msg.message}</span>
                         
                         {isMe && (
                           <button 
                             onClick={() => handleDelete(msg.id)}
-                            className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition p-1"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition"
                             title="Delete message"
                           >
-                            <TrashIcon size={14} />
+                            <TrashIcon size={14} weight="bold" />
                           </button>
                         )}
                       </div>
