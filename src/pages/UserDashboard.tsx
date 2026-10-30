@@ -26,7 +26,6 @@ export default function UserDashboard() {
   const navigate = useNavigate()
   const { profile, setProfile, checkAndShowDailyChallenge } = useNotifications()
   
-  // 🔧 FIX: We start with loading = true
   const [loading, setLoading] = useState(true)
   
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -98,7 +97,7 @@ export default function UserDashboard() {
           .maybeSingle()
 
         if (freshProfile) {
-          setProfile(freshProfile) // Update global context instantly
+          setProfile(freshProfile)
         }
 
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
@@ -128,12 +127,19 @@ export default function UserDashboard() {
 
         let quizzesToday = 0
         if (attempts) {
-          const today = new Date().toISOString().split('T')[0]
-          const totalCompletedToday = attempts.filter(
-            (a) => a.status === 'completed' && a.created_at.startsWith(today)
-          ).length
+          // 🔧 FIX: Use Asia/Manila timezone to match the database
+          const today = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }).split(',')[0]
+          
+          const totalCompletedToday = attempts.filter((a) => {
+            if (a.status !== 'completed') return false
+            const attemptDate = new Date(a.created_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }).split(',')[0]
+            return attemptDate === today
+          }).length
           
           quizzesToday = Math.min(totalCompletedToday, 3) 
+
+          // Immediately update progress bar
+          setStats(prev => ({ ...prev, quizzesToday }))
 
           if (totalCompletedToday >= 3) {
             await checkAndShowDailyChallenge()
@@ -187,19 +193,17 @@ export default function UserDashboard() {
           })
           setRecentActivity(attemptsWithData)
         } else {
-          setStats(prev => ({ ...prev, quizzesToday }))
+          setStats(prev => ({ ...prev, quizzesToday: 0 }))
         }
 
       } catch (error) {
         console.error('Dashboard fetch error:', error)
       } finally {
-        // 🔧 FIX: Simply set loading to false, no isMounted checks
         setLoading(false)
       }
     }
 
     fetchData()
-  // 🔧 FIX: Run exactly once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) 
 
