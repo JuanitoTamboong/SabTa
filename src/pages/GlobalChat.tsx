@@ -18,9 +18,9 @@ export default function GlobalChat() {
   const [onlineCount, setOnlineCount] = useState(1) 
   const [unreadCount, setUnreadCount] = useState(0)
   
-  // 🔧 VISUAL REACTIONS STATE
+  // 🔧 REACTIONS STATE
   const [showReactionMenu, setShowReactionMenu] = useState<string | null>(null)
-  const [messageReactions, setMessageReactions] = useState<Record<string, string>>({}) // Visual only for now
+  const [messageReactions, setMessageReactions] = useState<Record<string, any[]>>({})
 
   // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
@@ -51,25 +51,18 @@ export default function GlobalChat() {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (isMounted) setCurrentUser(profile)
 
-      // 🔧 Fetch Badges
       const badgesData = await fetchAllBadges()
       if (isMounted) setAllBadges(badgesData)
 
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
+      // Fetch messages AND their reactions
       const { data } = await supabase
         .from('chat_messages')
         .select(`
           id, message, created_at, user_id,
-          profiles ( 
-            display_name, 
-            avatar_url,
-            points,
-            user_inventory ( 
-              is_equipped, 
-              cosmetic_items ( preview_url, cosmetic_type ) 
-            )
-          )
+          profiles ( display_name, avatar_url, points, user_inventory ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) ) ),
+          chat_reactions ( id, user_id, emoji )
         `)
         .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: true })
@@ -77,14 +70,20 @@ export default function GlobalChat() {
 
       if (data && isMounted) {
         setMessages(data)
+        
+        // Group reactions by message ID
+        const reactionsMap: Record<string, any[]> = {}
+        data.forEach(msg => {
+          if (msg.chat_reactions) reactionsMap[msg.id] = msg.chat_reactions
+        })
+        setMessageReactions(reactionsMap)
+        
         setTimeout(scrollToBottom, 100)
       }
 
       channel = supabase
         .channel('global_chat_room', {
-          config: {
-            presence: { key: user.id },
-          },
+          config: { presence: { key: user.id } },
         })
         .on(
           'postgres_changes', 
@@ -94,15 +93,8 @@ export default function GlobalChat() {
               .from('chat_messages')
               .select(`
                 id, message, created_at, user_id,
-                profiles ( 
-                  display_name, 
-                  avatar_url,
-                  points,
-                  user_inventory ( 
-                    is_equipped, 
-                    cosmetic_items ( preview_url, cosmetic_type ) 
-                  )
-                )
+                profiles ( display_name, avatar_url, points, user_inventory ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) ) ),
+                chat_reactions ( id, user_id, emoji )
               `)
               .eq('id', payload.new.id)
               .single()
@@ -125,16 +117,33 @@ export default function GlobalChat() {
             }
           }
         )
+        // 🔧 Listen for new/updated reactions in real-time
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'chat_reactions' },
+          async () => {
+            const { data: reactionsData } = await supabase
+              .from('chat_reactions')
+              .select('*')
+            
+            if (reactionsData && isMounted) {
+              const reactionsMap: Record<string, any[]> = {}
+              reactionsData.forEach(rx => {
+                if (!reactionsMap[rx.message_id]) reactionsMap[rx.message_id] = []
+                reactionsMap[rx.message_id].push(rx)
+              })
+              setMessageReactions(reactionsMap)
+            }
+          }
+        )
         .on('presence', { event: 'sync' }, () => {
           const state = channel?.presenceState() || {}
-          
           const uniqueUserIds = new Set()
           Object.values(state).forEach((presences: any) => {
             presences.forEach((p: any) => {
               if (p.user_id) uniqueUserIds.add(p.user_id)
             })
           })
-
           const count = Math.max(1, uniqueUserIds.size)
           if (isMounted) setOnlineCount(count)
         })
@@ -185,13 +194,30 @@ export default function GlobalChat() {
     setMessages((prev) => prev.filter(m => m.id !== id))
   }
 
-  // 🔧 Handle Reaction Click (Visual Only for now)
-  const handleReaction = (msgId: string, emoji: string) => {
-    setMessageReactions(prev => ({
-      ...prev,
-      [msgId]: emoji
-    }))
-    setShowReactionMenu(null)
+  // 🔧 Handle Reaction Click (Toggle on/off & save to DB)
+  const handleReaction = async (msgId: string, emoji: string) => {
+    setShowReactionMenu(null) // Close menu immediately
+    if (!currentUser) return
+
+    const existingReactions = messageReactions[msgId] || []
+    const myReaction = existingReactions.find(r => r.user_id === currentUser.id)
+
+    if (myReaction) {
+      if (myReaction.emoji === emoji) {
+        // Click same emoji to remove it
+        await supabase.from('chat_reactions').delete().eq('id', myReaction.id)
+      } else {
+        // Click different emoji to update it
+        await supabase.from('chat_reactions').update({ emoji }).eq('id', myReaction.id)
+      }
+    } else {
+      // New reaction
+      await supabase.from('chat_reactions').insert({
+        message_id: msgId,
+        user_id: currentUser.id,
+        emoji
+      })
+    }
   }
 
   const formatTime = (dateStr: string) => {
@@ -246,6 +272,15 @@ export default function GlobalChat() {
                 )?.cosmetic_items?.preview_url
 
                 const senderBadge = getPlayerBadge(msg.profiles?.points || 0, allBadges)
+                
+                const reactionsForMsg = messageReactions[msg.id] || []
+                const reactionCounts = reactionsForMsg.reduce((acc: any, curr: any) => {
+                  acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+                  return acc;
+                }, {});
+
+                // Check if I reacted to this message
+                const myReaction = reactionsForMsg.find(r => r.user_id === currentUser?.id)
 
                 return (
                   <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -294,9 +329,16 @@ export default function GlobalChat() {
                         <span className="text-[9px] text-gray-600">{formatTime(msg.created_at)}</span>
                       </div>
 
-                      {/* 🔧 MESSAGE BUBBLE WITH PRESS & HOLD */}
                       <div className="relative group">
                         
+                        {/* 🔧 Invisible overlay to close the menu when clicking outside */}
+                        {showReactionMenu === msg.id && (
+                          <div 
+                            className="fixed inset-0 z-40" 
+                            onClick={() => setShowReactionMenu(null)}
+                          />
+                        )}
+
                         {/* The Reaction Menu Popup */}
                         {showReactionMenu === msg.id && (
                           <div className={`absolute -top-12 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95 ${isMe ? 'right-0' : 'left-0'}`}>
@@ -304,7 +346,7 @@ export default function GlobalChat() {
                               <button 
                                 key={emoji} 
                                 onClick={() => handleReaction(msg.id, emoji)}
-                                className="hover:scale-125 hover:bg-white/10 rounded-full w-8 h-8 flex items-center justify-center transition text-lg"
+                                className={`hover:scale-125 hover:bg-white/10 rounded-full w-8 h-8 flex items-center justify-center transition text-lg ${myReaction?.emoji === emoji ? 'bg-white/20 scale-110' : ''}`}
                               >
                                 {emoji}
                               </button>
@@ -351,10 +393,26 @@ export default function GlobalChat() {
                           )}
                         </div>
 
-                        {/* Visual Reaction Display */}
-                        {messageReactions[msg.id] && (
-                          <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} bg-[#1a1c23] border border-white/10 rounded-full px-1.5 py-0.5 text-xs shadow-md z-20`}>
-                            {messageReactions[msg.id]}
+                        {/* Display Reaction Badges */}
+                        {Object.keys(reactionCounts).length > 0 && (
+                          <div className={`absolute -bottom-3 flex gap-1 ${isMe ? 'right-2' : 'left-2'} z-20`}>
+                            {Object.entries(reactionCounts).map(([emoji, count]) => {
+                              // Check if *I* am one of the people who reacted with this emoji
+                              const iReacted = reactionsForMsg.some(r => r.emoji === emoji && r.user_id === currentUser?.id)
+                              
+                              return (
+                                <button 
+                                  key={emoji}
+                                  onClick={() => handleReaction(msg.id, emoji)} // Clicking the badge toggles it
+                                  className={`bg-[#1a1c23] border rounded-full px-1.5 py-0.5 text-xs shadow-md flex items-center gap-1 transition ${
+                                    iReacted ? 'border-[#ccff00]' : 'border-white/10'
+                                  }`}
+                                >
+                                  <span>{emoji}</span>
+                                  <span className="text-[9px] text-gray-400 font-bold">{(count as number) > 1 ? count : ''}</span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
