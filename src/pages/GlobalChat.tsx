@@ -29,6 +29,8 @@ export default function GlobalChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  const holdTimeoutRef = useRef<any>(null)
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -56,7 +58,6 @@ export default function GlobalChat() {
 
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-      // Fetch messages AND their reactions
       const { data } = await supabase
         .from('chat_messages')
         .select(`
@@ -71,7 +72,6 @@ export default function GlobalChat() {
       if (data && isMounted) {
         setMessages(data)
         
-        // Group reactions by message ID
         const reactionsMap: Record<string, any[]> = {}
         data.forEach(msg => {
           if (msg.chat_reactions) reactionsMap[msg.id] = msg.chat_reactions
@@ -117,7 +117,6 @@ export default function GlobalChat() {
             }
           }
         )
-        // 🔧 Listen for new/updated reactions in real-time
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'chat_reactions' },
@@ -194,9 +193,8 @@ export default function GlobalChat() {
     setMessages((prev) => prev.filter(m => m.id !== id))
   }
 
-  // 🔧 Handle Reaction Click (Toggle on/off & save to DB)
   const handleReaction = async (msgId: string, emoji: string) => {
-    setShowReactionMenu(null) // Close menu immediately
+    setShowReactionMenu(null)
     if (!currentUser) return
 
     const existingReactions = messageReactions[msgId] || []
@@ -204,19 +202,33 @@ export default function GlobalChat() {
 
     if (myReaction) {
       if (myReaction.emoji === emoji) {
-        // Click same emoji to remove it
         await supabase.from('chat_reactions').delete().eq('id', myReaction.id)
       } else {
-        // Click different emoji to update it
         await supabase.from('chat_reactions').update({ emoji }).eq('id', myReaction.id)
       }
     } else {
-      // New reaction
       await supabase.from('chat_reactions').insert({
         message_id: msgId,
         user_id: currentUser.id,
         emoji
       })
+    }
+  }
+
+  // 🔧 Helper to Open the menu (via Hold)
+  const handleHoldStart = (msgId: string) => {
+    // Only start the timer if it's NOT already open
+    if (showReactionMenu === msgId) return;
+
+    holdTimeoutRef.current = setTimeout(() => {
+      setShowReactionMenu(msgId) 
+    }, 500)
+  }
+
+  // 🔧 Cancel the timer if they just clicked quickly
+  const handleHoldEnd = () => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current)
     }
   }
 
@@ -227,6 +239,14 @@ export default function GlobalChat() {
 
   return (
     <>
+      {/* Invisible background overlay to close menu when clicking outside */}
+      {showReactionMenu && (
+        <div 
+          className="fixed inset-0 z-[80]" 
+          onClick={() => setShowReactionMenu(null)}
+        />
+      )}
+
       <button
         onClick={() => setIsOpen(true)}
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[90] bg-[#ccff00] text-black p-4 rounded-full shadow-[0_0_20px_rgba(204,255,0,0.4)] hover:scale-110 transition-transform ${isOpen ? 'hidden' : 'flex'}`}
@@ -279,7 +299,6 @@ export default function GlobalChat() {
                   return acc;
                 }, {});
 
-                // Check if I reacted to this message
                 const myReaction = reactionsForMsg.find(r => r.user_id === currentUser?.id)
 
                 return (
@@ -331,21 +350,16 @@ export default function GlobalChat() {
 
                       <div className="relative group">
                         
-                        {/* 🔧 Invisible overlay to close the menu when clicking outside */}
-                        {showReactionMenu === msg.id && (
-                          <div 
-                            className="fixed inset-0 z-40" 
-                            onClick={() => setShowReactionMenu(null)}
-                          />
-                        )}
-
                         {/* The Reaction Menu Popup */}
                         {showReactionMenu === msg.id && (
                           <div className={`absolute -top-12 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95 ${isMe ? 'right-0' : 'left-0'}`}>
                             {['👍', '😂', '❤️', '😢', '😮', '😡'].map(emoji => (
                               <button 
                                 key={emoji} 
-                                onClick={() => handleReaction(msg.id, emoji)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReaction(msg.id, emoji);
+                                }}
                                 className={`hover:scale-125 hover:bg-white/10 rounded-full w-8 h-8 flex items-center justify-center transition text-lg ${myReaction?.emoji === emoji ? 'bg-white/20 scale-110' : ''}`}
                               >
                                 {emoji}
@@ -358,22 +372,20 @@ export default function GlobalChat() {
                         )}
 
                         <div 
-                          // 🔧 PRESS AND HOLD LOGIC
-                          onMouseDown={(e) => {
-                            const target = e.currentTarget;
-                            target.dataset.timer = setTimeout(() => {
-                              setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id);
-                            }, 500)?.toString();
+                          // 🔧 HYBRID LOGIC
+                          onMouseDown={() => handleHoldStart(msg.id)}
+                          onMouseUp={handleHoldEnd}
+                          onMouseLeave={handleHoldEnd}
+                          onTouchStart={() => handleHoldStart(msg.id)}
+                          onTouchEnd={handleHoldEnd}
+                          
+                          // Single click to close
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('.delete-btn')) return;
+                            if (showReactionMenu === msg.id) {
+                              setShowReactionMenu(null);
+                            }
                           }}
-                          onMouseUp={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
-                          onMouseLeave={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
-                          onTouchStart={(e) => {
-                            const target = e.currentTarget;
-                            target.dataset.timer = setTimeout(() => {
-                              setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id);
-                            }, 500)?.toString();
-                          }}
-                          onTouchEnd={(e) => clearTimeout(Number(e.currentTarget.dataset.timer))}
 
                           className={`relative flex items-center rounded-2xl text-sm cursor-pointer select-none ${
                           isMe 
@@ -384,8 +396,11 @@ export default function GlobalChat() {
                           
                           {isMe && (
                             <button 
-                              onClick={(e) => { e.stopPropagation(); handleDelete(msg.id) }}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                handleDelete(msg.id); 
+                              }}
+                              className="delete-btn absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition"
                               title="Delete message"
                             >
                               <TrashIcon size={14} weight="bold" />
@@ -397,19 +412,24 @@ export default function GlobalChat() {
                         {Object.keys(reactionCounts).length > 0 && (
                           <div className={`absolute -bottom-3 flex gap-1 ${isMe ? 'right-2' : 'left-2'} z-20`}>
                             {Object.entries(reactionCounts).map(([emoji, count]) => {
-                              // Check if *I* am one of the people who reacted with this emoji
+                              const numCount = count as number;
                               const iReacted = reactionsForMsg.some(r => r.emoji === emoji && r.user_id === currentUser?.id)
                               
                               return (
                                 <button 
                                   key={emoji}
-                                  onClick={() => handleReaction(msg.id, emoji)} // Clicking the badge toggles it
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReaction(msg.id, emoji);
+                                  }}
                                   className={`bg-[#1a1c23] border rounded-full px-1.5 py-0.5 text-xs shadow-md flex items-center gap-1 transition ${
                                     iReacted ? 'border-[#ccff00]' : 'border-white/10'
                                   }`}
                                 >
                                   <span>{emoji}</span>
-                                  <span className="text-[9px] text-gray-400 font-bold">{(count as number) > 1 ? count : ''}</span>
+                                  <span className="text-[9px] text-gray-400 font-bold">
+                                    {numCount > 1 ? numCount : ''}
+                                  </span>
                                 </button>
                               )
                             })}
