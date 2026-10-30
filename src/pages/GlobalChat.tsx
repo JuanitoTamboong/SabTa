@@ -18,6 +18,10 @@ export default function GlobalChat() {
   const [onlineCount, setOnlineCount] = useState(1) 
   const [unreadCount, setUnreadCount] = useState(0)
   
+  // 🔧 VISUAL REACTIONS STATE
+  const [showReactionMenu, setShowReactionMenu] = useState<string | null>(null)
+  const [messageReactions, setMessageReactions] = useState<Record<string, string>>({}) // Visual only for now
+
   // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
@@ -181,6 +185,15 @@ export default function GlobalChat() {
     setMessages((prev) => prev.filter(m => m.id !== id))
   }
 
+  // 🔧 Handle Reaction Click (Visual Only for now)
+  const handleReaction = (msgId: string, emoji: string) => {
+    setMessageReactions(prev => ({
+      ...prev,
+      [msgId]: emoji
+    }))
+    setShowReactionMenu(null)
+  }
+
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -281,22 +294,52 @@ export default function GlobalChat() {
                         <span className="text-[9px] text-gray-600">{formatTime(msg.created_at)}</span>
                       </div>
 
-                      {/* 🔧 MESSAGE BUBBLE WITH PADDING FIX */}
-                      <div className={`relative flex items-center rounded-2xl text-sm group ${
-                        isMe 
-                          ? 'bg-[#ccff00] text-black rounded-tr-none pl-3 pr-8 py-2' // Extra right padding if me
-                          : 'bg-white/10 text-white rounded-tl-none px-3 py-2'
-                      }`}>
-                        <span className="break-words">{msg.message}</span>
+                      {/* 🔧 MESSAGE BUBBLE (Now Clickable for Reactions) */}
+                      <div className="relative group">
                         
-                        {isMe && (
-                          <button 
-                            onClick={() => handleDelete(msg.id)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition"
-                            title="Delete message"
-                          >
-                            <TrashIcon size={14} weight="bold" />
-                          </button>
+                        {/* The Reaction Menu Popup (Visual) */}
+                        {showReactionMenu === msg.id && (
+                          <div className="absolute -top-10 left-0 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95">
+                            {['👍', '😂', '❤️', '😢', '😮', '😡'].map(emoji => (
+                              <button 
+                                key={emoji} 
+                                onClick={() => handleReaction(msg.id, emoji)}
+                                className="hover:scale-125 hover:bg-white/10 rounded-full w-8 h-8 flex items-center justify-center transition text-lg"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                            <button className="hover:scale-125 hover:bg-white/10 rounded-full w-8 h-8 flex items-center justify-center transition text-gray-400 font-bold text-xl">
+                              +
+                            </button>
+                          </div>
+                        )}
+
+                        <div 
+                          onDoubleClick={() => setShowReactionMenu(showReactionMenu === msg.id ? null : msg.id)}
+                          className={`relative flex items-center rounded-2xl text-sm cursor-pointer ${
+                          isMe 
+                            ? 'bg-[#ccff00] text-black rounded-tr-none pl-3 pr-8 py-2' 
+                            : 'bg-white/10 text-white rounded-tl-none px-3 py-2'
+                        }`}>
+                          <span className="break-words">{msg.message}</span>
+                          
+                          {isMe && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDelete(msg.id) }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition"
+                              title="Delete message"
+                            >
+                              <TrashIcon size={14} weight="bold" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Visual Reaction Display */}
+                        {messageReactions[msg.id] && (
+                          <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} bg-[#1a1c23] border border-white/10 rounded-full px-1.5 py-0.5 text-xs shadow-md z-20`}>
+                            {messageReactions[msg.id]}
+                          </div>
                         )}
                       </div>
                     </div>
