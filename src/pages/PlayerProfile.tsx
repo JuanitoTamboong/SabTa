@@ -7,7 +7,7 @@ import {
   TrophyIcon, LightningIcon, MedalIcon, TargetIcon, XIcon, ClockIcon, 
   PaletteIcon, ImageIcon, StarIcon, FireIcon, CoinsIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
-import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges' // 🔧 Import Badge Helpers
+import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 
 export default function PlayerProfile() {
   const { playerId } = useParams()
@@ -17,10 +17,8 @@ export default function PlayerProfile() {
   const [myProfile, setMyProfile] = useState<any>(null)
   const [player, setPlayer] = useState<any>(null)
   
-  // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
-  // Follow State
   const [isFollowing, setIsFollowing] = useState(false)
   const [isFollowedByThem, setIsFollowedByThem] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
@@ -28,20 +26,16 @@ export default function PlayerProfile() {
   const isMutual = isFollowing && isFollowedByThem
   const needsFollowBack = !isFollowing && isFollowedByThem
 
-  // ── Custom Alert State ──
   const [alertData, setAlertData] = useState<{ title: string; message: string; type: 'success' | 'error' } | null>(null)
 
-  // ── Challenge Type Selector ──
   const [showChallengeTypeModal, setShowChallengeTypeModal] = useState(false)
 
-  // ── Friendly PvP State ──
   const [showChallengeModal, setShowChallengeModal] = useState(false)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [creatingBattle, setCreatingBattle] = useState(false)
   const [existingPendingBattle, setExistingPendingBattle] = useState<any>(null)
   const [hasAlreadyPlayed, setHasAlreadyPlayed] = useState(false)
 
-  // ── Bet Battle State ──
   const [showBetModal, setShowBetModal] = useState(false)
   const [betWager, setBetWager] = useState<any>(25)
   const [creatingBet, setCreatingBet] = useState(false)
@@ -55,15 +49,12 @@ export default function PlayerProfile() {
       if (!user) return navigate('/')
       if (user.id === playerId) return navigate('/profile')
 
-      // 🔧 Fetch Badges
       const badgesData = await fetchAllBadges()
       setAllBadges(badgesData)
 
-      // 1. Fetch my profile
       const { data: me } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setMyProfile(me)
 
-      // 2. Fetch target player's profile & ALL inventory items
       const { data: target } = await supabase
         .from('profiles')
         .select(`*, user_inventory ( is_equipped, cosmetic_items ( name, preview_url, cosmetic_type, rarity ) )`)
@@ -72,7 +63,6 @@ export default function PlayerProfile() {
       
       setPlayer(target)
 
-      // 3. Check BOTH follow directions in parallel
       const [myFollow, theirFollow] = await Promise.all([
         supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', playerId).maybeSingle(),
         supabase.from('follows').select('id').eq('follower_id', playerId).eq('following_id', user.id).maybeSingle(),
@@ -81,7 +71,6 @@ export default function PlayerProfile() {
       setIsFollowing(!!myFollow.data)
       setIsFollowedByThem(!!theirFollow.data)
 
-      // 4. Check for any valid pending FRIENDLY battles
       const { data: pending } = await supabase
         .from('quiz_battles')
         .select('id, quiz_id, challenger_id, opponent_id, challenger_score, opponent_score, quizzes(title)')
@@ -101,7 +90,6 @@ export default function PlayerProfile() {
         }
       }
 
-      // 5. Check for active BET battles (pending OR accepted)
       const { data: bet } = await supabase
         .from('bet_battles')
         .select('id, quiz_id, challenger_id, opponent_id, wager_amount, status, challenger_score, opponent_score, challenger_submitted, opponent_submitted, quizzes(title)')
@@ -325,6 +313,38 @@ export default function PlayerProfile() {
   const totalBgs = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'background').length
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
 
+  // 🌈 DYNAMIC COLOR & GLOW HELPER
+  // Returns distinct colors + circular styling + dynamic glow based on the count
+  const getOwnedBadgeStyle = (count: number, type: 'theme' | 'bg' | 'border') => {
+    // Base circular styling
+    let base = "text-[9px] font-black px-2.5 py-1 rounded-full border transition-all duration-500 flex items-center justify-center min-w-[60px]";
+    
+    // Color palettes based on type
+    const colors = {
+      theme: {
+        default: 'border-[#00f0ff]/20 bg-[#00f0ff]/5 text-[#00f0ff]',
+        mid: 'border-[#00f0ff]/60 bg-[#00f0ff]/15 text-[#00f0ff] shadow-[0_0_8px_rgba(0,240,255,0.3)]',
+        high: 'border-[#00f0ff] bg-[#00f0ff]/20 text-white shadow-[0_0_15px_rgba(0,240,255,0.6)] animate-pulse'
+      },
+      bg: {
+        default: 'border-[#ff00a0]/20 bg-[#ff00a0]/5 text-[#ff00a0]',
+        mid: 'border-[#ff00a0]/60 bg-[#ff00a0]/15 text-[#ff00a0] shadow-[0_0_8px_rgba(255,0,160,0.3)]',
+        high: 'border-[#ff00a0] bg-[#ff00a0]/20 text-white shadow-[0_0_15px_rgba(255,0,160,0.6)] animate-pulse'
+      },
+      border: {
+        default: 'border-yellow-500/20 bg-yellow-500/5 text-yellow-500',
+        mid: 'border-yellow-500/60 bg-yellow-500/15 text-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.3)]',
+        high: 'border-yellow-500 bg-yellow-500/20 text-white shadow-[0_0_15px_rgba(234,179,8,0.6)] animate-pulse'
+      }
+    };
+
+    let specificColors = colors[type];
+
+    if (count >= 10) return `${base} ${specificColors.high}`;
+    if (count >= 4) return `${base} ${specificColors.mid}`;
+    return `${base} ${specificColors.default}`;
+  }
+
   const amIBetChallenger = existingBet?.challenger_id === myProfile?.id
   const amIBetOpponent = existingBet?.opponent_id === myProfile?.id
 
@@ -333,7 +353,6 @@ export default function PlayerProfile() {
   const canPlayBet = existingBet?.status === 'accepted' && !hasPlayedBet
   const waitingOnBetOpponent = existingBet?.status === 'accepted' && hasPlayedBet
 
-  // 🔧 Get Current Badge for the player
   const playerBadge = getPlayerBadge(player.points || 0, allBadges)
 
   return (
@@ -371,7 +390,6 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            {/* 🔧 BADGE BETWEEN AVATAR AND NAME */}
             <div className="relative w-full flex justify-center mt-2 mb-4 z-30">
               {playerBadge && (
                 <img 
@@ -521,12 +539,14 @@ export default function PlayerProfile() {
               </div>
             </div>
 
+            {/* 🚀 REDESIGNED COSMETICS SECTION WITH CIRCULAR DYNAMIC GLOW 🚀 */}
             <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                 <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
               </h3>
               
               <div className="space-y-2">
+                {/* Quiz Theme */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedTheme?.cosmetic_items?.preview_url ? (
@@ -538,7 +558,7 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Quiz Theme</p>
-                      <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
+                      <span className={getOwnedBadgeStyle(totalThemes, 'theme')}>
                         {totalThemes} Owned
                       </span>
                     </div>
@@ -546,6 +566,7 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
+                {/* Background */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBg?.cosmetic_items?.preview_url ? (
@@ -557,7 +578,7 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Background</p>
-                      <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
+                      <span className={getOwnedBadgeStyle(totalBgs, 'bg')}>
                         {totalBgs} Owned
                       </span>
                     </div>
@@ -565,6 +586,7 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
+                {/* Avatar Border */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBorder?.cosmetic_items?.preview_url ? (
@@ -576,7 +598,7 @@ export default function PlayerProfile() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Avatar Border</p>
-                      <span className="text-[8px] font-bold text-[#ccff00] bg-[#ccff00]/10 px-1.5 py-0.5 rounded border border-[#ccff00]/20">
+                      <span className={getOwnedBadgeStyle(totalBorders, 'border')}>
                         {totalBorders} Owned
                       </span>
                     </div>
@@ -628,7 +650,7 @@ export default function PlayerProfile() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
-                  <CoinsIcon weight="fill" className="w-5 h-5 text-yellow-400" />
+                                    <CoinsIcon weight="fill" className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-sm text-white group-hover:text-yellow-400 transition">Bet Battle</p>

@@ -105,14 +105,28 @@ export default function Profile() {
 
   // ✅ Function to fetch fresh data from DB and normalize relations
   const refreshFriends = async (userId: string) => {
+    // 🔧 UPDATED: Added nested join for user_inventory and cosmetic_items
     const { data: followersData } = await supabase
       .from('follows')
-      .select(`follower_id, profiles!follower_id ( id, display_name, avatar_url, points )`)
+      .select(`
+        follower_id, 
+        profiles!follower_id (
+          id, display_name, avatar_url, points,
+          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
+        )
+      `)
       .eq('following_id', userId)
 
+    // 🔧 UPDATED: Added nested join for user_inventory and cosmetic_items
     const { data: followingData } = await supabase
       .from('follows')
-      .select(`following_id, profiles!following_id ( id, display_name, avatar_url, points )`)
+      .select(`
+        following_id, 
+        profiles!following_id (
+          id, display_name, avatar_url, points,
+          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
+        )
+      `)
       .eq('follower_id', userId)
 
     const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
@@ -623,7 +637,7 @@ export default function Profile() {
                     >
                       Followers ({followers.length})
                     </button>
-                    <button 
+                                      <button 
                       onClick={() => setFriendTab('following')} 
                       className={`flex-1 py-2 rounded-xl text-sm font-bold transition ${friendTab === 'following' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
                     >
@@ -648,6 +662,11 @@ export default function Profile() {
                         if (!player) return null
                         
                         const friendBadge = getPlayerBadge(player.points || 0, allBadges)
+                        
+                        // 🔧 Extract the equipped avatar border for this specific friend
+                        const friendEquippedBorder = player.user_inventory?.find(
+                          (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
+                        )
 
                         return (
                           <div 
@@ -656,13 +675,29 @@ export default function Profile() {
                             className="flex items-center justify-between p-3 sm:p-4 bg-black/40 border border-white/5 rounded-2xl hover:border-[#ccff00]/50 transition cursor-pointer group"
                           >
                             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-sm font-bold uppercase shrink-0">
-                                {player.avatar_url ? (
-                                  <img src={player.avatar_url} className="w-full h-full object-cover" />
-                                ) : (
-                                  player.display_name?.charAt(0) || 'P'
+                              
+                              {/* 🔧 Updated Avatar Container to support Borders */}
+                              <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
+                                
+                                {/* Inner Avatar Image */}
+                                <div className="absolute inset-[15%] rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-sm font-bold uppercase z-10">
+                                  {player.avatar_url ? (
+                                    <img src={player.avatar_url} className="w-full h-full object-cover" />
+                                  ) : (
+                                    player.display_name?.charAt(0) || 'P'
+                                  )}
+                                </div>
+
+                                {/* Avatar Border Overlay */}
+                                {friendEquippedBorder?.cosmetic_items?.preview_url && (
+                                  <img 
+                                    src={friendEquippedBorder.cosmetic_items.preview_url} 
+                                    alt="Border" 
+                                    className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" 
+                                  />
                                 )}
                               </div>
+
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-bold text-white text-sm sm:text-base group-hover:text-[#ccff00] transition truncate">{player.display_name}</p>
