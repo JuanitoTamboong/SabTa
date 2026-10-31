@@ -1,5 +1,7 @@
 // src/pages/LandingPage.tsx
 import { useState, useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { SocialLogin } from '@capgo/capacitor-social-login'
 import { supabase } from '../lib/supabase'
 import {
   ArrowRightIcon,
@@ -55,19 +57,51 @@ export default function LandingPage() {
     setError(null)
 
     try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
-      })
+      const isNative = Capacitor.isNativePlatform()
 
-      if (authError) {
-        setError(authError.message)
-        setLoading(false)
+      if (isNative) {
+        // --- APK FLOW (Native Popup) ---
+        await SocialLogin.initialize({
+          google: {
+            // 👇 USE THE WEB CLIENT ID HERE (The h1fv... one)
+            webClientId: '1074969611424-h1fvqkhjne14rmrn81pak4bkkav1f8sf.apps.googleusercontent.com',
+            mode: 'online',
+          }
+        })
+
+        const result = await SocialLogin.login({
+          provider: 'google',
+          options: { scopes: ['email', 'profile'] },
+        })
+
+        // 🔧 FIXED: Added 'as any' to bypass TypeScript strict checking
+        const idToken = (result.result as any)?.idToken
+        if (!idToken) throw new Error("No ID token received")
+
+        const { error: authError } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        })
+        
+        if (authError) throw authError
+
+        // Success! Redirect to dashboard
+        window.location.href = '/dashboard'
+
+      } else {
+        // --- WEB FLOW (Browser Redirect) ---
+        const { error: authError } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/`,
+          },
+        })
+
+        if (authError) throw authError
       }
-    } catch {
-      setError('Unable to connect right now. Please try again.')
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Unable to connect right now. Please try again.')
       setLoading(false)
     }
   }
