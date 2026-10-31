@@ -14,7 +14,7 @@ import GlobalChat from './pages/GlobalChat'
 import PlayerProfile from './pages/PlayerProfile'
 import Quizzes from './pages/Quizzes'
 import BattleHistory from './pages/BattleHistory'
-import Clans from './pages/Clans' // 👈 ADDED THIS
+import Clans from './pages/Clans'
 
 import { NotificationsProvider } from './pages/notifications/NotificationsProvider'
 import NotificationsHost from './pages/notifications/NotificationsHost'
@@ -64,7 +64,12 @@ function AuthCallback() {
 
 function AppRoutes({ session, profile }: { session: any, profile: any }) {
   const location = useLocation()
-  const isQuizRoute = location.pathname.startsWith('/quizzes') || location.pathname.startsWith('/play')
+  
+  // 🔧 FIXED: Hide the global chat bubble on Quiz, Play, and Clans pages
+  const isFullScreenPage = 
+    location.pathname.startsWith('/quizzes') || 
+    location.pathname.startsWith('/play') || 
+    location.pathname.startsWith('/clans')
 
   return (
     <>
@@ -140,7 +145,6 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
           }
         />
 
-        {/* 👇 ADDED CLANS ROUTE HERE 👇 */}
         <Route
           path="/clans"
           element={
@@ -168,7 +172,7 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      {session && profile?.age_category && !isQuizRoute && <GlobalChat />}
+      {session && profile?.age_category && !isFullScreenPage && <GlobalChat />}
     </>
   )
 }
