@@ -108,14 +108,15 @@ export default function Profile() {
   const refreshFriends = async (userId: string) => {
     const { data: followersData } = await supabase
       .from('follows')
-      .select(`
+           .select(`
         follower_id, 
-        profiles!follower_id (
-          id, display_name, avatar_url, points,
+        profiles!follower_id!inner (
+          id, display_name, avatar_url, points, role,
           user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
         )
       `)
       .eq('following_id', userId)
+      .eq('profiles.role', 'player')
 
     const { data: followingData } = await supabase
       .from('follows')

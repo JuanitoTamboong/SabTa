@@ -109,8 +109,11 @@ export default function Leaderboard() {
             }
           })
 
+          // 🔧 FIX: Protects daily bonus points during the season, but prevents ghost points after a reset.
           const totalQuizPoints = quizNormal + quizIntermediate + quizHard
-          const bonusPoints = Math.max(0, (p.points || 0) - totalQuizPoints)
+          const currentProfilePoints = p.points || 0
+          
+          const bonusPoints = currentProfilePoints > totalQuizPoints ? (currentProfilePoints - totalQuizPoints) : 0
 
           let displayPoints = 0
           let displayTime = 99999
