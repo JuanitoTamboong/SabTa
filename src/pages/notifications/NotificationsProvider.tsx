@@ -283,7 +283,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [profile?.id, profile?.age_category, refreshIncomingBattles, checkForNewContent])
 
-  // 📡 INSTANT POP-UP VIA SUPABASE REALTIME (The new fix)
+  // 📡 INSTANT POP-UP VIA SUPABASE REALTIME (New Content)
   useEffect(() => {
     if (!profile?.id || !profile?.age_category) return
 
@@ -294,7 +294,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         { event: 'INSERT', schema: 'public', table: 'quizzes' },
         (payload) => {
           const newQuiz = payload.new as any
-          // Only show if it matches the player's tier and is published
           if (newQuiz.status === 'published' && newQuiz.age_category === profile.age_category) {
             const today = new Date().toISOString().split('T')[0]
             if (localStorage.getItem('last_seen_banner_date') !== today) {
@@ -326,6 +325,45 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(channel)
     }
   }, [profile?.id, profile?.age_category])
+
+  // 📡 INSTANT BATTLE NOTIFICATIONS (Realtime Listener)
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const battleChannel = supabase
+      .channel(`battle-notifications-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bet_battles',
+          filter: `opponent_id=eq.${profile.id}`,
+        },
+        () => {
+          // Instantly refresh the incoming battles list
+          refreshIncomingBattles(profile.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quiz_battles',
+          filter: `opponent_id=eq.${profile.id}`,
+        },
+        () => {
+          // Instantly refresh the incoming friendly battles list
+          refreshIncomingBattles(profile.id)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(battleChannel)
+    }
+  }, [profile?.id, refreshIncomingBattles])
 
   const dismissNewContent = () => {
     setShowNewContentBanner(false)

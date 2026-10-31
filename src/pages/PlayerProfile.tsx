@@ -43,6 +43,7 @@ export default function PlayerProfile() {
   const [hasPlayedBet, setHasPlayedBet] = useState(false)
   const [betActionLoading, setBetActionLoading] = useState(false)
 
+  // 1. Initial Fetch
   useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -109,6 +110,78 @@ export default function PlayerProfile() {
     }
     fetchData()
   }, [playerId, navigate])
+
+  // 2. REALTIME LISTENER (No Refresh Needed!)
+  useEffect(() => {
+    if (!myProfile?.id || !playerId) return
+
+    // Listen for bet_battles changes (Accept, Decline, Cancel)
+    const betChannel = supabase
+      .channel(`bet_battles_changes_${myProfile.id}_${playerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'bet_battles',
+          filter: `or(and(challenger_id.eq.${myProfile.id},opponent_id.eq.${playerId}),and(challenger_id.eq.${playerId},opponent_id.eq.${myProfile.id}))`
+        },
+        (payload) => {
+          const updatedBet = payload.new as any
+          
+          if (payload.eventType === 'DELETE') {
+            setExistingBet(null)
+            return
+          }
+
+          if (updatedBet) {
+            setExistingBet(updatedBet)
+            
+            const isMeChallenger = updatedBet.challenger_id === myProfile.id
+            const mySubmitted = isMeChallenger ? updatedBet.challenger_submitted : updatedBet.opponent_submitted
+            setHasPlayedBet(!!mySubmitted)
+          }
+        }
+      )
+      .subscribe()
+
+    // Listen for quiz_battles changes (Friendly Battles)
+    const friendlyChannel = supabase
+      .channel(`quiz_battles_changes_${myProfile.id}_${playerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quiz_battles',
+          filter: `or(and(challenger_id.eq.${myProfile.id},opponent_id.eq.${playerId}),and(challenger_id.eq.${playerId},opponent_id.eq.${myProfile.id}))`
+        },
+        (payload) => {
+          const updatedBattle = payload.new as any
+          
+          if (payload.eventType === 'DELETE') {
+            setExistingPendingBattle(null)
+            return
+          }
+
+          if (updatedBattle) {
+            setExistingPendingBattle(updatedBattle)
+            const isMeChallenger = updatedBattle.challenger_id === myProfile.id
+            const myScore = isMeChallenger ? updatedBattle.challenger_score : updatedBattle.opponent_score
+            if (myScore !== null && myScore !== undefined) {
+              setHasAlreadyPlayed(true)
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    // Cleanup
+    return () => {
+      supabase.removeChannel(betChannel)
+      supabase.removeChannel(friendlyChannel)
+    }
+  }, [myProfile?.id, playerId])
 
   const handleFollow = async () => {
     if (!myProfile || followLoading) return
@@ -314,12 +387,9 @@ export default function PlayerProfile() {
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
 
   // 🌈 DYNAMIC COLOR & GLOW HELPER
-  // Returns distinct colors + circular styling + dynamic glow based on the count
   const getOwnedBadgeStyle = (count: number, type: 'theme' | 'bg' | 'border') => {
-    // Base circular styling
     let base = "text-[9px] font-black px-2.5 py-1 rounded-full border transition-all duration-500 flex items-center justify-center min-w-[60px]";
     
-    // Color palettes based on type
     const colors = {
       theme: {
         default: 'border-[#00f0ff]/20 bg-[#00f0ff]/5 text-[#00f0ff]',
@@ -610,7 +680,6 @@ export default function PlayerProfile() {
           </div>
         </div>
       </div>
-
       {/* ══════════════════════════════════════════════ */}
       {/* STEP 1: CHALLENGE TYPE SELECTOR                */}
       {/* ══════════════════════════════════════════════ */}

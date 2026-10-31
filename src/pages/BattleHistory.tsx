@@ -35,31 +35,29 @@ export default function BattleHistory() {
     wager?: number
   }>({ isOpen: false, type: null, battleId: null, isBet: false })
 
-  useEffect(() => {
-    fetchBattles()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const fetchBattles = async () => {
-    setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return navigate('/')
-    setUserId(user.id)
+    
+    // We only set the user ID on initial load to avoid resetting state
+    if (!userId) setUserId(user.id)
 
-    // ✅ Fetch Background
-    const { data: invData } = await supabase
-      .from('user_inventory')
-      .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
-      .eq('user_id', user.id)
-      .eq('is_equipped', true)
+    // ✅ Fetch Background (Only on initial load)
+    if (!equippedBackground) {
+      const { data: invData } = await supabase
+        .from('user_inventory')
+        .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
+        .eq('user_id', user.id)
+        .eq('is_equipped', true)
 
-    if (invData) {
-      const bg = invData.find((i: any) =>
-        i.is_equipped &&
-        (i.cosmetic_items as any)?.cosmetic_type === 'background'
-      )
-      if (bg && (bg.cosmetic_items as any)?.preview_url) {
-        setEquippedBackground((bg.cosmetic_items as any).preview_url)
+      if (invData) {
+        const bg = invData.find((i: any) =>
+          i.is_equipped &&
+          (i.cosmetic_items as any)?.cosmetic_type === 'background'
+        )
+        if (bg && (bg.cosmetic_items as any)?.preview_url) {
+          setEquippedBackground((bg.cosmetic_items as any).preview_url)
+        }
       }
     }
 
@@ -93,6 +91,39 @@ export default function BattleHistory() {
 
     setLoading(false)
   }
+
+  // 1. Initial Fetch
+  useEffect(() => {
+    fetchBattles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 2. REALTIME LISTENER
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel(`battle-history-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiz_battles' },
+        () => {
+          fetchBattles()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bet_battles' },
+        () => {
+          fetchBattles()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId])
 
   const openConfirmModal = (
     battleId: string,
