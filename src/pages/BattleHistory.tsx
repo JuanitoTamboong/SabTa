@@ -329,12 +329,12 @@ export default function BattleHistory() {
     return (
       <div
         key={battle.id}
-        className={`relative bg-black/40 backdrop-blur-xl border ${borderClass} rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all`}
+        className={`relative bg-black/40 backdrop-blur-xl border ${borderClass} rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all w-full max-w-full overflow-hidden`}
       >
         {/* Left Side */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 w-full min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <p className="font-bold text-sm sm:text-base text-white truncate">
+            <p className="font-bold text-sm sm:text-base text-white truncate max-w-full">
               {battle.quizzes?.title || 'Quiz Battle'}
             </p>
             {isBet && (
@@ -357,7 +357,7 @@ export default function BattleHistory() {
                   {battle.challenger?.display_name?.charAt(0)}
                 </div>
               )}
-              <span className="truncate max-w-[100px] sm:max-w-none">
+              <span className="truncate max-w-[80px] sm:max-w-none">
                 {battle.challenger?.display_name} {isMeChallenger && '(You)'}
               </span>
             </div>
@@ -372,7 +372,7 @@ export default function BattleHistory() {
                   {battle.opponent?.display_name?.charAt(0)}
                 </div>
               )}
-              <span className="truncate max-w-[100px] sm:max-w-none">
+              <span className="truncate max-w-[80px] sm:max-w-none">
                 {battle.opponent?.display_name} {isMeOpponent && '(You)'}
               </span>
             </div>
@@ -380,11 +380,11 @@ export default function BattleHistory() {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0 shrink-0">
-
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0 shrink-0">
+          
           {/* ✅ SCORE / POT (Fixed to show score once played) */}
           {!(isBet && isBetTerminal) && (
-            <div className="text-center shrink-0">
+            <div className="text-center shrink-0 mr-auto sm:mr-0">
               <p className="text-[10px] text-gray-500 uppercase font-bold">
                 {isBet && (iHavePlayed || theyHavePlayed) ? 'Score' : isBet ? 'Pot' : 'Score'}
               </p>
@@ -608,7 +608,7 @@ export default function BattleHistory() {
       {/* ✅ CUSTOM CONFIRMATION MODAL */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`bg-[#0f1014] border rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative ${
+          <div className={`bg-[#0f1014] border rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide ${
             modalCopy.color === 'yellow' ? 'border-yellow-500/30 shadow-[0_0_50px_rgba(234,179,8,0.15)]'
             : modalCopy.color === 'red' ? 'border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.15)]'
             : 'border-white/10 shadow-[0_0_50px_rgba(255,0,160,0.1)]'
@@ -665,7 +665,7 @@ export default function BattleHistory() {
       {/* ✅ INLINE ALERT MODAL */}
       {alertData && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide shadow-2xl animate-in zoom-in-95">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
               alertData.type === 'success' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-500'
             }`}>
