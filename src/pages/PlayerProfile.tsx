@@ -111,17 +111,16 @@ export default function PlayerProfile() {
     fetchData()
   }, [playerId, navigate])
 
-  // 2. REALTIME LISTENER (No Refresh Needed!)
+  // 2. REALTIME LISTENER (Instant Updates)
   useEffect(() => {
     if (!myProfile?.id || !playerId) return
 
-    // Listen for bet_battles changes (Accept, Decline, Cancel)
     const betChannel = supabase
       .channel(`bet_battles_changes_${myProfile.id}_${playerId}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'bet_battles',
           filter: `or(and(challenger_id.eq.${myProfile.id},opponent_id.eq.${playerId}),and(challenger_id.eq.${playerId},opponent_id.eq.${myProfile.id}))`
@@ -145,7 +144,6 @@ export default function PlayerProfile() {
       )
       .subscribe()
 
-    // Listen for quiz_battles changes (Friendly Battles)
     const friendlyChannel = supabase
       .channel(`quiz_battles_changes_${myProfile.id}_${playerId}`)
       .on(
@@ -176,12 +174,30 @@ export default function PlayerProfile() {
       )
       .subscribe()
 
-    // Cleanup
     return () => {
       supabase.removeChannel(betChannel)
       supabase.removeChannel(friendlyChannel)
     }
   }, [myProfile?.id, playerId])
+
+  // 🛡️ SAFETY NET POLLING (Fixes stuck "Waiting" if Realtime drops)
+  useEffect(() => {
+    if (!existingBet || existingBet.status !== 'pending') return
+
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('bet_battles')
+        .select('id, status, challenger_submitted, opponent_submitted')
+        .eq('id', existingBet.id)
+        .single()
+
+      if (data && data.status !== existingBet.status) {
+        setExistingBet((prev: any) => ({ ...prev, ...data }))
+      }
+    }, 2000) // Check every 2 seconds
+
+    return () => clearInterval(interval)
+  }, [existingBet])
 
   const handleFollow = async () => {
     if (!myProfile || followLoading) return
@@ -386,7 +402,6 @@ export default function PlayerProfile() {
   const totalBgs = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'background').length
   const totalBorders = allInventory.filter((i: any) => i.cosmetic_items?.cosmetic_type === 'avatar_border').length
 
-  // 🌈 DYNAMIC COLOR & GLOW HELPER
   const getOwnedBadgeStyle = (count: number, type: 'theme' | 'bg' | 'border') => {
     let base = "text-[9px] font-black px-2.5 py-1 rounded-full border transition-all duration-500 flex items-center justify-center min-w-[60px]";
     
@@ -609,14 +624,12 @@ export default function PlayerProfile() {
               </div>
             </div>
 
-            {/* 🚀 REDESIGNED COSMETICS SECTION WITH CIRCULAR DYNAMIC GLOW 🚀 */}
             <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                 <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
               </h3>
               
               <div className="space-y-2">
-                {/* Quiz Theme */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedTheme?.cosmetic_items?.preview_url ? (
@@ -636,7 +649,6 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                {/* Background */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBg?.cosmetic_items?.preview_url ? (
@@ -656,7 +668,6 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                {/* Avatar Border */}
                 <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBorder?.cosmetic_items?.preview_url ? (
@@ -680,6 +691,7 @@ export default function PlayerProfile() {
           </div>
         </div>
       </div>
+
       {/* ══════════════════════════════════════════════ */}
       {/* STEP 1: CHALLENGE TYPE SELECTOR                */}
       {/* ══════════════════════════════════════════════ */}
@@ -719,7 +731,7 @@ export default function PlayerProfile() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
-                                    <CoinsIcon weight="fill" className="w-5 h-5 text-yellow-400" />
+                  <CoinsIcon weight="fill" className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-sm text-white group-hover:text-yellow-400 transition">Bet Battle</p>
