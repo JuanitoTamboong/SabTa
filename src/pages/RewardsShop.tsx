@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import {
   CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
   ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
-  ImageIcon, XCircleIcon, XIcon, EyeIcon 
+  ImageIcon, XCircleIcon, XIcon, EyeIcon, ShieldIcon // 👈 ADDED ShieldIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 
@@ -24,8 +24,6 @@ export default function RewardsShop() {
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState('all')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
-
-  // ❌ REMOVED: Play Menu States
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,8 +64,6 @@ export default function RewardsShop() {
     const t = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(t)
   }, [toast])
-
-  // ❌ REMOVED: openPlayMenu function
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -166,12 +162,15 @@ export default function RewardsShop() {
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <HouseIcon weight="fill" className="w-6 h-6" /> Home
           </button>
-          {/* ✅ ROUTES TO QUIZZES PAGE */}
           <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
           </button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
+          </button>
+          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
+          <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
+            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
           </button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition">
             <ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop
@@ -430,7 +429,6 @@ export default function RewardsShop() {
           <HouseIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Home</span>
         </button>
-        {/* ✅ ROUTES TO QUIZZES PAGE */}
         <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <GameControllerIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Play</span>
@@ -438,6 +436,11 @@ export default function RewardsShop() {
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <TrophyIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Ranks</span>
+        </button>
+        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
+        <button onClick={() => navigate('/clans')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+          <ShieldIcon weight="fill" className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Clans</span>
         </button>
         <button className="flex flex-col items-center gap-1 text-[#ccff00]">
           <ShoppingBagIcon weight="fill" className="w-5 h-5" />

@@ -115,7 +115,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const checkSeasonAnnouncement = async () => {
     try {
-      // 1. Find the latest season that has results
       const { data: latestSeason } = await supabase
         .from('season_results')
         .select('season_number')
@@ -125,7 +124,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
       if (!latestSeason) return
 
-      // 2. Check if the current user needs to see it
       const { data, error } = await supabase.rpc('get_season_announcement', {
         p_season_number: latestSeason.season_number,
       })
@@ -160,15 +158,60 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // ✨ NEW CONTENT CHECK (Fallback for page load)
+  const checkForNewContent = useCallback(
+    async (userId: string, ageCategory: string | null) => {
+      if (!ageCategory) return
+
+      const today = new Date().toISOString().split('T')[0]
+      if (localStorage.getItem('last_seen_banner_date') === today) return
+
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+      const { data: newQuizzes, error: quizErr } = await supabase
+        .from('quizzes')
+        .select('id, created_at, age_category, status')
+        .eq('status', 'published')
+        .eq('age_category', ageCategory)
+        .gte('created_at', weekAgo)
+
+      if (quizErr) console.error('[NewContent] quiz query failed:', quizErr)
+
+      const { data: newCosmetics, error: cosmeticErr } = await supabase
+        .from('cosmetic_items')
+        .select('id, created_at, status')
+        .eq('status', 'published')
+        .gte('created_at', weekAgo)
+
+      if (cosmeticErr) console.error('[NewContent] cosmetic query failed:', cosmeticErr)
+
+      const { data: userInv } = await supabase
+        .from('user_inventory')
+        .select('cosmetic_item_id')
+        .eq('user_id', userId)
+
+      const ownedIds = new Set((userInv ?? []).map((i) => i.cosmetic_item_id))
+      const unownedCosmetics = (newCosmetics ?? []).filter((c) => !ownedIds.has(c.id))
+
+      const totalNew = (newQuizzes?.length ?? 0) + unownedCosmetics.length
+
+      if (totalNew > 0) {
+        setNewContentCount(totalNew)
+        setShowNewContentBanner(true)
+        localStorage.setItem('last_seen_banner_date', today) // Mark as seen when shown
+      }
+    },
+    []
+  )
+
+  // 🚀 BOOTSTRAP
   useEffect(() => {
     let isMounted = true
     let timer: ReturnType<typeof setTimeout>
 
     const boot = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+        const { data: { user } } = await supabase.auth.getUser()
         if (!user || !isMounted) return
 
         const { data: profileCheck } = await supabase
@@ -194,7 +237,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         setTimeout(() => {
           if (!isMounted) return
-
           if (streakResult && streakResult.status === 'success') {
             setStreakReward({
               coins: streakResult.coins,
@@ -202,93 +244,92 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             })
             setShowStreakModal(true)
           }
-
           if (challengeResult?.claimed) {
             setShowDailyBonusModal(true)
           }
         }, 50)
 
         await refreshIncomingBattles(user.id)
-
-        if (isMounted) {
-          await checkSeasonAnnouncement()
-        }
-
-        if (profileData.age_category && isMounted) {
-          const lastSeen = localStorage.getItem('last_seen_banner_date')
-          const today = new Date().toISOString().split('T')[0]
-
-          if (lastSeen !== today) {
-            const weekAgo = new Date(
-              Date.now() - 7 * 24 * 60 * 60 * 1000
-            ).toISOString()
-
-            const { data: newQ } = await supabase
-              .from('quizzes')
-              .select('id')
-              .eq('age_category', profileData.age_category)
-              .eq('status', 'published')
-              .gte('created_at', weekAgo)
-
-            const { data: userInv } = await supabase
-              .from('user_inventory')
-              .select('cosmetic_item_id')
-              .eq('user_id', user.id)
-            const ownedIds = userInv?.map((i) => i.cosmetic_item_id) || []
-
-            const { data: newC } = await supabase
-              .from('cosmetic_items')
-              .select('id')
-              .eq('status', 'published')
-              .gte('created_at', weekAgo)
-
-            const unownedCosmetics = (newC || []).filter(
-              (c) => !ownedIds.includes(c.id)
-            )
-
-            const totalNew = (newQ?.length || 0) + unownedCosmetics.length
-
-            if (totalNew > 0 && isMounted) {
-              setNewContentCount(totalNew)
-              setShowNewContentBanner(true)
-            }
-          }
-        }
+        if (isMounted) await checkSeasonAnnouncement()
+        if (isMounted) await checkForNewContent(user.id, profileData.age_category)
       } catch (error) {
         console.error('Notifications bootstrap error:', error)
       }
     }
 
-    timer = setTimeout(() => {
-      boot()
-    }, 500)
+    timer = setTimeout(() => { boot() }, 500)
 
     return () => {
       isMounted = false
       clearTimeout(timer)
     }
-  }, [refreshIncomingBattles])
+  }, [refreshIncomingBattles, checkForNewContent])
 
+  // 🔄 FALLBACK POLLING (15s battles, 2m content)
   useEffect(() => {
     if (!profile?.id) return
-    const interval = setInterval(() => {
+
+    const battleInterval = setInterval(() => {
       refreshIncomingBattles(profile.id)
     }, 15000)
-    return () => clearInterval(interval)
-  }, [profile?.id, refreshIncomingBattles])
 
+    const contentInterval = setInterval(() => {
+      checkForNewContent(profile.id, profile.age_category)
+    }, 120000)
+
+    return () => {
+      clearInterval(battleInterval)
+      clearInterval(contentInterval)
+    }
+  }, [profile?.id, profile?.age_category, refreshIncomingBattles, checkForNewContent])
+
+  // 📡 INSTANT POP-UP VIA SUPABASE REALTIME (The new fix)
   useEffect(() => {
-    if (!showNewContentBanner) return
-    const timer = setTimeout(() => {
-      dismissNewContent()
-    }, 5000)
-    return () => clearTimeout(timer)
-  }, [showNewContentBanner])
+    if (!profile?.id || !profile?.age_category) return
+
+    const channel = supabase
+      .channel('new-content-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'quizzes' },
+        (payload) => {
+          const newQuiz = payload.new as any
+          // Only show if it matches the player's tier and is published
+          if (newQuiz.status === 'published' && newQuiz.age_category === profile.age_category) {
+            const today = new Date().toISOString().split('T')[0]
+            if (localStorage.getItem('last_seen_banner_date') !== today) {
+              setNewContentCount((prev) => prev + 1)
+              setShowNewContentBanner(true)
+              localStorage.setItem('last_seen_banner_date', today)
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'cosmetic_items' },
+        (payload) => {
+          const newCosmetic = payload.new as any
+          if (newCosmetic.status === 'published') {
+            const today = new Date().toISOString().split('T')[0]
+            if (localStorage.getItem('last_seen_banner_date') !== today) {
+              setNewContentCount((prev) => prev + 1)
+              setShowNewContentBanner(true)
+              localStorage.setItem('last_seen_banner_date', today)
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [profile?.id, profile?.age_category])
 
   const dismissNewContent = () => {
     setShowNewContentBanner(false)
-    const today = new Date().toISOString().split('T')[0]
-    localStorage.setItem('last_seen_banner_date', today)
+    // localStorage is now handled when the banner is shown, so we don't need it here anymore.
   }
 
   return (

@@ -14,6 +14,7 @@ import GlobalChat from './pages/GlobalChat'
 import PlayerProfile from './pages/PlayerProfile'
 import Quizzes from './pages/Quizzes'
 import BattleHistory from './pages/BattleHistory'
+import Clans from './pages/Clans' // 👈 ADDED THIS
 
 import { NotificationsProvider } from './pages/notifications/NotificationsProvider'
 import NotificationsHost from './pages/notifications/NotificationsHost'
@@ -92,7 +93,6 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
           path="/dashboard"
           element={
             session && profile?.age_category ? (
-              // 🔧 FIX: Added key={location.key} back to force a completely fresh mount on navigation
               <UserDashboard key={location.key} />
             ) : (
               <Navigate to="/onboarding" />
@@ -136,6 +136,15 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
           path="/leaderboard"
           element={
             session && profile?.age_category ? <Leaderboard /> :
+            <Navigate to="/onboarding" />
+          }
+        />
+
+        {/* 👇 ADDED CLANS ROUTE HERE 👇 */}
+        <Route
+          path="/clans"
+          element={
+            session && profile?.age_category ? <Clans /> :
             <Navigate to="/onboarding" />
           }
         />

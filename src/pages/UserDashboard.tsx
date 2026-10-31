@@ -19,6 +19,7 @@ import {
   CoinsIcon,
   SwordIcon,
   HourglassIcon,
+  ShieldIcon, // 👈 ADDED THIS
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -299,6 +300,13 @@ export default function UserDashboard() {
             className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
           >
             <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
+          </button>
+          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
+          <button
+            onClick={() => navigate('/clans')}
+            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
+          >
+            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
           </button>
           <button
             onClick={() => navigate('/rewards')}
@@ -719,6 +727,14 @@ export default function UserDashboard() {
         >
           <TrophyIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Ranks</span>
+        </button>
+        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
+        <button
+          onClick={() => navigate('/clans')}
+          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
+        >
+          <ShieldIcon weight="fill" className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Clans</span>
         </button>
         <button
           onClick={() => navigate('/rewards')}

@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
   MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon,
-  CoinsIcon 
+  ShieldIcon // 👈 ADDED
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -194,6 +194,10 @@ export default function Leaderboard() {
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
           <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
+          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
+          <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
+            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
+          </button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
         </nav>
@@ -504,6 +508,11 @@ export default function Leaderboard() {
         <button className="flex flex-col items-center gap-1 text-[#ccff00]">
           <TrophyIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Ranks</span>
+        </button>
+        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
+        <button onClick={() => navigate('/clans')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+          <ShieldIcon weight="fill" className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Clans</span>
         </button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <ShoppingBagIcon weight="fill" className="w-5 h-5" />

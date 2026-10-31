@@ -6,7 +6,8 @@ import {
   UserIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon, ShoppingBagIcon,
   LightningIcon, CheckCircleIcon, PencilSimpleIcon, FloppyDiskIcon, 
   CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon,
-  CameraIcon, UsersIcon, CaretRightIcon, UserPlusIcon, UserMinusIcon
+  CameraIcon, UsersIcon, CaretRightIcon, UserPlusIcon, UserMinusIcon,
+  ShieldIcon // 👈 ADDED ShieldIcon
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -105,7 +106,6 @@ export default function Profile() {
 
   // ✅ Function to fetch fresh data from DB and normalize relations
   const refreshFriends = async (userId: string) => {
-    // 🔧 UPDATED: Added nested join for user_inventory and cosmetic_items
     const { data: followersData } = await supabase
       .from('follows')
       .select(`
@@ -117,7 +117,6 @@ export default function Profile() {
       `)
       .eq('following_id', userId)
 
-    // 🔧 UPDATED: Added nested join for user_inventory and cosmetic_items
     const { data: followingData } = await supabase
       .from('follows')
       .select(`
@@ -390,6 +389,10 @@ export default function Profile() {
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
           <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
+          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
+          <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
+            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
+          </button>
           <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
         </nav>
@@ -644,8 +647,7 @@ export default function Profile() {
                       Following ({following.length})
                     </button>
                   </div>
-
-                  <div className="space-y-3">
+                                    <div className="space-y-3">
                     {(friendTab === 'followers' ? followers : following).length === 0 ? (
                       <div className="text-center py-10">
                         <UsersIcon weight="duotone" className="w-12 h-12 text-gray-600 mx-auto mb-3" />
@@ -676,7 +678,7 @@ export default function Profile() {
                           >
                             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                               
-                              {/* 🔧 Updated Avatar Container to support Borders */}
+                              {/* 🔧 Avatar Container to support Borders */}
                               <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
                                 
                                 {/* Inner Avatar Image */}
@@ -766,6 +768,11 @@ export default function Profile() {
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
         <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
+        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
+        <button onClick={() => navigate('/clans')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
+          <ShieldIcon weight="fill" className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Clans</span>
+        </button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
         <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
