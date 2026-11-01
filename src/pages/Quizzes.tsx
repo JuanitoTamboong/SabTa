@@ -7,16 +7,77 @@ import { TrophyIcon, ArrowLeftIcon, CoinsIcon, GameControllerIcon, SparkleIcon }
 export default function Quizzes() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
 
   useEffect(() => {
-    const fetchQuizzes = async () => {
+    let isActive = true
+    let latestRequest = 0
+    let channel: ReturnType<typeof supabase.channel> | undefined
+
+    const fetchQuizzes = async (userId: string, ageCategory: string) => {
+      const requestId = ++latestRequest
+      setLoadError(null)
+
+      const { data: completed, error: completedError } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+
+      if (!isActive || requestId !== latestRequest) return
+      if (completedError) {
+        console.error('Failed to load completed quizzes:', completedError)
+        setLoadError('Unable to load quizzes right now. Please try again later.')
+        setLoading(false)
+        return
+      }
+
+      const completedIds = completed?.map(c => c.quiz_id) || []
+
+      let query = supabase
+        .from('quizzes')
+        .select('id, title, category, difficulty, created_at, questions(count)')
+        .eq('age_category', ageCategory)
+        .eq('status', 'published')
+
+      if (completedIds.length > 0) {
+        query = query.not('id', 'in', `(${completedIds.join(',')})`)
+      }
+
+      const { data: quizzes, error: quizzesError } = await query
+
+      if (!isActive || requestId !== latestRequest) return
+      if (quizzesError) {
+        console.error('Failed to load available quizzes:', quizzesError)
+        setLoadError('Unable to load quizzes right now. Please try again later.')
+        setLoading(false)
+        return
+      }
+
+      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
+      setLoading(false)
+    }
+
+    const initialize = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
+      if (!isActive) return
 
       // Fetch user profile
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (!isActive) return
+      if (profileError) {
+        console.error('Failed to load player profile:', profileError)
+        setLoadError('Unable to load quizzes right now. Please try again later.')
+        setLoading(false)
+        return
+      }
       setProfile(profileData)
 
       if (!profileData?.age_category) {
@@ -24,32 +85,26 @@ export default function Quizzes() {
         return
       }
 
-      // Fetch completed quizzes
-      const { data: completed } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed') 
-        
-      const completedIds = completed?.map(c => c.quiz_id) || []
+      channel = supabase
+        .channel(`available-quizzes-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'quizzes' },
+          () => {
+            void fetchQuizzes(user.id, profileData.age_category)
+          }
+        )
+        .subscribe()
 
-      // Fetch available quizzes
-      let query = supabase
-        .from('quizzes')
-        .select('id, title, category, difficulty, created_at, questions(count)')
-        .eq('age_category', profileData.age_category)
-        .eq('status', 'published')
-
-      if (completedIds.length > 0) {
-        query = query.not('id', 'in', `(${completedIds.join(',')})`)
-      }
-
-      const { data: quizzes } = await query
-      setAvailableQuizzes((quizzes || []).filter(q => (q.questions as any)?.[0]?.count > 0))
-      setLoading(false)
+      await fetchQuizzes(user.id, profileData.age_category)
     }
 
-    fetchQuizzes()
+    void initialize()
+
+    return () => {
+      isActive = false
+      if (channel) void supabase.removeChannel(channel)
+    }
   }, [navigate])
 
   // ✅ Helper to determine if a quiz was created today
@@ -88,7 +143,12 @@ export default function Quizzes() {
 
         {/* Quiz List */}
         <div className="space-y-3 sm:space-y-4">
-          {availableQuizzes.length === 0 ? (
+          {loadError && (
+            <div className="text-center py-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">
+              {loadError}
+            </div>
+          )}
+          {availableQuizzes.length === 0 && loadError ? null : availableQuizzes.length === 0 ? (
             <div className="text-center py-16 bg-[#0f1014] border border-white/10 rounded-3xl">
               <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400 font-bold text-lg">All caught up!</p>
