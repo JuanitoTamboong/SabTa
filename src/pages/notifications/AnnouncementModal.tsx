@@ -157,14 +157,15 @@ export default function AnnouncementModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-4">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-announcement-title"
-        className={`relative w-full max-w-lg overflow-hidden rounded-3xl border ${style.border} bg-[#101114] shadow-2xl`}
+        className={`relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border ${style.border} bg-[#101114] shadow-2xl`}
+        style={{ maxHeight: 'calc(100dvh - 1.5rem)' }}
       >
-        <div className={`flex items-center justify-between border-b border-white/10 px-6 py-5 ${style.background}`}>
+        <div className={`flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5 ${style.background}`}>
           <div className={`flex items-center gap-3 ${style.color}`}>
             <SeverityIcon aria-hidden="true" className="h-6 w-6" />
             <span className="text-xs font-bold uppercase tracking-[0.2em]">
@@ -181,10 +182,10 @@ export default function AnnouncementModal() {
           </button>
         </div>
 
-        <div className="px-6 py-7">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-7">
           <h2
             id="player-announcement-title"
-            className="text-2xl font-black leading-tight text-white sm:text-3xl"
+            className="break-words text-2xl font-black leading-tight text-white sm:text-3xl"
           >
             {announcement.title}
           </h2>
@@ -196,7 +197,7 @@ export default function AnnouncementModal() {
           </p>
         </div>
 
-        <div className="flex justify-end border-t border-white/10 px-6 py-4">
+        <div className="flex shrink-0 justify-end border-t border-white/10 px-4 py-4 sm:px-6">
           <button
             type="button"
             onClick={dismiss}
