@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { useNotifications } from './NotificationsProvider'
 import SeasonEndModal from './SeasonEndModal'
+import AnnouncementModal from './AnnouncementModal'
 
 export default function NotificationsHost() {
   const navigate = useNavigate()
@@ -155,6 +156,7 @@ export default function NotificationsHost() {
   return (
     <>
       <SeasonEndModal />
+      <AnnouncementModal />
 
       {/* NEW CONTENT BANNER (Mobile Optimized) */}
       {showNewContentBanner && (
