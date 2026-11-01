@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, BellRing, Info, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useNotifications } from './NotificationsProvider'
 
 type Announcement = {
   id: string
@@ -61,11 +62,18 @@ const SEVERITY_STYLES = {
 }
 
 export default function AnnouncementModal() {
+  const { profile } = useNotifications()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const revision = useRef(0)
 
   useEffect(() => {
+    if (!profile?.id) return
+
     let isMounted = true
+    const dismissalKey = (item: Announcement) =>
+      `sabta:dismissed-announcement:${profile.id}:${item.id}:${item.published_at}`
+    const isDismissed = (item: Announcement) =>
+      localStorage.getItem(dismissalKey(item)) === 'true'
 
     const fetchLatestAnnouncement = async () => {
       const currentRevision = revision.current
@@ -84,7 +92,9 @@ export default function AnnouncementModal() {
       }
 
       if (!isMounted || revision.current !== currentRevision) return
-      if (data && isAnnouncement(data)) setAnnouncement(data)
+      if (data && isAnnouncement(data) && !isDismissed(data)) {
+        setAnnouncement(data)
+      }
     }
 
     const channel = supabase
@@ -103,7 +113,7 @@ export default function AnnouncementModal() {
 
           if (!isAnnouncement(payload.new)) return
 
-          if (isCurrentlyActive(payload.new)) {
+          if (isCurrentlyActive(payload.new) && !isDismissed(payload.new)) {
             setAnnouncement(payload.new)
           } else {
             setAnnouncement((current) => current?.id === payload.new.id ? null : current)
@@ -122,7 +132,7 @@ export default function AnnouncementModal() {
       isMounted = false
       void supabase.removeChannel(channel)
     }
-  }, [])
+  }, [profile?.id])
 
   useEffect(() => {
     if (!announcement?.ends_at) return
@@ -138,7 +148,13 @@ export default function AnnouncementModal() {
 
   const style = SEVERITY_STYLES[announcement.severity]
   const SeverityIcon = style.Icon
-  const dismiss = () => setAnnouncement(null)
+  const dismiss = () => {
+    localStorage.setItem(
+      `sabta:dismissed-announcement:${profile.id}:${announcement.id}:${announcement.published_at}`,
+      'true'
+    )
+    setAnnouncement(null)
+  }
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
