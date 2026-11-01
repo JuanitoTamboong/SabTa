@@ -31,47 +31,26 @@ export default function Leaderboard() {
   }
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      setLoading(true)
+    let isActive = true
+    let canViewLeaderboard = false
+    let ageCategory: string | null = null
+
+    const fetchLeaderboardRows = async (showLoading = false) => {
+      if (showLoading) setLoading(true)
       setLoadError(null)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return navigate('/')
 
-      const badgesData = await fetchAllBadges()
-      setAllBadges(badgesData)
-
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      if (profileData) setProfile(profileData)
-      
-      // 🔧 FIX 1: Allow Admins to view even if they don't have an age_category
-      if (!profileData?.age_category && profileData?.role !== 'admin') { setLoading(false); return }
-
-      const { data: myInventory } = await supabase
-        .from('user_inventory')
-        .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
-        .eq('user_id', user.id)
-        .eq('is_equipped', true)
-
-      if (myInventory) {
-        const bg = myInventory.find(i => (i.cosmetic_items as any)?.cosmetic_type === 'background')
-        if (bg && (bg.cosmetic_items as any)?.preview_url) {
-          setEquippedBackground((bg.cosmetic_items as any).preview_url)
-        }
-      }
-
-      const ageCategory = activeTab !== 'global' && profileData?.role !== 'admin'
-        ? profileData?.age_category
-        : null
       const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
         'get_season_leaderboard',
         { p_age_category: ageCategory }
       )
 
+      if (!isActive) return
+
       if (leaderboardError) {
         console.error('Failed to load leaderboard:', leaderboardError)
         setLoadError('Unable to load rankings right now. Please try again later.')
         setPlayers([])
-        setLoading(false)
+        if (showLoading) setLoading(false)
         return
       }
 
@@ -104,10 +83,66 @@ export default function Leaderboard() {
         )
 
       setPlayers(playerStats)
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
 
-    fetchLeaderboard()
+    const fetchLeaderboard = async () => {
+      setLoading(true)
+      setLoadError(null)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return navigate('/')
+      if (!isActive) return
+
+      const badgesData = await fetchAllBadges()
+      if (!isActive) return
+      setAllBadges(badgesData)
+
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+      if (!isActive) return
+      if (profileData) setProfile(profileData)
+
+      // 🔧 FIX 1: Allow Admins to view even if they don't have an age_category
+      if (!profileData?.age_category && profileData?.role !== 'admin') { setLoading(false); return }
+      canViewLeaderboard = true
+
+      const { data: myInventory } = await supabase
+        .from('user_inventory')
+        .select('is_equipped, cosmetic_items(cosmetic_type, preview_url)')
+        .eq('user_id', user.id)
+        .eq('is_equipped', true)
+
+      if (!isActive) return
+      if (myInventory) {
+        const bg = myInventory.find(i => (i.cosmetic_items as any)?.cosmetic_type === 'background')
+        if (bg && (bg.cosmetic_items as any)?.preview_url) {
+          setEquippedBackground((bg.cosmetic_items as any).preview_url)
+        }
+      }
+
+      const selectedAgeCategory = activeTab !== 'global' && profileData?.role !== 'admin'
+        ? profileData?.age_category
+        : null
+      ageCategory = selectedAgeCategory
+      await fetchLeaderboardRows(true)
+    }
+
+    const channel = supabase
+      .channel('leaderboard-profiles')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          if (canViewLeaderboard) void fetchLeaderboardRows()
+        }
+      )
+      .subscribe()
+
+    void fetchLeaderboard()
+
+    return () => {
+      isActive = false
+      void supabase.removeChannel(channel)
+    }
   }, [navigate, activeTab])
 
   const handleLogout = async () => {
