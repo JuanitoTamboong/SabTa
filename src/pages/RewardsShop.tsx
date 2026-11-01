@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import LoadingScreen from '../components/LoadingScreen'
+import ModalPresence from '../components/ModalPresence'
 import {
   CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
   ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
@@ -318,9 +319,13 @@ export default function RewardsShop() {
       </main>
 
       {/* FULL DETAILS MODAL */}
-      {selectedItem && !purchaseItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 max-w-md w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
+      <ModalPresence
+        open={!!selectedItem && !purchaseItem}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        panelClassName="w-full max-w-md"
+      >
+        {selectedItem && !purchaseItem && (
+          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
             <button 
               onClick={() => setSelectedItem(null)} 
               className="absolute top-4 right-4 bg-white/5 hover:bg-white/10 p-2 rounded-full transition z-10"
@@ -373,13 +378,17 @@ export default function RewardsShop() {
               </button>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </ModalPresence>
 
       {/* PURCHASE CONFIRMATION MODAL */}
-      {purchaseItem && (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full text-center relative shadow-2xl">
+      <ModalPresence
+        open={!!purchaseItem}
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        panelClassName="w-full max-w-sm"
+      >
+        {purchaseItem && (
+          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 w-full text-center relative shadow-2xl">
             <h2 className="text-2xl font-bold mb-2">Confirm Purchase</h2>
             <p className="text-gray-400 text-sm mb-6">Are you sure you want to buy this item?</p>
             
@@ -407,8 +416,8 @@ export default function RewardsShop() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModalPresence>
 
       {/* TOAST */}
       {toast && (

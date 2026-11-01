@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import ModalPresence from '../components/ModalPresence'
 import { 
   ChatCircleDotsIcon, XIcon, PaperPlaneRightIcon, 
   UserIcon, TrashIcon 
@@ -262,8 +263,11 @@ export default function GlobalChat() {
         )}
       </button>
 
-      {isOpen && (
-        <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[100] w-[calc(100vw-2rem)] sm:w-96 h-[500px] max-h-[70vh] bg-[#0f1014] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
+      <ModalPresence
+        open={isOpen}
+        mode="panel"
+        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[100] w-[calc(100vw-2rem)] sm:w-96 h-[500px] max-h-[70vh] bg-[#0f1014] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+      >
           
           <div className="flex items-center justify-between p-4 bg-black/40 border-b border-white/10">
             <div className="flex items-center gap-2">
@@ -462,8 +466,7 @@ export default function GlobalChat() {
             </button>
           </form>
 
-        </div>
-      )}
+      </ModalPresence>
     </>
   )
 }

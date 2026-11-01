@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { LoadingIndicator } from '../components/LoadingScreen'
 import LoadingScreen from '../components/LoadingScreen'
+import ModalPresence from '../components/ModalPresence'
 import { 
   ShieldIcon, UsersIcon, TrophyIcon, PlusIcon, XIcon, 
   CameraIcon, PencilIcon, TrashIcon, CaretLeftIcon, 
@@ -496,9 +497,13 @@ export default function Clans() {
         </div>
 
         {/* CLAN CHAT MODAL */}
-        {isChatOpen && myClan && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl relative animate-in zoom-in-95">
+        <ModalPresence
+          open={isChatOpen && !!myClan}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          panelClassName="w-full max-w-lg"
+        >
+          {isChatOpen && myClan && (
+            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full h-[80vh] flex flex-col shadow-2xl relative">
               
               <div className="p-4 border-b border-white/10 bg-black/40 flex justify-between items-center shrink-0 rounded-t-3xl">
                 <div className="flex items-center gap-3">
@@ -592,13 +597,17 @@ export default function Clans() {
               </form>
               
             </div>
-          </div>
-        )}
+          )}
+        </ModalPresence>
 
         {/* EDIT CLAN MODAL */}
-        {isEditing && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative animate-in zoom-in-95">
+        <ModalPresence
+          open={isEditing}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          panelClassName="w-full max-w-md"
+        >
+          {isEditing && (
+            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
               <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
                 <h2 className="text-xl font-black text-white">Edit Clan</h2>
                 <button onClick={handleCancelEdit} className="text-gray-400 hover:text-white"><XIcon weight="bold" size={20}/></button>
@@ -632,13 +641,17 @@ export default function Clans() {
                 </button>
               </form>
             </div>
-          </div>
-        )}
+          )}
+        </ModalPresence>
 
         {/* CLAN DETAILS MODAL */}
-        {viewingClan && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative animate-in zoom-in-95">
+        <ModalPresence
+          open={!!viewingClan}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          panelClassName="w-full max-w-md"
+        >
+          {viewingClan && (
+            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
               <div className="p-5 border-b border-white/10 bg-black/40 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center font-bold text-[#ccff00] overflow-hidden shrink-0">
@@ -702,13 +715,17 @@ export default function Clans() {
                 <p className="text-xs text-gray-400">Total Clan Points: <span className="font-bold text-[#ccff00]">{(viewingClan.total_points || 0).toLocaleString()}</span></p>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </ModalPresence>
 
                {/* CONFIRMATION MODAL */}
-        {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl relative animate-in zoom-in-95 p-6 text-center">
+        <ModalPresence
+          open={confirmModal.isOpen}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          panelClassName="w-full max-w-sm"
+        >
+          {confirmModal.isOpen && (
+            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative p-6 text-center">
               
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
                 confirmModal.type === 'delete' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'
@@ -750,8 +767,8 @@ export default function Clans() {
               </div>
 
             </div>
-          </div>
-        )}
+          )}
+        </ModalPresence>
 
       </div>
     </div>
