@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   SwordIcon, ArrowLeftIcon, TrophyIcon, ClockIcon, TrashIcon,
   XCircleIcon, WarningIcon, MinusIcon, CoinsIcon, WarningCircleIcon
@@ -199,7 +200,7 @@ export default function BattleHistory() {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING BATTLES...</div>
+  if (loading) return <LoadingScreen title="Loading your battles" subtitle="Getting your friendly and wager matches." />
 
   // ── Render a battle card (shared for friendly + bet) ──
   const renderBattleCard = (battle: any, isBet: boolean) => {

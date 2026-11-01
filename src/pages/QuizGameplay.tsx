@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   ClockIcon, CheckIcon, XIcon, LightningIcon, 
   ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon,
@@ -374,7 +375,7 @@ export default function QuizGameplay() {
     return `${secs}s`
   }
 
-  if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING...</div>
+  if (loading) return <LoadingScreen title="Preparing your quiz" subtitle="Shuffling questions and setting the timer." />
 
   if (error) {
     return (

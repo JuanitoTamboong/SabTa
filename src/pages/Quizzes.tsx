@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { TrophyIcon, ArrowLeftIcon, CoinsIcon, GameControllerIcon, SparkleIcon } from '@phosphor-icons/react'
+import LoadingScreen from '../components/LoadingScreen'
 
 export default function Quizzes() {
   const navigate = useNavigate()
@@ -116,7 +117,7 @@ export default function Quizzes() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING QUIZZES...</div>
+    return <LoadingScreen title="Finding your next quiz" subtitle="Loading quizzes for your arena." />
   }
 
   return (

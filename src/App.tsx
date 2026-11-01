@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import LoadingScreen from './components/LoadingScreen'
 
 import LandingPage from './pages/LandingPage'
 import AgeSelection from './pages/AgeSelection'
@@ -225,11 +226,7 @@ function App() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        SYSTEM INITIALIZING...
-      </div>
-    )
+    return <LoadingScreen title="Getting things ready" subtitle="Setting up your SabTa arena." />
   }
 
   return (

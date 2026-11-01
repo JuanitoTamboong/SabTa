@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import { 
   UserPlusIcon, UserCheckIcon, ArrowLeftIcon, 
   TrophyIcon, LightningIcon, MedalIcon, TargetIcon, XIcon, ClockIcon, 
@@ -388,7 +389,7 @@ export default function PlayerProfile() {
   const followButtonLabel = isMutual ? 'Friends' : needsFollowBack ? 'Follow Back' : isFollowing ? 'Following' : 'Add Friend'
   const followButtonIcon = isMutual ? <UserCheckIcon weight="fill" /> : needsFollowBack ? <UserPlusIcon weight="bold" /> : isFollowing ? <UserCheckIcon weight="bold" /> : <UserPlusIcon weight="bold" />
 
-  if (loading) return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center font-mono">LOADING PROFILE...</div>
+  if (loading) return <LoadingScreen title="Opening player profile" subtitle="Loading stats and achievements." />
   if (!player) return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center">Player not found.</div>
 
   const allInventory = player.user_inventory || []

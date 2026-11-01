@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
@@ -151,7 +152,7 @@ export default function Leaderboard() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING RANKINGS...</div>
+    return <LoadingScreen title="Loading the leaderboard" subtitle="Bringing the latest arena rankings into view." />
   }
 
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1

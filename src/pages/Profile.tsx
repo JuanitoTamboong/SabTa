@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   UserIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon, ShoppingBagIcon,
   LightningIcon, CheckCircleIcon, PencilSimpleIcon, FloppyDiskIcon, 
@@ -357,7 +358,7 @@ export default function Profile() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">LOADING PROFILE...</div>
+    return <LoadingScreen title="Loading your profile" subtitle="Gathering your stats and achievements." />
   }
 
   const equippedBorder = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'avatar_border')

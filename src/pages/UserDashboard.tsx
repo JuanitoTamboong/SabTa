@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { LoadingIndicator } from '../components/LoadingScreen'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   TrophyIcon,
   LightningIcon,
@@ -246,11 +248,7 @@ export default function UserDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        LOADING DASHBOARD...
-      </div>
-    )
+    return <LoadingScreen title="Loading your dashboard" subtitle="Getting your stats and next challenge ready." />
   }
 
   const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
@@ -616,9 +614,7 @@ export default function UserDashboard() {
             </div>
             <div className="space-y-3">
               {topPlayersLoading ? (
-                <div className="text-gray-500 text-xs text-center py-2">
-                  Loading top players...
-                </div>
+                <LoadingIndicator label="Loading top players..." className="justify-center py-2 text-xs" />
               ) : topPlayers.length === 0 ? (
                 <div className="text-gray-500 text-xs text-center py-2">
                   No players yet.

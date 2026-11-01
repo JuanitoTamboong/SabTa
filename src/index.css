@@ -47,3 +47,142 @@ html {
 .animate-glow {
   animation: glowPulse 3s infinite;
 }
+
+.sab-loading-screen {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  padding: 1.5rem;
+  color: #fff;
+  background:
+    radial-gradient(ellipse at center, rgba(204, 255, 0, 0.07), transparent 42%),
+    #050505;
+}
+
+.sab-loading-screen__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: sabLoadingAppear 0.45s ease-out both;
+}
+
+.sab-loading-emblem {
+  position: relative;
+  display: grid;
+  width: 5.25rem;
+  aspect-ratio: 1;
+  place-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.sab-loading-emblem img {
+  width: 3.25rem;
+  height: 3.25rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(204, 255, 0, 0.25));
+  animation: sabLoadingFloat 2.2s ease-in-out infinite;
+}
+
+.sab-loading-emblem__orbit {
+  position: absolute;
+  inset: 0.2rem;
+  border: 1.5px solid rgba(204, 255, 0, 0.22);
+  border-top-color: #ccff00;
+  border-right-color: rgba(255, 0, 160, 0.75);
+  border-radius: 50%;
+  animation: sabLoadingSpin 3.2s linear infinite;
+}
+
+.sab-loading-emblem__spark {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.85rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #ff00a0;
+  box-shadow: 0 0 10px rgba(255, 0, 160, 0.8);
+}
+
+.sab-loading-title {
+  margin: 0;
+  color: #e8ebdf;
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.sab-loading-subtitle {
+  margin: 0.32rem 0 0;
+  color: #85877f;
+  font-size: 0.75rem;
+}
+
+.sab-loading-dots {
+  display: inline-flex;
+  gap: 0.24rem;
+  margin-top: 0.75rem;
+}
+
+.sab-loading-dots i {
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: #ccff00;
+  animation: sabLoadingDot 0.9s ease-in-out infinite;
+}
+
+.sab-loading-dots i:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.sab-loading-dots i:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.sab-loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #a1a1aa;
+}
+
+.sab-loading-indicator__spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+  border: 2px solid rgba(204, 255, 0, 0.18);
+  border-top-color: #ccff00;
+  border-radius: 50%;
+  animation: sabLoadingSpin 0.8s linear infinite;
+}
+
+@keyframes sabLoadingSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sabLoadingFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes sabLoadingDot {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+@keyframes sabLoadingAppear {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sab-loading-screen *,
+  .sab-loading-indicator__spinner {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { LoadingIndicator } from '../components/LoadingScreen'
+import LoadingScreen from '../components/LoadingScreen'
 import { 
   ShieldIcon, UsersIcon, TrophyIcon, PlusIcon, XIcon, 
   CameraIcon, PencilIcon, TrashIcon, CaretLeftIcon, 
@@ -330,11 +332,7 @@ export default function Clans() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        LOADING CLANS...
-      </div>
-    )
+    return <LoadingScreen title="Gathering your clan" subtitle="Loading clan members and standings." />
   }
 
   return (
@@ -658,7 +656,7 @@ export default function Clans() {
               
               <div className="max-h-[60vh] overflow-y-auto p-2 admin-custom-scrollbar">
                 {loadingMembers ? (
-                  <div className="text-center py-10 text-gray-400 text-sm animate-pulse">Loading members...</div>
+                  <LoadingIndicator label="Loading members..." className="justify-center py-10 text-sm" />
                 ) : clanMembers.length === 0 ? (
                   <div className="text-center py-10 text-gray-400 text-sm">No members found.</div>
                 ) : (

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadingScreen from '../components/LoadingScreen'
 import {
   CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
   ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
@@ -128,11 +129,7 @@ export default function RewardsShop() {
     })
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-[#ccff00] flex items-center justify-center text-xl font-bold font-mono">
-        LOADING SHOP...
-      </div>
-    )
+    return <LoadingScreen title="Opening the rewards shop" subtitle="Checking your coins and loading the latest items." />
   }
 
   return (
