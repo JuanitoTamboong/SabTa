@@ -75,7 +75,7 @@ export default function UserDashboard() {
 
       const end = data.end_date ? new Date(data.end_date).getTime() : null
       const daysLeft = end
-        ? Math.max(0, Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24)))
+        ? Math.max(0, Math.floor((end - Date.now()) / (1000 * 60 * 60 * 24)))
         : 0
 
       setSeason({
