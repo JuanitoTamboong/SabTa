@@ -1,6 +1,6 @@
 // src/pages/notifications/NotificationsHost.tsx
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import {
   CoinsIcon,
@@ -19,7 +19,9 @@ import SeasonEndModal from './SeasonEndModal'
 import AnnouncementModal from './AnnouncementModal'
 
 export default function NotificationsHost() {
+  const location = useLocation()
   const navigate = useNavigate()
+  const activeBattleId = new URLSearchParams(location.search).get('battleId')
   const {
     profile,
     setProfile,
@@ -51,6 +53,9 @@ export default function NotificationsHost() {
     wager: number
   }>({ isOpen: false, battleId: null, wager: 0 })
   const [betDeclining, setBetDeclining] = useState(false)
+  const visibleIncomingBattles = incomingBattles.filter(
+    (battle) => battle.id !== activeBattleId
+  )
 
   const openDeclineModal = (battleId: string) => {
     setDeclineModal({ isOpen: true, battleId })
@@ -198,9 +203,9 @@ export default function NotificationsHost() {
       )}
 
       {/* COMBINED BATTLE BANNERS (Mobile Optimized) */}
-      {(incomingBattles.length > 0 || incomingBetBattles.length > 0) && (
+      {(visibleIncomingBattles.length > 0 || incomingBetBattles.length > 0) && (
         <div className="fixed top-4 right-4 z-[80] w-[92%] sm:w-[calc(100%-2rem)] max-w-md max-h-[80vh] overflow-y-auto space-y-3 pb-4">
-          {incomingBattles.map((battle) => (
+          {visibleIncomingBattles.map((battle) => (
             <div
               key={battle.id}
               className="bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(255,0,160,0.25)] animate-in slide-in-from-right-4"
