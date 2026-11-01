@@ -90,11 +90,18 @@ export default function Leaderboard() {
           age_category: row.age_category,
           points,
           bestTime,
+          coins: row.coins,
+          createdAt: row.created_at,
           border_url: row.border_url,
         }
       })
         .filter((player: any) => player.points > 0)
-        .sort((a: any, b: any) => b.points - a.points || a.bestTime - b.bestTime)
+        .sort((a: any, b: any) =>
+          b.points - a.points ||
+          a.bestTime - b.bestTime ||
+          b.coins - a.coins ||
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
 
       setPlayers(playerStats)
       setLoading(false)
