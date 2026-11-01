@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -113,14 +114,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const checkSeasonAnnouncement = async () => {
+  const checkingSeasonAnnouncement = useRef(false)
+
+  const checkSeasonAnnouncement = useCallback(async () => {
+    if (checkingSeasonAnnouncement.current) return
+    checkingSeasonAnnouncement.current = true
+
     try {
-      const { data: latestSeason } = await supabase
+      const { data: latestSeason, error: seasonError } = await supabase
         .from('season_results')
         .select('season_number')
         .order('season_number', { ascending: false })
         .limit(1)
         .maybeSingle()
+
+      if (seasonError) {
+        console.error('Season results query error:', seasonError)
+        return
+      }
 
       if (!latestSeason) return
 
@@ -141,15 +152,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('Error checking season announcement:', err)
+    } finally {
+      checkingSeasonAnnouncement.current = false
     }
-  }
+  }, [])
 
   const dismissSeasonAnnouncement = async () => {
     try {
       if (seasonAnnouncement) {
-        await supabase.rpc('mark_season_announcement_seen', {
+        const { error } = await supabase.rpc('mark_season_announcement_seen', {
           p_season_number: seasonAnnouncement.seasonNumber,
         })
+        if (error) throw error
       }
     } catch (err) {
       console.error('Error marking season announcement seen:', err)
@@ -198,7 +212,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       if (totalNew > 0) {
         setNewContentCount(totalNew)
         setShowNewContentBanner(true)
-        localStorage.setItem('last_seen_banner_date', today) // Mark as seen when shown
+        localStorage.setItem('last_seen_banner_date', today)
       }
     },
     []
@@ -214,26 +228,25 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user || !isMounted) return
 
-        const { data: profileCheck } = await supabase
-          .from('profiles')
-          .select('age_category')
-          .eq('id', user.id)
-          .maybeSingle()
-
-        if (!profileCheck?.age_category) return
-
-        const { data: streakResult } = await supabase.rpc('claim_daily_streak')
-        const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
-
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .maybeSingle()
 
-        if (!isMounted || !profileData) return
+        if (profileError) {
+          console.error('Notifications profile query error:', profileError)
+          return
+        }
+        if (!profileData || !isMounted) return
 
         setProfile(profileData)
+        await checkSeasonAnnouncement()
+
+        if (!profileData.age_category && profileData.role !== 'admin') return
+
+        const { data: streakResult } = await supabase.rpc('claim_daily_streak')
+        const { data: challengeResult } = await supabase.rpc('check_daily_challenge')
 
         setTimeout(() => {
           if (!isMounted) return
@@ -250,7 +263,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         }, 50)
 
         await refreshIncomingBattles(user.id)
-        if (isMounted) await checkSeasonAnnouncement()
         if (isMounted) await checkForNewContent(user.id, profileData.age_category)
       } catch (error) {
         console.error('Notifications bootstrap error:', error)
@@ -263,7 +275,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       isMounted = false
       clearTimeout(timer)
     }
-  }, [refreshIncomingBattles, checkForNewContent])
+  }, [refreshIncomingBattles, checkForNewContent, checkSeasonAnnouncement])
 
   // 🔄 FALLBACK POLLING (15s battles, 2m content)
   useEffect(() => {
@@ -276,12 +288,22 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const contentInterval = setInterval(() => {
       checkForNewContent(profile.id, profile.age_category)
     }, 120000)
+    const seasonInterval = setInterval(() => {
+      void checkSeasonAnnouncement()
+    }, 30000)
 
     return () => {
       clearInterval(battleInterval)
       clearInterval(contentInterval)
+      clearInterval(seasonInterval)
     }
-  }, [profile?.id, profile?.age_category, refreshIncomingBattles, checkForNewContent])
+  }, [
+    profile?.id,
+    profile?.age_category,
+    refreshIncomingBattles,
+    checkForNewContent,
+    checkSeasonAnnouncement,
+  ])
 
   // 📡 INSTANT POP-UP VIA SUPABASE REALTIME (New Content)
   useEffect(() => {
@@ -341,7 +363,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           filter: `opponent_id=eq.${profile.id}`,
         },
         () => {
-          // Instantly refresh the incoming battles list
           refreshIncomingBattles(profile.id)
         }
       )
@@ -354,7 +375,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           filter: `opponent_id=eq.${profile.id}`,
         },
         () => {
-          // Instantly refresh the incoming friendly battles list
           refreshIncomingBattles(profile.id)
         }
       )
@@ -367,7 +387,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const dismissNewContent = () => {
     setShowNewContentBanner(false)
-    // localStorage is now handled when the banner is shown, so we don't need it here anymore.
   }
 
   return (

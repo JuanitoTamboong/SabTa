@@ -237,7 +237,7 @@ function App() {
       <NotificationsProvider>
         <AppRoutes session={session} profile={profile} />
         
-        {session && profile?.age_category && <NotificationsHost />}
+        {session && <NotificationsHost />}
       </NotificationsProvider>
     </BrowserRouter>
   )

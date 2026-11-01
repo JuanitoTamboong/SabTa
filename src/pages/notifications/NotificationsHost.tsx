@@ -15,6 +15,7 @@ import {
   XCircleIcon,
 } from '@phosphor-icons/react'
 import { useNotifications } from './NotificationsProvider'
+import SeasonEndModal from './SeasonEndModal'
 
 export default function NotificationsHost() {
   const navigate = useNavigate()
@@ -153,6 +154,8 @@ export default function NotificationsHost() {
 
   return (
     <>
+      <SeasonEndModal />
+
       {/* NEW CONTENT BANNER (Mobile Optimized) */}
       {showNewContentBanner && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[92%] sm:w-full max-w-2xl bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">

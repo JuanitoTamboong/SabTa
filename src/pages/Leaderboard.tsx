@@ -6,7 +6,7 @@ import {
   TrophyIcon, LightningIcon, SignOutIcon, HouseIcon,
   GameControllerIcon, ShoppingBagIcon, UserIcon,
   MedalIcon, CrownIcon, StarIcon, TimerIcon, GlobeIcon,
-  ShieldIcon // 👈 ADDED
+  ShieldIcon 
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -18,10 +18,7 @@ export default function Leaderboard() {
   const [players, setPlayers] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
   
-  // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
-
-  // State for equipped background
   const [equippedBackground, setEquippedBackground] = useState<string | null>(null)
 
   const formatTime = (totalSeconds: number) => {
@@ -38,14 +35,14 @@ export default function Leaderboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
-      // 🔧 Fetch Badges
       const badgesData = await fetchAllBadges()
       setAllBadges(badgesData)
 
-      // 1. Fetch Profile & Equipped Background
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (profileData) setProfile(profileData)
-      if (!profileData?.age_category) { setLoading(false); return }
+      
+      // 🔧 FIX 1: Allow Admins to view even if they don't have an age_category
+      if (!profileData?.age_category && profileData?.role !== 'admin') { setLoading(false); return }
 
       const { data: myInventory } = await supabase
         .from('user_inventory')
@@ -60,7 +57,6 @@ export default function Leaderboard() {
         }
       }
 
-      // 2. Fetch all profiles (to get their total real points)
       let profileQuery = supabase
         .from('profiles')
         .select(`
@@ -70,14 +66,14 @@ export default function Leaderboard() {
             cosmetic_items ( preview_url, cosmetic_type )
           )
         `)
+        .eq('role', 'player') // 🔧 FIX 2: Exclude Admins from the leaderboard data
 
-      if (activeTab !== 'global') {
+      if (activeTab !== 'global' && profileData?.role !== 'admin') {
         profileQuery = profileQuery.eq('age_category', profileData.age_category)
       }
 
       const { data: allProfiles, error: profileError } = await profileQuery
 
-      // 3. Fetch all attempts (to calculate difficulty breakdowns and times)
       const { data: attempts } = await supabase
         .from('quiz_attempts')
         .select('user_id, score, time_taken_seconds, quizzes(difficulty)')
@@ -89,7 +85,6 @@ export default function Leaderboard() {
             (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
           )
 
-          // Calculate quiz scores per difficulty
           let quizNormal = 0, quizIntermediate = 0, quizHard = 0
           let bestTimeNormal = 99999, bestTimeIntermediate = 99999, bestTimeHard = 99999
 
@@ -109,7 +104,6 @@ export default function Leaderboard() {
             }
           })
 
-          // 🔧 FIX: Protects daily bonus points during the season, but prevents ghost points after a reset.
           const totalQuizPoints = quizNormal + quizIntermediate + quizHard
           const currentProfilePoints = p.points || 0
           
@@ -197,7 +191,6 @@ export default function Leaderboard() {
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
           <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
           <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
-          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
           <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
             <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
           </button>
@@ -219,7 +212,7 @@ export default function Leaderboard() {
             <p className="text-gray-400 text-xs md:text-sm">
               {activeTab === 'global' 
                 ? 'Comparing players across ALL age groups including bonus points.'
-                : <>You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category}</span> {activeTab} leaderboard.</>
+                : <>You are viewing the <span className="text-[#ccff00] font-bold uppercase">{profile?.age_category || 'ALL'}</span> {activeTab} leaderboard.</>
               }
             </p>
           </div>
@@ -302,7 +295,6 @@ export default function Leaderboard() {
                     
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[1].display_name}</p>
-                      {/* 🔧 BADGE 2ND */}
                       {(() => {
                         const b = getPlayerBadge(players[1].points, allBadges);
                         return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain" /> : null;
@@ -341,7 +333,6 @@ export default function Leaderboard() {
                     
                     <div className="flex items-center justify-center gap-1 mb-1 relative z-10">
                       <p className="text-xs sm:text-base font-black truncate text-white">{players[0].display_name}</p>
-                      {/* 🔧 BADGE 1ST */}
                       {(() => {
                         const b = getPlayerBadge(players[0].points, allBadges);
                         return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-4 h-4 sm:w-5 sm:h-5 object-contain" /> : null;
@@ -378,7 +369,6 @@ export default function Leaderboard() {
                     
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <p className="text-[10px] sm:text-sm font-bold truncate text-gray-200 group-hover:text-white transition-colors">{players[2].display_name}</p>
-                      {/* 🔧 BADGE 3RD */}
                       {(() => {
                         const b = getPlayerBadge(players[2].points, allBadges);
                         return b ? <img src={b.image_url} alt={b.name} title={b.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain" /> : null;
@@ -404,7 +394,6 @@ export default function Leaderboard() {
                   const rank = idx + 4
                   const isMe = player.id === profile?.id
                   
-                  // 🔧 Get badge for row
                   const rowBadge = getPlayerBadge(player.points, allBadges)
 
                   return (
@@ -435,7 +424,6 @@ export default function Leaderboard() {
                           <span className={`font-bold text-xs sm:text-sm md:text-base truncate group-hover:text-[#ccff00] transition-colors ${isMe ? 'text-[#ccff00]' : 'text-white'}`}>
                             {player.display_name} {isMe && '(You)'}
                           </span>
-                          {/* 🔧 ROW BADGE */}
                           {rowBadge && (
                             <img src={rowBadge.image_url} alt={rowBadge.name} title={rowBadge.name} className="w-4 h-4 object-contain" />
                           )}
@@ -463,7 +451,7 @@ export default function Leaderboard() {
               </div>
             </div>
 
-            {currentUserRank > 3 && (
+            {currentUserRank > 3 && profile?.role === 'player' && (
               <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-12 bg-[#ccff00] text-black p-3 sm:p-4 rounded-2xl shadow-[0_10px_30px_rgba(204,255,0,0.3)] flex items-center justify-between z-40">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <span className="font-bold font-mono text-sm sm:text-lg">#{currentUserRank}</span>
@@ -483,7 +471,6 @@ export default function Leaderboard() {
 
                   <div className="flex items-center gap-1.5 truncate max-w-[100px] sm:max-w-none">
                     <span className="font-bold text-xs sm:text-base truncate">{profile?.display_name} (You)</span>
-                    {/* 🔧 Sticky Footer Badge */}
                     {(() => {
                       const myBadge = getPlayerBadge(profile?.points || 0, allBadges)
                       return myBadge ? <img src={myBadge.image_url} alt="my-badge" className="w-4 h-4 object-contain" /> : null;
@@ -512,7 +499,6 @@ export default function Leaderboard() {
           <TrophyIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Ranks</span>
         </button>
-        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
         <button onClick={() => navigate('/clans')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
           <ShieldIcon weight="fill" className="w-5 h-5" />
           <span className="text-[9px] font-bold">Clans</span>

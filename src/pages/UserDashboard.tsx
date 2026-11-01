@@ -24,7 +24,6 @@ import {
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
 import { useNotifications } from './notifications/NotificationsProvider'
-import SeasonEndModal from './notifications/SeasonEndModal'
 
 type SeasonInfo = {
   seasonNumber: number
@@ -258,9 +257,6 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative">
-      {/* 🔧 SEASON END POPUP */}
-      <SeasonEndModal />
-
       {equippedBackground && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img
