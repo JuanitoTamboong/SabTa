@@ -14,6 +14,7 @@ import sabtaLogo from '../assets/icons/sabta-logo.png'
 export default function Leaderboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [players, setPlayers] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'global' | 'normal' | 'intermediate' | 'hard'>('global')
@@ -32,6 +33,7 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true)
+      setLoadError(null)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return navigate('/')
 
@@ -57,96 +59,44 @@ export default function Leaderboard() {
         }
       }
 
-      let profileQuery = supabase
-        .from('profiles')
-        .select(`
-          id, display_name, avatar_url, age_category, points,
-          user_inventory (
-            is_equipped,
-            cosmetic_items ( preview_url, cosmetic_type )
-          )
-        `)
-        .eq('role', 'player') // 🔧 FIX 2: Exclude Admins from the leaderboard data
+      const ageCategory = activeTab !== 'global' && profileData?.role !== 'admin'
+        ? profileData?.age_category
+        : null
+      const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
+        'get_season_leaderboard',
+        { p_age_category: ageCategory }
+      )
 
-      if (activeTab !== 'global' && profileData?.role !== 'admin') {
-        profileQuery = profileQuery.eq('age_category', profileData.age_category)
+      if (leaderboardError) {
+        console.error('Failed to load leaderboard:', leaderboardError)
+        setLoadError('Unable to load rankings right now. Please try again later.')
+        setPlayers([])
+        setLoading(false)
+        return
       }
 
-      const { data: allProfiles, error: profileError } = await profileQuery
+      const playerStats = (leaderboardRows || []).map((row: any) => {
+        const points = activeTab === 'global'
+          ? row.points
+          : row[`${activeTab}_points`]
+        const bestTime = activeTab === 'global'
+          ? row.best_time
+          : row[`${activeTab}_best_time`]
 
-      const { data: attempts } = await supabase
-        .from('quiz_attempts')
-        .select('user_id, score, time_taken_seconds, quizzes(difficulty)')
+        return {
+          id: row.id,
+          display_name: row.display_name,
+          avatar_url: row.avatar_url,
+          age_category: row.age_category,
+          points,
+          bestTime,
+          border_url: row.border_url,
+        }
+      })
+        .filter((player: any) => player.points > 0)
+        .sort((a: any, b: any) => b.points - a.points || a.bestTime - b.bestTime)
 
-      if (!profileError && allProfiles && attempts) {
-        
-        const playerStats = allProfiles.map((p: any) => {
-          const equippedBorder = p.user_inventory?.find(
-            (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
-          )
-
-          let quizNormal = 0, quizIntermediate = 0, quizHard = 0
-          let bestTimeNormal = 99999, bestTimeIntermediate = 99999, bestTimeHard = 99999
-
-          const pAttempts = attempts.filter(a => a.user_id === p.id)
-          
-          pAttempts.forEach((a: any) => {
-            const diff = a.quizzes?.difficulty
-            if (diff === 'normal') {
-              quizNormal += a.score
-              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeNormal) bestTimeNormal = a.time_taken_seconds
-            } else if (diff === 'intermediate') {
-              quizIntermediate += a.score
-              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeIntermediate) bestTimeIntermediate = a.time_taken_seconds
-            } else if (diff === 'hard') {
-              quizHard += a.score
-              if (a.time_taken_seconds && a.time_taken_seconds < bestTimeHard) bestTimeHard = a.time_taken_seconds
-            }
-          })
-
-          const totalQuizPoints = quizNormal + quizIntermediate + quizHard
-          const currentProfilePoints = p.points || 0
-          
-          const bonusPoints = currentProfilePoints > totalQuizPoints ? (currentProfilePoints - totalQuizPoints) : 0
-
-          let displayPoints = 0
-          let displayTime = 99999
-
-          if (activeTab === 'global') {
-            displayPoints = totalQuizPoints + bonusPoints
-            displayTime = Math.min(bestTimeNormal, bestTimeIntermediate, bestTimeHard)
-          } else if (activeTab === 'normal') {
-            displayPoints = quizNormal
-            displayTime = bestTimeNormal
-          } else if (activeTab === 'intermediate') {
-            displayPoints = quizIntermediate
-            displayTime = bestTimeIntermediate
-          } else if (activeTab === 'hard') {
-            displayPoints = quizHard
-            displayTime = bestTimeHard
-          }
-
-          return {
-            id: p.id,
-            display_name: p.display_name,
-            avatar_url: p.avatar_url,
-            age_category: p.age_category,
-            points: displayPoints,
-            bestTime: displayTime,
-            border_url: equippedBorder?.cosmetic_items?.preview_url || null,
-          }
-        })
-        .filter((p: any) => p.points > 0)
-        .sort((a, b) => {
-          if (b.points !== a.points) {
-            return b.points - a.points
-          }
-          return a.bestTime - b.bestTime
-        })
-
-        setPlayers(playerStats)
-      }
-
+      setPlayers(playerStats)
       setLoading(false)
     }
 
@@ -257,7 +207,11 @@ export default function Leaderboard() {
           ))}
         </div>
 
-        {players.length === 0 ? (
+        {loadError ? (
+          <div className="bg-black/40 backdrop-blur-md border border-red-500/20 rounded-3xl p-12 text-center relative z-10">
+            <p className="text-red-300 font-bold text-lg">{loadError}</p>
+          </div>
+        ) : players.length === 0 ? (
           <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl p-12 text-center relative z-10">
             <TrophyIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 font-bold mb-1 text-lg">No scores yet</p>
