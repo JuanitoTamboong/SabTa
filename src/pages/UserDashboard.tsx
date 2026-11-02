@@ -73,20 +73,15 @@ export default function UserDashboard() {
       const { data, error } = await supabase.rpc('get_current_season')
       if (cancelled || error || !data?.has_season) return
 
-      const end = data.end_date ? new Date(data.end_date).getTime() : null
-      const daysLeft = end
-        ? Math.max(0, Math.floor((end - Date.now()) / (1000 * 60 * 60 * 24)))
-        : 0
-
       setSeason({
         seasonNumber: data.season_number,
         name: data.name,
-        daysLeft,
+        daysLeft: data.days_left,
         endDate: data.end_date ?? null,
       })
     }
     loadSeason()
-    const id = setInterval(loadSeason, 5 * 60 * 1000)
+    const id = setInterval(loadSeason, 60 * 1000)
     return () => {
       cancelled = true
       clearInterval(id)
