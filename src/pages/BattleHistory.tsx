@@ -387,13 +387,13 @@ export default function BattleHistory() {
           {!(isBet && isBetTerminal) && (
             <div className="text-center shrink-0 mr-auto sm:mr-0">
               <p className="text-[10px] text-gray-500 uppercase font-bold">
-                {isBet && (iHavePlayed || theyHavePlayed) ? 'Score' : isBet ? 'Pot' : 'Score'}
+                {isBet && !(iHavePlayed || theyHavePlayed) ? 'Pot' : 'Score · Challenger / Opponent'}
               </p>
               
               {isBet ? (
                 (iHavePlayed || theyHavePlayed) ? (
                   <p className="text-sm font-bold text-[#ccff00]">
-                    {myScore !== null && myScore !== undefined ? myScore : '-'} - {theirScore !== null && theirScore !== undefined ? theirScore : '-'}
+                    {battle.challenger_score ?? '-'} - {battle.opponent_score ?? '-'}
                   </p>
                 ) : (
                   <p className="text-sm font-bold text-yellow-400 flex items-center justify-center gap-1">
@@ -402,7 +402,7 @@ export default function BattleHistory() {
                 )
               ) : (
                 <p className="text-sm font-bold text-[#ccff00]">
-                  {myScore !== null ? myScore : '-'} - {theirScore !== null ? theirScore : '-'}
+                  {battle.challenger_score ?? '-'} - {battle.opponent_score ?? '-'}
                 </p>
               )}
             </div>
