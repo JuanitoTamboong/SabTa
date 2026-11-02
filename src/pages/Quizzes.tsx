@@ -182,7 +182,10 @@ export default function Quizzes() {
                   </p>
                 </div>
                 
-                <div className="flex items-center w-full sm:w-auto shrink-0 justify-between sm:justify-end">
+                <div className="flex items-center w-full sm:w-auto shrink-0 justify-between gap-2 sm:justify-end">
+                  <span className="text-[10px] sm:text-xs font-semibold text-gray-400">
+                    {(q.questions as { count: number }[] | null)?.[0]?.count ?? 0} questions
+                  </span>
                   <span className={`text-[10px] sm:text-xs font-bold uppercase px-2.5 py-1.5 rounded-lg border ${
                     q.difficulty === 'hard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
                     q.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 

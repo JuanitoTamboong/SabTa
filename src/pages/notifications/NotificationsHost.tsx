@@ -147,7 +147,7 @@ export default function NotificationsHost() {
       if (profile?.id) {
         const { data } = await supabase
           .from('bet_battles')
-          .select(`id, quiz_id, challenger_id, wager_amount, profiles!challenger_id ( display_name, avatar_url )`)
+          .select(`id, quiz_id, challenger_id, wager_amount, profiles!challenger_id ( display_name, avatar_url ), quizzes ( title, category, questions ( count ) )`)
           .eq('opponent_id', profile.id)
           .eq('status', 'pending')
         
@@ -237,6 +237,21 @@ export default function NotificationsHost() {
                   </p>
                 </div>
               </div>
+              <div className="min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+                <p className="truncate text-xs font-bold text-white">
+                  {battle.quizzes?.title || 'Quiz challenge'}
+                </p>
+                {battle.quizzes?.category && (
+                  <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                    Category: {battle.quizzes.category}
+                  </p>
+                )}
+                {battle.quizzes?.questions?.[0]?.count != null && (
+                  <p className="mt-0.5 text-[10px] text-gray-400">
+                    {battle.quizzes.questions[0].count} questions
+                  </p>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => openDeclineModal(battle.id)}
@@ -298,6 +313,21 @@ export default function NotificationsHost() {
                       </p>
                     )}
                   </div>
+                </div>
+                <div className="min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+                  <p className="truncate text-xs font-bold text-white">
+                    {battle.quizzes?.title || 'Quiz challenge'}
+                  </p>
+                  {battle.quizzes?.category && (
+                    <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                      Category: {battle.quizzes.category}
+                    </p>
+                  )}
+                  {battle.quizzes?.questions?.[0]?.count != null && (
+                    <p className="mt-0.5 text-[10px] text-gray-400">
+                      {battle.quizzes.questions[0].count} questions
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button

@@ -72,7 +72,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const { data: pendingBattles } = await supabase
         .from('quiz_battles')
         .select(
-          `id, quiz_id, challenger_id, challenger_score, opponent_score, profiles!challenger_id ( display_name, avatar_url )`
+          `id, quiz_id, challenger_id, challenger_score, opponent_score, profiles!challenger_id ( display_name, avatar_url ), quizzes ( title, category, questions ( count ) )`
         )
         .eq('opponent_id', userId)
         .eq('status', 'pending')
@@ -83,7 +83,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const { data: pendingBets } = await supabase
         .from('bet_battles')
         .select(
-          `id, quiz_id, challenger_id, wager_amount, profiles!challenger_id ( display_name, avatar_url )`
+          `id, quiz_id, challenger_id, wager_amount, profiles!challenger_id ( display_name, avatar_url ), quizzes ( title, category, questions ( count ) )`
         )
         .eq('opponent_id', userId)
         .eq('status', 'pending')
