@@ -48,6 +48,97 @@ const playSound = (type: 'correct' | 'wrong' | 'tick') => {
   }
 }
 
+const splitQuestionCode = (text: string) => {
+  const codeStart = text.search(/\b(?:public\s+)?class\s+[A-Za-z_$][\w$]*/)
+  if (codeStart < 0) return { prompt: text, code: null }
+
+  const prompt = text.slice(0, codeStart).trim()
+  const source = text.slice(codeStart).replace(/^\s*(```[^\n]*|~~~[^\n]*)?\s*/, '').replace(/\s*(```|~~~)\s*$/, '')
+  const tokens = source.match(/"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|>>>?=?|<<=?|==|!=|<=|>=|&&|\|\||\+\+|--|->|::|\.\.\.|[+\-*/%&|^=<>!?:]=?|[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|[{}()[\];,.@]|\S/g) ?? []
+  const lines: string[] = []
+  let line = ''
+  let indent = 0
+  let previousToken = ''
+
+  const flushLine = () => {
+    if (line.trim()) lines.push(`${'  '.repeat(Math.max(indent, 0))}${line.trim()}`)
+    line = ''
+  }
+  const append = (value: string) => { line += value }
+
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index]
+    const previousIsWord = /^[A-Za-z_$\d]/.test(previousToken)
+    const tokenIsWord = /^[A-Za-z_$\d]/.test(token)
+
+    if (token.startsWith('//')) {
+      if (line && !line.endsWith(' ')) append(' ')
+      append(token)
+      flushLine()
+    } else if (token.startsWith('/*')) {
+      flushLine()
+      append(token)
+      flushLine()
+    } else if (token === '{') {
+      if (line && !line.endsWith(' ')) append(' ')
+      append('{')
+      flushLine()
+      indent++
+    } else if (token === '}') {
+      flushLine()
+      indent = Math.max(indent - 1, 0)
+      line = '}'
+      flushLine()
+    } else if (token === ';') {
+      append(';')
+      flushLine()
+    } else if (token === ',') {
+      append(', ')
+    } else if (token === '.') {
+      append('.')
+    } else if (token === '(') {
+      const needsSpace = ['if', 'for', 'while', 'switch', 'catch', 'synchronized'].includes(previousToken)
+      if (needsSpace && line && !line.endsWith(' ')) append(' ')
+      append('(')
+    } else if (token === ')') {
+      append(')')
+    } else if (token === '[') {
+      append('[')
+    } else if (token === ']') {
+      append(']')
+    } else if (token === '@') {
+      append(`@${tokens[index + 1] ?? ''}`)
+      index++
+      flushLine()
+    } else if (/^(?:>>>?=?|<<=?|==|!=|<=|>=|&&|\|\||\+\+|--|->|::|\.\.\.|[+\-*/%&|^=<>!?:]=?)$/.test(token)) {
+      if (line && !line.endsWith(' ')) append(' ')
+      append(token)
+      append(' ')
+    } else {
+      if (previousIsWord && tokenIsWord) append(' ')
+      append(token)
+    }
+
+    previousToken = token
+  }
+  flushLine()
+
+  return { prompt, code: lines.join('\n') }
+}
+
+function CodeSnippet({ code }: { code: string }) {
+  return (
+    <div className="mb-6 w-full min-w-0 overflow-hidden rounded-xl border border-cyan-400/15 bg-[#080b10]">
+      <div className="border-b border-white/5 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-300/60">
+        Code snippet
+      </div>
+      <pre className="block w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain whitespace-pre p-3 text-[11px] leading-6 text-cyan-100/90 font-mono touch-pan-x sm:p-4 sm:text-xs">
+        <code className="block w-max min-w-full">{code}</code>
+      </pre>
+    </div>
+  )
+}
+
 export default function QuizGameplay() {
   const navigate = useNavigate()
   const { quizId } = useParams()
@@ -417,7 +508,17 @@ export default function QuizGameplay() {
                     <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${res.is_correct ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
                       {index + 1}
                     </span>
-                    <p className="font-semibold text-sm sm:text-base">{res.question_text}</p>
+                    {(() => {
+                      const { prompt, code } = splitQuestionCode(res.question_text)
+                      if (!code) return <p className="font-semibold text-sm sm:text-base">{res.question_text}</p>
+
+                      return (
+                        <div className="min-w-0 flex-1 space-y-3">
+                          {prompt && <p className="font-semibold text-sm sm:text-base whitespace-pre-wrap">{prompt}</p>}
+                          <CodeSnippet code={code} />
+                        </div>
+                      )
+                    })()}
                   </div>
                   
                   <div className="ml-8 space-y-2 text-sm">
@@ -543,6 +644,7 @@ export default function QuizGameplay() {
   
   const canAffordHintPoints = (profile?.points || 0) >= 5
   const canAffordHintCoins = (profile?.coins || 0) >= 50
+  const questionDisplay = splitQuestionCode(currentQuestion.question_text)
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
@@ -588,7 +690,12 @@ export default function QuizGameplay() {
           <div className="h-full bg-[#ccff00] transition-all duration-300 shadow-[0_0_10px_rgba(204,255,0,0.5)]" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md">{currentQuestion.question_text}</h2>
+        {(!questionDisplay.code || questionDisplay.prompt) && (
+          <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md${questionDisplay.code ? ' whitespace-pre-wrap' : ''}`}>
+            {questionDisplay.code ? questionDisplay.prompt : currentQuestion.question_text}
+          </h2>
+        )}
+        {questionDisplay.code && <CodeSnippet code={questionDisplay.code} />}
         
         {!isAnswerRevealed && !isBattleMode && (
           <div className="flex justify-center mb-4 sm:mb-6">
