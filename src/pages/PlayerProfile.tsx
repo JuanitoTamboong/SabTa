@@ -203,8 +203,8 @@ export default function PlayerProfile() {
 
         if (existingBet.challenger_id === myProfile?.id) {
           setAlertData({
-            title: 'Bet Challenge Closed',
-            message: 'This bet is no longer active. Your wager has been refunded.',
+            title: 'Bet Challenge Declined',
+            message: `${player?.display_name || 'Your opponent'} declined your bet challenge. Your wager has been refunded.`,
             type: 'success',
           })
 
