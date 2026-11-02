@@ -130,7 +130,7 @@ export default function PlayerProfile() {
           const updatedBet = payload.new as any
           
           if (payload.eventType === 'DELETE') {
-            setExistingBet(null)
+            // Let the pending-bet poll resolve the deletion and report the refund.
             return
           }
 
@@ -186,19 +186,47 @@ export default function PlayerProfile() {
     if (!existingBet || existingBet.status !== 'pending') return
 
     const interval = setInterval(async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('bet_battles')
         .select('id, status, challenger_submitted, opponent_submitted')
         .eq('id', existingBet.id)
-        .single()
+        .maybeSingle()
 
-      if (data && data.status !== existingBet.status) {
+      if (error) {
+        console.error('Failed to check pending bet battle:', error)
+        return
+      }
+
+      if (!data) {
+        setExistingBet((current: any) => current?.id === existingBet.id ? null : current)
+        setHasPlayedBet(false)
+
+        if (existingBet.challenger_id === myProfile?.id) {
+          setAlertData({
+            title: 'Bet Challenge Closed',
+            message: 'This bet is no longer active. Your wager has been refunded.',
+            type: 'success',
+          })
+
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('coins')
+            .eq('id', myProfile.id)
+            .single()
+
+          if (error) {
+            console.error('Failed to refresh coins after bet challenge closed:', error)
+          } else if (profileData) {
+            setMyProfile((current: any) => current ? { ...current, coins: profileData.coins } : current)
+          }
+        }
+      } else if (data.status !== existingBet.status) {
         setExistingBet((prev: any) => ({ ...prev, ...data }))
       }
     }, 2000) // Check every 2 seconds
 
     return () => clearInterval(interval)
-  }, [existingBet])
+  }, [existingBet, myProfile?.id])
 
   const handleFollow = async () => {
     if (!myProfile || followLoading) return
@@ -223,7 +251,7 @@ export default function PlayerProfile() {
     if (!myProfile?.age_category) return
     const { data } = await supabase
       .from('quizzes')
-      .select('id, title, category, difficulty')
+      .select('id, title, category, difficulty, questions(count)')
       .eq('age_category', myProfile.age_category)
       .eq('status', 'published')
     
@@ -786,6 +814,9 @@ export default function PlayerProfile() {
                     <div className="pr-2">
                       <p className="font-bold text-sm text-white group-hover:text-[#ff00a0] transition">{q.title}</p>
                       <p className="text-[10px] text-gray-400">{q.category}</p>
+                      <p className="text-[10px] text-gray-500">
+                        {q.questions?.[0]?.count ?? 0} questions
+                      </p>
                     </div>
                     <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded border shrink-0 ${
                       q.difficulty === 'hard' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
@@ -894,6 +925,9 @@ export default function PlayerProfile() {
                     <div className="pr-2">
                       <p className="font-bold text-sm text-white group-hover:text-yellow-400 transition">{q.title}</p>
                       <p className="text-[10px] text-gray-400">{q.category}</p>
+                      <p className="text-[10px] text-gray-500">
+                        {q.questions?.[0]?.count ?? 0} questions
+                      </p>
                     </div>
                     <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded border shrink-0 ${
                       q.difficulty === 'hard' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
