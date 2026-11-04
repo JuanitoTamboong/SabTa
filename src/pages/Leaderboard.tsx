@@ -209,6 +209,7 @@ export default function Leaderboard() {
         <div className="leaderboard-podium-card">
           <span className="leaderboard-podium-title">{place === 1 ? 'CHAMPION' : place === 2 ? 'RUNNER UP' : 'THIRD PLACE'}</span>
           <span className="leaderboard-podium-name">{player.display_name}</span>
+          {renderPlayerBadge(player.points, 'leaderboard-badge leaderboard-podium-badge')}
           {activeTab === 'global' && <span className="leaderboard-podium-tier">{player.age_category || 'PLAYER'}</span>}
           <span className="leaderboard-podium-points"><LightningIcon weight="fill" /> {player.points.toLocaleString()} <small>PTS</small></span>
         </div>

@@ -19,6 +19,7 @@ export default function PlayerProfile() {
   const [loading, setLoading] = useState(true)
   const [myProfile, setMyProfile] = useState<any>(null)
   const [player, setPlayer] = useState<any>(null)
+  const [seasonPoints, setSeasonPoints] = useState<number | null>(null)
   
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
@@ -66,6 +67,18 @@ export default function PlayerProfile() {
         .single()
       
       setPlayer(target)
+
+      const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
+        'get_season_leaderboard',
+        { p_age_category: null }
+      )
+      if (leaderboardError) {
+        console.error('Failed to load player season points:', leaderboardError)
+        setSeasonPoints(null)
+      } else {
+        const seasonRow = leaderboardRows?.find((row: { id: string; points: number }) => row.id === playerId)
+        setSeasonPoints(seasonRow?.points ?? 0)
+      }
 
       const [myFollow, theirFollow] = await Promise.all([
         supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', playerId).maybeSingle(),
@@ -469,7 +482,7 @@ export default function PlayerProfile() {
   const canPlayBet = existingBet?.status === 'accepted' && !hasPlayedBet
   const waitingOnBetOpponent = existingBet?.status === 'accepted' && hasPlayedBet
 
-  const playerBadge = getPlayerBadge(player.points || 0, allBadges)
+  const playerBadge = seasonPoints === null ? null : getPlayerBadge(seasonPoints, allBadges)
 
   return (
     <div className="public-player-page min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
@@ -637,8 +650,8 @@ export default function PlayerProfile() {
               <div className="public-player-stat public-player-stat--points bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
                 <div>
-                  <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Total Points</p>
-                  <p className="text-2xl font-black text-[#ccff00]">{player.points}</p>
+                  <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Season Points</p>
+                  <p className="text-2xl font-black text-[#ccff00]">{seasonPoints === null ? 'Unavailable' : seasonPoints.toLocaleString()}</p>
                 </div>
                 <LightningIcon weight="fill" className="text-[#ccff00] w-8 h-8 opacity-50" />
               </div>

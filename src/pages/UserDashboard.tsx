@@ -43,6 +43,7 @@ export default function UserDashboard() {
 
   const [loading, setLoading] = useState(true)
   const [season, setSeason] = useState<SeasonInfo>(null)
+  const [seasonPoints, setSeasonPoints] = useState<number | null>(null)
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [equippedBorder, setEquippedBorder] = useState<string | null>(null)
@@ -138,6 +139,18 @@ export default function UserDashboard() {
 
         if (freshProfile) {
           setProfile(freshProfile)
+        }
+
+        const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
+          'get_season_leaderboard',
+          { p_age_category: null }
+        )
+        if (leaderboardError) {
+          console.error('Failed to load dashboard season points:', leaderboardError)
+          setSeasonPoints(null)
+        } else {
+          const seasonRow = leaderboardRows?.find((row: { id: string; points: number }) => row.id === user.id)
+          setSeasonPoints(seasonRow?.points ?? 0)
         }
 
         const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
@@ -249,7 +262,7 @@ export default function UserDashboard() {
     return <LoadingScreen title="Loading your dashboard" subtitle="Getting your stats and next challenge ready." />
   }
 
-  const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
+  const currentBadge = seasonPoints === null ? null : getPlayerBadge(seasonPoints, allBadges)
 
   return (
     <div className="game-dashboard">
@@ -325,7 +338,7 @@ export default function UserDashboard() {
           <div className="game-topbar__crumb"><span>PLAYER HUB</span><i>/</i> OVERVIEW</div>
           <div className="game-topbar__right">
             <div className="game-wallet game-wallet--coins"><CoinsIcon weight="fill" /><strong>{profile?.coins || 0}</strong><span>COINS</span></div>
-            <div className="game-wallet game-wallet--points"><LightningIcon weight="fill" /><strong>{profile?.points || 0}</strong><span>PTS</span></div>
+            <div className="game-wallet game-wallet--points"><LightningIcon weight="fill" /><strong>{seasonPoints === null ? '—' : seasonPoints.toLocaleString()}</strong><span>SEASON PTS</span></div>
             <button className="game-avatar-button" onClick={() => navigate('/profile')} aria-label="Open profile">
               <PlayerAvatar
                 className="game-avatar--top"

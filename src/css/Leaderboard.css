@@ -727,6 +727,11 @@
   white-space: nowrap;
 }
 
+.leaderboard-podium-badge {
+  width: 22px;
+  height: 22px;
+}
+
 .leaderboard-podium-player--1 .leaderboard-podium-name {
   font-size: 13px;
 }
@@ -1387,6 +1392,11 @@
 
   .leaderboard-podium-name {
     font-size: 9px;
+  }
+
+  .leaderboard-podium-badge {
+    width: 18px;
+    height: 18px;
   }
 
   .leaderboard-podium-player--1 .leaderboard-podium-name {
