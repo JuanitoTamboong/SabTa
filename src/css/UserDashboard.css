@@ -1502,17 +1502,27 @@
   }
 
   .game-hero__art-label {
-    right: 2%;
+    right: auto;
+    left: -10%;
     bottom: 19%;
     font-size: 6px;
+    white-space: nowrap;
   }
 
   .game-hero__badge {
-    top: auto;
+    top: 13px;
     right: 13px;
-    bottom: 13px;
+    bottom: auto;
+    max-width: 42%;
     padding: 4px 6px;
     font-size: 8px;
+  }
+
+  .game-hero__badge span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .game-hero__badge img {
@@ -1700,6 +1710,10 @@
   .game-hero__art {
     right: -20px;
     width: 158px;
+  }
+
+  .game-hero__art-label {
+    left: -8%;
   }
 
   .game-hero__meta {
