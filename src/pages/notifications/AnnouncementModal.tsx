@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BellRing, Info, X } from 'lucide-react'
+import { AlertTriangle, BellRing, Download, Info, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useNotifications } from './NotificationsProvider'
 import '../../css/AnnouncementModal.css'
@@ -8,10 +8,22 @@ type Announcement = {
   id: string
   title: string
   message: string
+  apk_url: string | null
   severity: 'info' | 'warning' | 'urgent'
   is_active: boolean
   published_at: string
   ends_at: string | null
+}
+
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 function isAnnouncement(value: unknown): value is Announcement {
@@ -22,6 +34,9 @@ function isAnnouncement(value: unknown): value is Announcement {
     typeof announcement.id === 'string' &&
     typeof announcement.title === 'string' &&
     typeof announcement.message === 'string' &&
+    (announcement.apk_url === null ||
+      announcement.apk_url === '' ||
+      isHttpUrl(announcement.apk_url)) &&
     (announcement.severity === 'info' ||
       announcement.severity === 'warning' ||
       announcement.severity === 'urgent') &&
@@ -80,7 +95,7 @@ export default function AnnouncementModal() {
       const currentRevision = revision.current
       const { data, error } = await supabase
         .from('announcements')
-        .select('id, title, message, severity, is_active, published_at, ends_at')
+        .select('id, title, message, apk_url, severity, is_active, published_at, ends_at')
         .eq('is_active', true)
         .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
         .order('published_at', { ascending: false })
@@ -149,6 +164,13 @@ export default function AnnouncementModal() {
 
   const style = SEVERITY_STYLES[announcement.severity]
   const SeverityIcon = style.Icon
+  const apkDownloadUrl = announcement.apk_url
+    ? (() => {
+        const url = new URL(announcement.apk_url)
+        url.searchParams.set('download', 'SabTa.apk')
+        return url.toString()
+      })()
+    : null
   const dismiss = () => {
     localStorage.setItem(
       `sabta:dismissed-announcement:${profile.id}:${announcement.id}:${announcement.published_at}`,
@@ -158,18 +180,17 @@ export default function AnnouncementModal() {
   }
 
   return (
-    <div className="sab-popup-overlay fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-4">
+    <div className="announcement-modal__overlay sab-popup-overlay fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/80 backdrop-blur-sm">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-announcement-title"
-        className={`announcement-modal sab-popup-card relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border ${style.border} bg-[#101114] shadow-2xl`}
-        style={{ maxHeight: 'calc(100dvh - 1.5rem)' }}
+        className={`announcement-modal sab-popup-card relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border ${style.border} bg-[#101114] shadow-2xl`}
       >
         <div className={`announcement-modal__header flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5 ${style.background}`} data-severity={announcement.severity}>
-          <div className={`announcement-modal__label flex items-center gap-3 ${style.color}`}>
+          <div className={`announcement-modal__label flex min-w-0 items-center gap-3 ${style.color}`}>
             <span className="announcement-modal__icon"><SeverityIcon aria-hidden="true" /></span>
-            <span className="text-xs font-bold uppercase tracking-[0.2em]">
+            <span className="truncate text-xs font-bold uppercase tracking-[0.2em]">
               {style.label}
             </span>
           </div>
@@ -193,7 +214,23 @@ export default function AnnouncementModal() {
           <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-gray-300 sm:text-base">
             {announcement.message}
           </p>
-          <p className="mt-5 text-xs text-gray-500">
+          {apkDownloadUrl && (
+            <a
+              href={apkDownloadUrl}
+              download="SabTa.apk"
+              className="announcement-modal__download mt-5 flex min-h-14 w-full items-center gap-3 rounded-2xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-left text-white transition hover:border-[#ccff00]/60 hover:bg-[#ccff00]/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ccff00]"
+            >
+              <span className="announcement-modal__download-icon">
+                <Download aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold">Download SabTa for Android</span>
+                <span className="mt-0.5 block text-xs text-gray-400">APK installer</span>
+              </span>
+              <span className="announcement-modal__download-action">Download</span>
+            </a>
+          )}
+          <p className="announcement-modal__published mt-5 text-xs text-gray-500">
             {new Date(announcement.published_at).toLocaleString()}
           </p>
         </div>

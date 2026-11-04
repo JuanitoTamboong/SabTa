@@ -1,7 +1,18 @@
+.announcement-modal__overlay {
+  box-sizing: border-box;
+  padding:
+    calc(.75rem + env(safe-area-inset-top))
+    calc(.75rem + env(safe-area-inset-right))
+    calc(.75rem + env(safe-area-inset-bottom))
+    calc(.75rem + env(safe-area-inset-left)) !important;
+}
+
 .announcement-modal {
+  box-sizing: border-box;
+  max-height: calc(100dvh - 1.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
   border-color: rgba(207, 216, 226, .18) !important;
   background: linear-gradient(150deg, #1b2129, #12171e 62%, #171c23) !important;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .62) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .62) !important;
 }
 
 .announcement-modal.sab-popup-card::before {
@@ -28,10 +39,15 @@
   letter-spacing: .16em;
 }
 
+.announcement-modal__label > span:last-child {
+  min-width: 0;
+}
+
 .announcement-modal__icon {
   display: grid;
   width: 39px;
   height: 39px;
+  flex: 0 0 39px;
   place-items: center;
   border: 1px solid rgba(207, 216, 226, .17);
   border-radius: 12px;
@@ -61,11 +77,13 @@
 }
 
 .announcement-modal__body {
+  overscroll-behavior: contain;
   padding-top: 25px !important;
   padding-bottom: 24px !important;
 }
 
 .announcement-modal__body h2 {
+  overflow-wrap: anywhere;
   color: #f4f8fa !important;
   font-size: clamp(24px, 5vw, 32px) !important;
   letter-spacing: -.045em;
@@ -80,12 +98,50 @@
 
 .announcement-modal__body > p:last-child {
   display: inline-flex;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 6px 9px;
   border: 1px solid #4b545e;
   border-radius: 7px;
   background: #252c34;
   color: #c3cbd3 !important;
   font-size: 9px !important;
+}
+
+.announcement-modal__download {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.announcement-modal__download-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid rgba(204, 255, 0, .25);
+  border-radius: 12px;
+  background: rgba(204, 255, 0, .1);
+  color: #ccff00;
+}
+
+.announcement-modal__download-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.announcement-modal__download-action {
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: #ccff00;
+  padding: 9px 12px;
+  color: #101114;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.announcement-modal__download:focus-visible {
+  outline-offset: 3px;
 }
 
 .announcement-modal__footer {
@@ -105,11 +161,71 @@
 }
 
 @media (max-width: 520px) {
+  .announcement-modal {
+    width: 100%;
+  }
+
   .announcement-modal__header {
-    min-height: 62px;
+    min-height: 60px;
+    padding: 12px 14px !important;
+  }
+
+  .announcement-modal__label {
+    gap: 9px !important;
+    letter-spacing: .12em;
+  }
+
+  .announcement-modal__icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .announcement-modal__header > button {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .announcement-modal__body {
+    padding: 20px 17px !important;
+  }
+
+  .announcement-modal__body h2 {
+    font-size: clamp(23px, 7vw, 29px) !important;
   }
 
   .announcement-modal__body > p:first-of-type {
     font-size: 13px;
+  }
+
+  .announcement-modal__download {
+    gap: 10px;
+    padding: 11px;
+  }
+
+  .announcement-modal__download-action {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .announcement-modal__footer {
+    padding: 12px 17px !important;
+  }
+
+  .announcement-modal__footer button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .announcement-modal__download-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .announcement-modal__download-action {
+    padding: 7px 8px;
   }
 }
