@@ -24,6 +24,7 @@ export default function Profile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [popupMessage, setPopupMessage] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [seasonPoints, setSeasonPoints] = useState<number | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   // 🔧 Badge State
@@ -78,9 +79,32 @@ export default function Profile() {
       `)
       .eq('follower_id', userId)
 
+    const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
+      'get_season_leaderboard',
+      { p_age_category: null }
+    )
+    if (leaderboardError) {
+      console.error('Failed to load follower season points:', leaderboardError)
+    }
+    const seasonPointsById = new Map(
+      (leaderboardRows || []).map((row: { id: string; points: number }) => [row.id, row.points])
+    )
+
     const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
 
-    const validFollowing = (followingData || []).filter(f => normalizeProfile(f.profiles) !== null);
+    const validFollowing = (followingData || [])
+      .map(f => {
+        const followedProfile = normalizeProfile(f.profiles)
+        if (!followedProfile) return null
+        return {
+          ...f,
+          profiles: {
+            ...followedProfile,
+            points: seasonPointsById.get(followedProfile.id) ?? followedProfile.points,
+          },
+        }
+      })
+      .filter(f => f !== null)
     const followingIds = new Set(validFollowing.map(f => normalizeProfile(f.profiles).id));
 
     const enrichedFollowers = (followersData || [])
@@ -88,7 +112,14 @@ export default function Profile() {
         const profile = normalizeProfile(f.profiles);
         if (!profile) return null;
         const isMutual = followingIds.has(profile.id);
-        return { ...f, profiles: profile, isMutual };
+        return {
+          ...f,
+          profiles: {
+            ...profile,
+            points: seasonPointsById.get(profile.id) ?? profile.points,
+          },
+          isMutual,
+        };
       })
       .filter(f => f !== null && f.isMutual === false);
 
@@ -110,6 +141,18 @@ export default function Profile() {
       if (profileData) {
         setProfile(profileData)
         setEditName(profileData.display_name || '')
+      }
+
+      const { data: leaderboardRows, error: leaderboardError } = await supabase.rpc(
+        'get_season_leaderboard',
+        { p_age_category: null }
+      )
+      if (leaderboardError) {
+        console.error('Failed to load profile season points:', leaderboardError)
+        setSeasonPoints(null)
+      } else {
+        const seasonRow = leaderboardRows?.find((row: { id: string; points: number }) => row.id === user.id)
+        setSeasonPoints(seasonRow?.points ?? 0)
       }
 
       // Priority: uploaded avatar > Google avatar > none
@@ -406,7 +449,7 @@ export default function Profile() {
   const equippedBackground = inventory.find(i => i.is_equipped && i.cosmetic_items?.cosmetic_type === 'background')
 
   // 🔧 Get Current Badge
-  const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
+  const currentBadge = getPlayerBadge(seasonPoints ?? 0, allBadges)
 
   return (
     <div className="profile-page min-h-screen bg-[#050505] text-white flex relative">
@@ -518,8 +561,8 @@ export default function Profile() {
 
               <div className="profile-wallet w-full space-y-3 mt-6 relative z-10">
                 <div className="profile-wallet__item flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-white/5">
-                  <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><MedalIcon weight="fill" className="text-gray-500 w-5 h-5" /> Total Points</span>
-                  <span className="font-bold text-[#ccff00] text-lg flex items-center gap-1.5"><LightningIcon weight="fill"/> {profile?.points || 0}</span>
+                  <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><MedalIcon weight="fill" className="text-gray-500 w-5 h-5" /> Season Points</span>
+                  <span className="font-bold text-[#ccff00] text-lg flex items-center gap-1.5"><LightningIcon weight="fill"/> {seasonPoints?.toLocaleString() ?? '—'}</span>
                 </div>
                 <div className="profile-wallet__item flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-[#ff00a0]/20">
                   <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><ShoppingBagIcon weight="fill" className="text-[#ff00a0] w-5 h-5" /> Coins Balance</span>
