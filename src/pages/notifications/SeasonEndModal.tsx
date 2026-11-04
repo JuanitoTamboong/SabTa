@@ -118,7 +118,7 @@ export default function SeasonEndModal() {
               Season <span className="text-[#ffd700]">{currentSeason}</span> Has Ended!
             </h2>
             <p className="text-gray-400 text-xs sm:text-sm mt-2 max-w-xs">
-              Congratulations to our Top 3 global players — their final points and coin rewards are shown below.
+              Congratulations to our Top 3 global players. Season points include completed quizzes and daily challenge rewards.
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export default function SeasonEndModal() {
                     </p>
                   </div>
                   <p className="text-[10px] text-gray-500 font-semibold">
-                    {player.final_points.toLocaleString()} pts
+                    {player.final_points.toLocaleString()} season pts
                   </p>
                 </div>
 
