@@ -32,7 +32,6 @@ type LandingAnnouncement = {
   message: string
   apk_url: string
   published_at: string
-  ends_at: string | null
 }
 
 function isLandingAnnouncement(value: unknown): value is LandingAnnouncement {
@@ -44,8 +43,7 @@ function isLandingAnnouncement(value: unknown): value is LandingAnnouncement {
     typeof item.title === 'string' &&
     typeof item.message === 'string' &&
     isApkUrl(item.apk_url) &&
-    typeof item.published_at === 'string' &&
-    (item.ends_at === null || typeof item.ends_at === 'string')
+    typeof item.published_at === 'string'
   )
 }
 
@@ -118,14 +116,15 @@ export default function LandingPage() {
 
   useEffect(() => {
     let isMounted = true
+    let fetchRevision = 0
 
     const fetchAnnouncement = async () => {
+      const currentRevision = ++fetchRevision
       const { data, error: announcementError } = await supabase
         .from('announcements')
-        .select('id, title, message, apk_url, published_at, ends_at')
+        .select('id, title, message, apk_url, published_at')
         .eq('is_active', true)
         .ilike('apk_url', '%.apk%')
-        .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
         .order('published_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -135,7 +134,7 @@ export default function LandingPage() {
         return
       }
 
-      if (!isMounted) return
+      if (!isMounted || currentRevision !== fetchRevision) return
       if (data && isLandingAnnouncement(data)) {
         setAnnouncement(data)
       } else {
@@ -156,21 +155,20 @@ export default function LandingPage() {
         }
       })
 
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void fetchAnnouncement()
+    }
+    const refreshInterval = window.setInterval(() => void fetchAnnouncement(), 30_000)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
     void fetchAnnouncement()
 
     return () => {
       isMounted = false
+      window.clearInterval(refreshInterval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
       void supabase.removeChannel(channel)
     }
   }, [])
-
-  useEffect(() => {
-    if (!announcement?.ends_at) return
-
-    const remaining = new Date(announcement.ends_at).getTime() - Date.now()
-    const timeout = window.setTimeout(() => setAnnouncement(null), Math.max(remaining, 0))
-    return () => window.clearTimeout(timeout)
-  }, [announcement])
 
   // ✅ NEW: Reject Admin accounts on the Player app
   useEffect(() => {
