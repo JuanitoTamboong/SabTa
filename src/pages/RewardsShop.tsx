@@ -356,31 +356,38 @@ export default function RewardsShop() {
         panelClassName="w-full max-w-sm"
       >
         {purchaseItem && (
-          <div className="rewards-shop-modal rewards-shop-confirmation bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 w-full text-center relative shadow-2xl">
-            <h2 className="text-2xl font-bold mb-2">Confirm Purchase</h2>
-            <p className="text-gray-400 text-sm mb-6">Are you sure you want to buy this item?</p>
-            
-            <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-6">
-              <p className="font-bold text-white mb-1">{purchaseItem.name}</p>
-              <div className="flex items-center justify-center gap-1 text-[#ff00a0] font-bold text-xl mt-2">
-                <CoinsIcon weight="fill" /> {purchaseItem.price} COINS
+          <div className="rewards-shop-modal rewards-shop-confirmation w-full relative text-center">
+            <div className="rewards-shop-confirmation__icon" aria-hidden="true">
+              <ShoppingBagIcon weight="fill" />
+            </div>
+            <span className="rewards-shop-confirmation__eyebrow">SHOP CHECKOUT</span>
+            <h2>Confirm Purchase</h2>
+            <p className="rewards-shop-confirmation__copy">This item will be added to your collection.</p>
+
+            <div className="rewards-shop-confirmation__item">
+              <span>YOU'RE GETTING</span>
+              <strong>{purchaseItem.name}</strong>
+              <div className="rewards-shop-confirmation__price">
+                <CoinsIcon weight="fill" />
+                <strong>{purchaseItem.price.toLocaleString()}</strong>
+                <span>COINS</span>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="rewards-shop-confirmation__actions flex gap-3">
               <button 
                 onClick={() => setPurchaseItem(null)} 
                 disabled={purchasing}
-                className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition disabled:opacity-50"
+                className="rewards-shop-confirmation__cancel flex-1"
               >
                 Cancel
               </button>
               <button 
                 onClick={handlePurchase} 
                 disabled={purchasing}
-                className="flex-1 py-3 bg-[#ccff00] text-black hover:bg-white rounded-xl font-bold transition disabled:opacity-50"
+                className="rewards-shop-confirmation__confirm flex-1"
               >
-                {purchasing ? 'Buying...' : 'Confirm'}
+                {purchasing ? 'Processing...' : 'Confirm'}
               </button>
             </div>
           </div>

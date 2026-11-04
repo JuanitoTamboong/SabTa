@@ -868,37 +868,156 @@
 }
 
 .rewards-shop-confirmation {
-  padding: 27px !important;
+  padding: 28px !important;
+  border-color: #39434c !important;
+  background: #171d23 !important;
 }
 
 .rewards-shop-confirmation h2 {
-  font-size: 21px !important;
+  margin: 8px 0 0;
+  color: #f5f7f8 !important;
+  font-size: 23px !important;
+  letter-spacing: -.035em;
 }
 
-.rewards-shop-confirmation > div {
-  border-color: rgba(207, 225, 238, .1) !important;
-  background: rgba(5, 9, 13, .58) !important;
+.rewards-shop-confirmation__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin: 0 auto 13px;
+  border: 1px solid #566348;
+  border-radius: 14px;
+  background: #303a29;
+  color: #c2d99a;
+  font-size: 23px;
 }
 
-.rewards-shop-confirmation button:last-child {
-  background: var(--shop-lime) !important;
+.rewards-shop-confirmation__eyebrow {
+  color: #bdc5cc;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .16em;
 }
 
-.rewards-shop-confirmation button:last-child:hover {
-  background: #fff !important;
+.rewards-shop-confirmation__copy {
+  margin: 7px 0 20px;
+  color: #c0c8ce !important;
+  font-size: 12px !important;
+}
+
+.rewards-shop-confirmation__item {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid #3c4650 !important;
+  border-radius: 14px;
+  background: #20272f !important;
+  text-align: left;
+}
+
+.rewards-shop-confirmation__item > span {
+  color: #aeb8c1;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.rewards-shop-confirmation__item > strong {
+  overflow-wrap: anywhere;
+  color: #f4f6f7;
+  font-size: 15px;
+}
+
+.rewards-shop-confirmation__price {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  margin-top: 2px;
+  padding: 7px 10px;
+  border: 1px solid #a87b24;
+  border-radius: 9px;
+  background: #493716;
+  color: #fff0bd;
+}
+
+.rewards-shop-confirmation__price svg {
+  color: #ffd05a;
+}
+
+.rewards-shop-confirmation__price strong {
+  font-size: 14px;
+}
+
+.rewards-shop-confirmation__price span {
+  color: #f0d58f;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.rewards-shop-confirmation__actions button {
+  min-height: 44px;
+  border-radius: 10px !important;
+  font-size: 12px;
+  font-weight: 800;
+  transition: background .16s ease, border-color .16s ease;
+}
+
+.rewards-shop-confirmation__cancel {
+  border: 1px solid #4b5661 !important;
+  background: #29313a !important;
+  color: #e1e6ea !important;
+}
+
+.rewards-shop-confirmation__cancel:hover:not(:disabled) {
+  border-color: #65717d !important;
+  background: #333d47 !important;
+}
+
+.rewards-shop-confirmation__confirm {
+  border: 1px solid #9bd45b !important;
+  background: #79bd35 !important;
+  color: #10190b !important;
+}
+
+.rewards-shop-confirmation__confirm:hover:not(:disabled) {
+  border-color: #b2e477 !important;
+  background: #91d44a !important;
+}
+
+.rewards-shop-confirmation__actions button:disabled {
+  cursor: wait;
+}
+
+@media (max-width: 420px) {
+  .rewards-shop-confirmation {
+    padding: 22px !important;
+  }
+
+  .rewards-shop-confirmation__item {
+    padding: 13px;
+  }
 }
 
 .rewards-shop-buy-now {
-  border: 1px solid #8da94e;
-  background: #a9c66a !important;
-  color: #17200d !important;
+  border: 1px solid #9bd45b !important;
+  background: #79bd35 !important;
+  color: #10190b !important;
   box-shadow: none !important;
 }
 
 .rewards-shop-buy-now:hover:not(:disabled) {
-  border-color: #a7c96a;
-  background: #b8d77a !important;
-  color: #17200d !important;
+  border-color: #b2e477 !important;
+  background: #91d44a !important;
+  color: #10190b !important;
+}
+
+.rewards-shop-buy-now:focus-visible,
+.rewards-shop-confirmation__confirm:focus-visible {
+  outline: 3px solid #c0ef89;
+  outline-offset: 3px;
 }
 
 .rewards-shop-buy-now:disabled {
