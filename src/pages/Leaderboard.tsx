@@ -170,7 +170,8 @@ export default function Leaderboard() {
   }
 
   const currentUserRank = players.findIndex(p => p.id === profile?.id) + 1
-  const currentUserPoints = players[currentUserRank - 1]?.points || 0
+  const currentUser = players.find(player => player.id === profile?.id)
+  const currentUserPoints = currentUser?.points ?? 0
 
   const tabOptions = [
     { id: 'global' as const, label: 'Global', icon: <GlobeIcon weight="bold" /> },
@@ -249,7 +250,7 @@ export default function Leaderboard() {
           </button>
           <div className="leaderboard-breadcrumb"><span>PLAYER HUB</span><i>/</i> LEADERBOARD</div>
           <div className="leaderboard-topbar__right">
-            <span className="leaderboard-points"><LightningIcon weight="fill" /> <strong>{profile?.points || 0}</strong><small>PTS</small></span>
+            <span className="leaderboard-points"><LightningIcon weight="fill" /> <strong>{currentUserPoints.toLocaleString()}</strong><small>{activeTab === 'global' ? 'SEASON PTS' : `${activeTab.toUpperCase()} PTS`}</small></span>
             <button className="leaderboard-topbar__logout" onClick={handleLogout} aria-label="Log out"><SignOutIcon weight="bold" /></button>
           </div>
         </header>
@@ -324,7 +325,7 @@ export default function Leaderboard() {
                 </div>
                 {players.length > 3 ? (
                   <div className="leaderboard-table">
-                    <div className="leaderboard-table__header"><span>RANK</span><span>PLAYER</span><span>BEST TIME</span><span>{activeTab === 'global' ? 'TOTAL PTS' : `${activeTab.toUpperCase()} PTS`}</span></div>
+                    <div className="leaderboard-table__header"><span>RANK</span><span>PLAYER</span><span>BEST TIME</span><span>{activeTab === 'global' ? 'SEASON PTS' : `${activeTab.toUpperCase()} PTS`}</span></div>
                     {players.slice(3).map((player, index) => {
                       const rank = index + 4
                       const isMe = player.id === profile?.id
@@ -370,7 +371,7 @@ export default function Leaderboard() {
                     displayName={profile?.display_name}
                   />
                   <span className="leaderboard-you-bar__name">{profile?.display_name} <i>YOU</i></span>
-                  {renderPlayerBadge(profile?.points || 0)}
+                  {renderPlayerBadge(currentUserPoints)}
                   <span className="leaderboard-you-bar__points"><LightningIcon weight="fill" /> {currentUserPoints.toLocaleString()} <small>PTS</small></span>
                 </div>
               )}
