@@ -8,9 +8,10 @@ import {
   ShieldIcon, UsersIcon, TrophyIcon, PlusIcon, XIcon, 
   CameraIcon, PencilIcon, TrashIcon, CaretLeftIcon, 
   ChatCircleDotsIcon, PaperPlaneRightIcon, CaretRightIcon,
-  CheckCircleIcon, WarningCircleIcon
+  CheckCircleIcon, WarningCircleIcon, CrownIcon, SparkleIcon
 } from '@phosphor-icons/react'
 import { useNotifications } from './notifications/NotificationsProvider'
+import '../css/Clans.css'
 
 export default function Clans() {
   const navigate = useNavigate()
@@ -332,12 +333,14 @@ export default function Clans() {
     setEditAvatar(null)
   }
 
+  const myClanRank = leaderboard.findIndex((clan) => clan.clan_id === profile?.clan_id)
+
   if (loading) {
     return <LoadingScreen title="Gathering your clan" subtitle="Loading clan members and standings." />
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white relative">
+    <div className="clans-page min-h-screen bg-[#050505] text-white relative">
       
       {/* TOAST NOTIFICATION */}
       {notification && (
@@ -351,7 +354,7 @@ export default function Clans() {
 
       {/* BACKGROUND */}
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+        <div className="clans-background fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img
             src={equippedBackground}
             alt="bg"
@@ -362,36 +365,55 @@ export default function Clans() {
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto p-4 py-10 relative z-10">
-        
-        <div className="flex items-center gap-3 mb-8">
+      <main className="clans-content max-w-5xl mx-auto p-4 py-10 relative z-10">
+        <header className="clans-hero">
+          <div className="clans-hero__topline">
           <button 
             onClick={() => navigate('/dashboard')}
-            className="p-2 bg-[#0f1014]/90 backdrop-blur-md border border-white/10 hover:bg-white/10 rounded-xl transition text-gray-400 hover:text-white"
+            className="clans-back"
+            aria-label="Back to dashboard"
           >
             <CaretLeftIcon weight="bold" size={20} />
           </button>
-          <h1 className="text-3xl font-black flex items-center gap-3 drop-shadow-md">
-            <ShieldIcon weight="fill" className="text-[#ccff00]" /> Clan Hub
-          </h1>
-        </div>
+            <span>PLAYER HUB <i>/</i> CLAN ARENA</span>
+          </div>
+          <div className="clans-hero__body">
+            <div>
+              <span className="clans-eyebrow"><ShieldIcon weight="fill" /> THE TEAM FRONT</span>
+              <h1>Stronger <span>together.</span></h1>
+              <p>Find your squad, build your legacy, and climb the clan rankings as a team.</p>
+            </div>
+            <div className="clans-hero__stats">
+              <div><UsersIcon weight="fill" /><strong>{leaderboard.length}</strong><small>CLANS RANKED</small></div>
+              <span />
+              <div><TrophyIcon weight="fill" /><strong>{myClanRank >= 0 ? `#${myClanRank + 1}` : '--'}</strong><small>YOUR POSITION</small></div>
+            </div>
+          </div>
+          <div className="clans-hero__bottom">
+            <span><i /> {profile?.clan_id ? 'CLAN MEMBER' : 'FREE AGENT'}</span>
+            <span>PLAY QUIZZES. EARN POINTS. RISE TOGETHER.</span>
+          </div>
+          <span className="clans-hero__deco" aria-hidden="true"><ShieldIcon weight="duotone" /></span>
+        </header>
 
         {profile?.clan_id ? (
-          <div className="bg-[#0f1014]/90 backdrop-blur-md border border-[#ccff00]/30 p-6 rounded-3xl mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center font-bold text-xl text-[#ccff00] overflow-hidden shrink-0">
+          <section className="clans-current-panel bg-[#0f1014]/90 backdrop-blur-md border border-[#ccff00]/30 p-6 rounded-3xl mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="clans-current-panel__identity flex items-center gap-4">
+              <div className="clans-emblem w-16 h-16 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center font-bold text-xl text-[#ccff00] overflow-hidden shrink-0">
                   {myClan?.clan_avatar ? (
                     <img src={myClan.clan_avatar} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    myClan?.clan_tag
+                    <span>{myClan?.clan_tag || 'CLAN'}</span>
                   )}
                 </div>
               <div>
+                <span className="clans-current-panel__tag">[{myClan?.clan_tag || 'SQUAD'}] {myClan?.leader_id === profile.id ? '· CLAN LEADER' : '· YOUR CLAN'}</span>
                 <h2 className="text-xl font-bold text-[#ccff00]">{myClan?.clan_name || 'Your Clan'}</h2>
                 <p className="text-gray-400 text-sm">Play quizzes to increase your clan's total points.</p>
+                {myClan && <span className="clans-current-panel__points"><TrophyIcon weight="fill" /> {(myClan.total_points || 0).toLocaleString()} TOTAL POINTS</span>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="clans-current-panel__actions flex items-center gap-2">
               
               <button 
                 onClick={() => setIsChatOpen(true)} 
@@ -416,15 +438,18 @@ export default function Clans() {
                 <TrashIcon weight="bold" /> {myClan?.leader_id === profile.id ? 'Delete' : 'Leave'}
               </button>
             </div>
-          </div>
+          </section>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-[#0f1014]/90 backdrop-blur-md border border-white/10 p-6 rounded-3xl">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><PlusIcon /> Create a Clan</h2>
+          <div className="clans-onboarding grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="clans-create-card bg-[#0f1014]/90 backdrop-blur-md border border-white/10 p-6 rounded-3xl">
+              <div className="clans-card-heading">
+                <span className="clans-card-heading__icon"><PlusIcon weight="bold" /></span>
+                <div><h2>Create a Clan</h2><p>Start your own team and set the standard.</p></div>
+              </div>
               <form onSubmit={handleCreateClan} className="space-y-4">
                 
                 <div className="flex justify-center mb-4">
-                  <div onClick={() => fileInputRef.current?.click()} className="w-24 h-24 rounded-2xl bg-black/50 border-2 border-dashed border-white/20 hover:border-[#ccff00] flex flex-col items-center justify-center cursor-pointer overflow-hidden transition relative group">
+                  <button type="button" aria-label="Choose clan image" onClick={() => fileInputRef.current?.click()} className="clans-upload w-24 h-24 rounded-2xl bg-black/50 border-2 border-dashed border-white/20 hover:border-[#ccff00] flex flex-col items-center justify-center cursor-pointer overflow-hidden transition relative group">
                     {clanAvatar ? (
                       <img src={URL.createObjectURL(clanAvatar)} alt="Clan" className="w-full h-full object-cover" />
                     ) : (
@@ -433,7 +458,7 @@ export default function Clans() {
                         <span className="text-[10px] text-gray-500 font-bold">Add Photo</span>
                       </>
                     )}
-                  </div>
+                  </button>
                   <input type="file" accept="image/*" ref={fileInputRef} onChange={(e) => setClanAvatar(e.target.files?.[0] || null)} className="hidden" />
                 </div>
 
@@ -451,50 +476,55 @@ export default function Clans() {
               </form>
             </div>
             
-            <div className="bg-[#0f1014]/90 backdrop-blur-md border border-white/10 p-6 rounded-3xl flex flex-col justify-center items-center text-center">
-              <TrophyIcon weight="fill" className="w-16 h-16 text-gray-500 mb-4" />
-              <h3 className="font-bold text-white mb-1">Join an Existing Clan</h3>
-              <p className="text-xs text-gray-400">Scroll down to see the top Clans and click "Join" to join their ranks!</p>
+            <div className="clans-recruit-card bg-[#0f1014]/90 backdrop-blur-md border border-white/10 p-6 rounded-3xl flex flex-col justify-center items-center text-center">
+              <span className="clans-recruit-card__icon"><TrophyIcon weight="duotone" /></span>
+              <span className="clans-eyebrow"><SparkleIcon weight="fill" /> FIND YOUR SQUAD</span>
+              <h3>Join an existing clan</h3>
+              <p>Explore the top-ranked teams below and join their push for the summit.</p>
+              <span className="clans-recruit-card__count">{leaderboard.length} TEAMS IN THE ARENA</span>
             </div>
           </div>
         )}
 
         {/* CLAN LEADERBOARD */}
-        <div className="bg-[#0f1014]/90 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden">
-          <div className="p-5 border-b border-white/10 bg-black/40">
-            <h2 className="font-bold flex items-center gap-2"><TrophyIcon className="text-[#ffd700]" /> Top Clans</h2>
+        <section className="clans-leaderboard bg-[#0f1014]/90 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden">
+          <div className="clans-leaderboard__header p-5 border-b border-white/10 bg-black/40">
+            <div><span className="clans-eyebrow"><TrophyIcon weight="fill" /> CLAN RANKINGS</span><h2>Top clans</h2><p>Teams leading the arena by total points.</p></div>
+            <span className="clans-leaderboard__season">ALL-TIME STANDINGS</span>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="clans-leaderboard__rows divide-y divide-white/5">
             {leaderboard.map((clan, idx) => (
-              <div key={clan.clan_id} className="flex items-center justify-between p-4 hover:bg-white/5 transition">
-                <div className="flex items-center gap-4 cursor-pointer" onClick={() => handleViewClan(clan)}>
-                  <span className={`text-lg font-black w-6 text-center ${idx === 0 ? 'text-[#ffd700]' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-[#cd7f32]' : 'text-gray-600'}`}>
-                    #{idx + 1}
+              <div key={clan.clan_id} className={`clans-rank-row ${clan.clan_id === profile?.clan_id ? 'is-mine' : ''}`}>
+                <button type="button" className="clans-rank-row__details" onClick={() => handleViewClan(clan)} aria-label={`View ${clan.clan_name} members`}>
+                  <span className={`clans-rank-row__rank ${idx < 3 ? `is-top-${idx + 1}` : ''}`}>
+                    {idx === 0 && <CrownIcon weight="fill" />}
+                    <small>#{idx + 1}</small>
                   </span>
-                  <div className="w-12 h-12 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center font-bold text-sm text-[#ccff00] overflow-hidden shrink-0">
+                  <div className="clans-emblem clans-rank-row__emblem w-12 h-12 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center font-bold text-sm text-[#ccff00] overflow-hidden shrink-0">
                     {clan.clan_avatar ? <img src={clan.clan_avatar} alt="" className="w-full h-full object-cover" /> : clan.clan_tag}
                   </div>
-                  <div>
-                    <p className="font-bold text-white text-sm hover:text-[#ccff00] transition">{clan.clan_name}</p>
-                    <p className="text-[10px] text-gray-400 flex items-center gap-1"><UsersIcon size={12} /> {clan.member_count} members</p>
+                  <div className="clans-rank-row__name">
+                    <p>{clan.clan_name} {clan.clan_id === profile?.clan_id && <small>YOUR CLAN</small>}</p>
+                    <span><b>[{clan.clan_tag}]</b><i /> <UsersIcon weight="fill" /> {clan.member_count} members</span>
                   </div>
-                </div>
+                </button>
                 
-                <div className="flex items-center gap-6">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs font-bold text-[#ccff00]">{clan.total_points.toLocaleString()} pts</p>
-                    <p className="text-[10px] text-gray-500">Clan Total</p>
+                <div className="clans-rank-row__right">
+                  <div className="clans-rank-row__points">
+                    <strong>{(clan.total_points || 0).toLocaleString()}</strong>
+                    <span>POINTS</span>
                   </div>
                   {!profile?.clan_id && (
-                    <button onClick={() => handleJoinClan(clan.clan_id)} className="bg-white/10 hover:bg-[#ccff00] hover:text-black px-4 py-2 rounded-lg text-xs font-bold transition">
-                      Join
+                    <button onClick={() => handleJoinClan(clan.clan_id)} className="clans-join-button">
+                      Join <CaretRightIcon weight="bold" />
                     </button>
                   )}
                 </div>
               </div>
             ))}
+            {leaderboard.length === 0 && <div className="clans-rank-empty">No clans are listed yet. Be the first to create one.</div>}
           </div>
-        </div>
+        </section>
 
         {/* CLAN CHAT MODAL */}
         <ModalPresence
@@ -503,7 +533,7 @@ export default function Clans() {
           panelClassName="w-full max-w-lg"
         >
           {isChatOpen && myClan && (
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full h-[80vh] flex flex-col shadow-2xl relative">
+            <div className="clans-modal clans-chat-modal bg-[#0f1014] border border-white/10 rounded-3xl w-full h-[80vh] flex flex-col shadow-2xl relative">
               
               <div className="p-4 border-b border-white/10 bg-black/40 flex justify-between items-center shrink-0 rounded-t-3xl">
                 <div className="flex items-center gap-3">
@@ -607,7 +637,7 @@ export default function Clans() {
           panelClassName="w-full max-w-md"
         >
           {isEditing && (
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
+            <div className="clans-modal clans-edit-modal bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
               <div className="p-5 border-b border-white/10 flex justify-between items-center bg-black/40">
                 <h2 className="text-xl font-black text-white">Edit Clan</h2>
                 <button onClick={handleCancelEdit} className="text-gray-400 hover:text-white"><XIcon weight="bold" size={20}/></button>
@@ -651,7 +681,7 @@ export default function Clans() {
           panelClassName="w-full max-w-md"
         >
           {viewingClan && (
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
+            <div className="clans-modal bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative">
               <div className="p-5 border-b border-white/10 bg-black/40 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center font-bold text-[#ccff00] overflow-hidden shrink-0">
@@ -725,7 +755,7 @@ export default function Clans() {
           panelClassName="w-full max-w-sm"
         >
           {confirmModal.isOpen && (
-            <div className="bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative p-6 text-center">
+            <div className="clans-modal bg-[#0f1014] border border-white/10 rounded-3xl w-full overflow-hidden shadow-2xl relative p-6 text-center">
               
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
                 confirmModal.type === 'delete' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'
@@ -770,7 +800,7 @@ export default function Clans() {
           )}
         </ModalPresence>
 
-      </div>
+      </main>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   CaretRightIcon,
   MedalIcon,
 } from '@phosphor-icons/react'
+import '../../css/SeasonEndModal.css'
 
 // 🔧 FIXED: Add Interface so TypeScript knows 'border_url' exists
 interface SeasonPlayer {
@@ -86,8 +87,8 @@ export default function SeasonEndModal() {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-opacity duration-300 ${
-        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      className={`sab-popup-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 ${
+        visible ? '' : 'invisible pointer-events-none'
       }`}
     >
       {/* Backdrop */}
@@ -96,18 +97,14 @@ export default function SeasonEndModal() {
         onClick={handleClose}
       />
 
-      {/* Confetti-ish glows */}
-      <div className="absolute top-10 left-10 w-72 h-72 bg-[#ffd700]/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-[#ff00a0]/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-
       {/* Card */}
       <div
-        className={`relative w-full max-w-lg bg-[#0a0a0a]/95 border border-[#ffd700]/30 rounded-3xl overflow-hidden transition-all duration-500 ${
+        className={`season-end-modal sab-popup-card relative w-full max-w-lg bg-[#0a0a0a]/95 border border-[#ffd700]/30 rounded-3xl overflow-hidden transition-all duration-500 ${
           visible ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
         }`}
       >
         {/* Top banner */}
-        <div className="relative bg-gradient-to-br from-[#ffd700]/25 via-[#ff00a0]/15 to-transparent px-6 pt-8 pb-6 text-center border-b border-white/10">
+        <div className="season-end-modal__hero relative bg-gradient-to-br from-[#ffd700]/25 via-[#ff00a0]/15 to-transparent px-6 pt-8 pb-6 text-center border-b border-white/10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,215,0,0.25),transparent_70%)]" />
           <div className="relative z-10 flex flex-col items-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#ffd700] to-[#ff9500] flex items-center justify-center mb-3 shadow-[0_0_30px_rgba(255,215,0,0.5)]">
@@ -133,7 +130,7 @@ export default function SeasonEndModal() {
             return (
               <div
                 key={player.user_id}
-                className={`flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border ${style.border} ${style.glow}`}
+                className={`season-end-modal__rank-row season-end-modal__rank-row--${idx + 1} flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border ${style.border} ${style.glow}`}
               >
                 {/* 🔧 FIXED AVATAR & BORDER CONTAINER */}
                 <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
@@ -202,7 +199,7 @@ export default function SeasonEndModal() {
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 pt-1 space-y-2">
+        <div className="season-end-modal__footer px-5 pb-5 pt-1 space-y-2">
           <div className="flex items-center justify-center gap-2 text-[11px] text-gray-400 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
             <SparkleIcon weight="fill" className="w-3.5 h-3.5 text-[#00f0ff]" />
             

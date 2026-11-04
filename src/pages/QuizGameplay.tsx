@@ -8,6 +8,7 @@ import {
   ArrowLeftIcon, LightbulbIcon, XCircleIcon, TrophyIcon, TargetIcon, StarIcon, CaretDownIcon, CaretUpIcon,
   CoinsIcon, TimerIcon, SwordIcon
 } from '@phosphor-icons/react'
+import '../css/QuizGameplay.css'
 
 // --- SOUND EFFECTS HELPER ---
 const playSound = (type: 'correct' | 'wrong' | 'tick') => {
@@ -168,6 +169,7 @@ export default function QuizGameplay() {
   const [responses, setResponses] = useState<any[]>([])
   const [showHint, setShowHint] = useState(false)
   const [showHintModal, setShowHintModal] = useState(false)
+  const [gameNotice, setGameNotice] = useState<string | null>(null)
   
   // App State
   const [loading, setLoading] = useState(true)
@@ -352,16 +354,16 @@ export default function QuizGameplay() {
 
   const handleUseHint = (payWith: 'points' | 'coins') => {
     // ✅ Disable hints in battle mode to keep it fair
-    if (isBattleMode) return alert("Hints are disabled in Battle Mode!")
+    if (isBattleMode) return setGameNotice('Hints are disabled in Battle Mode.')
 
     if (showHint || isAnswerRevealed) return
     
     if (payWith === 'points') {
-      if ((profile?.points || 0) < 5) return alert("Not enough points!")
+      if ((profile?.points || 0) < 5) return setGameNotice('Not enough points.')
       pointsSpentRef.current += 5
       setProfile((prev: any) => ({ ...prev, points: Math.max(0, (prev?.points || 0) - 5) }))
     } else {
-      if ((profile?.coins || 0) < 50) return alert("Not enough coins!")
+      if ((profile?.coins || 0) < 50) return setGameNotice('Not enough coins.')
       coinsSpentRef.current += 50
       setProfile((prev: any) => ({ ...prev, coins: Math.max(0, (prev?.coins || 0) - 50) }))
     }
@@ -470,8 +472,8 @@ export default function QuizGameplay() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
-        <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 text-center max-w-lg w-full">
+      <div className="quiz-gameplay-page quiz-gameplay-error min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
+        <div className="quiz-gameplay-result-card bg-[#0f1014] border border-white/10 rounded-[2rem] p-8 text-center max-w-lg w-full">
           <XCircleIcon weight="fill" className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Quiz Unavailable</h1>
           <p className="text-gray-400 mb-8">{error}</p>
@@ -489,7 +491,7 @@ export default function QuizGameplay() {
     // ✅ REVIEW SCREEN
     if (showReview) {
       return (
-        <div className="min-h-screen bg-[#050505] text-white p-4 sm:p-6 flex flex-col items-center">
+        <div className="quiz-gameplay-page quiz-gameplay-review min-h-screen bg-[#050505] text-white p-4 sm:p-6 flex flex-col items-center">
           <div className="w-full max-w-3xl py-6 relative z-10">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-xl sm:text-2xl font-bold">Review Answers</h1>
@@ -551,7 +553,7 @@ export default function QuizGameplay() {
     }
 
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative overflow-y-auto">
+      <div className="quiz-gameplay-page quiz-gameplay-results min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative overflow-y-auto">
         
         {equippedTheme && (
           <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
@@ -563,7 +565,7 @@ export default function QuizGameplay() {
 
         <div className="w-full max-w-2xl py-6 md:py-10 relative z-10">
           
-          <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 md:p-10 text-center shadow-2xl mb-4 sm:mb-6">
+          <div className="quiz-gameplay-result-card bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 md:p-10 text-center shadow-2xl mb-4 sm:mb-6">
             <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#ccff00] to-green-400 rounded-full flex items-center justify-center mb-4 sm:mb-6 shadow-[0_0_40px_rgba(204,255,0,0.3)]">
               <TrophyIcon weight="fill" className="w-8 h-8 sm:w-10 sm:h-10 text-black" />
             </div>
@@ -647,7 +649,7 @@ export default function QuizGameplay() {
   const questionDisplay = splitQuestionCode(currentQuestion.question_text)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
+    <div className="quiz-gameplay-page quiz-gameplay-active min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative">
       
       {equippedTheme && (
         <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
@@ -657,7 +659,7 @@ export default function QuizGameplay() {
         </div>
       )}
 
-      <div className="w-full max-w-3xl flex justify-between items-center mb-4 relative z-10">
+      <div className="quiz-gameplay-hud w-full max-w-3xl flex justify-between items-center mb-4 relative z-10">
         <button 
           onClick={() => setShowQuitModal(true)} 
           className="flex items-center gap-1.5 sm:gap-2 text-gray-400 hover:text-red-400 transition bg-black/40 backdrop-blur-md px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border border-white/10"
@@ -678,20 +680,20 @@ export default function QuizGameplay() {
         </div>
       </div>
 
-      <div className="w-full max-w-3xl relative z-10">
-        <div className="flex justify-between items-center mb-6">
-          <div className="text-gray-400 font-mono text-xs sm:text-sm bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">Q {currentQIndex + 1} / {questions.length}</div>
-          <div className={`flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border backdrop-blur-md ${timeLeft <= 5 ? 'text-red-500 border-red-500/50 bg-red-500/20 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
+      <div className="quiz-gameplay-content w-full max-w-3xl relative z-10">
+        <div className="quiz-gameplay-progress-row flex justify-between items-center mb-6">
+          <div className="quiz-gameplay-question-count text-gray-400 font-mono text-xs sm:text-sm bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">Q {currentQIndex + 1} / {questions.length}</div>
+          <div className={`quiz-gameplay-timer flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border backdrop-blur-md ${timeLeft <= 5 ? 'is-urgent text-red-500 border-red-500/50 bg-red-500/20 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
             <ClockIcon weight="bold" className="w-5 h-5 sm:w-6 sm:h-6" /> 00:{timeLeft.toString().padStart(2, '0')}
           </div>
         </div>
 
-        <div className="w-full h-1.5 sm:h-2 bg-black/40 backdrop-blur-md rounded-full mb-8 sm:mb-12 overflow-hidden border border-white/5">
-          <div className="h-full bg-[#ccff00] transition-all duration-300 shadow-[0_0_10px_rgba(204,255,0,0.5)]" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
+        <div className="quiz-gameplay-progress-track w-full h-1.5 sm:h-2 bg-black/40 backdrop-blur-md rounded-full mb-8 sm:mb-12 overflow-hidden border border-white/5">
+          <div className="quiz-gameplay-progress-fill h-full bg-[#ccff00] transition-all duration-300 shadow-[0_0_10px_rgba(204,255,0,0.5)]" style={{ width: `${((currentQIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
         {(!questionDisplay.code || questionDisplay.prompt) && (
-          <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md${questionDisplay.code ? ' whitespace-pre-wrap' : ''}`}>
+          <h2 className={`quiz-gameplay-question-title text-xl sm:text-2xl md:text-3xl font-bold mb-6 text-center leading-snug drop-shadow-md${questionDisplay.code ? ' whitespace-pre-wrap' : ''}`}>
             {questionDisplay.code ? questionDisplay.prompt : currentQuestion.question_text}
           </h2>
         )}
@@ -715,7 +717,7 @@ export default function QuizGameplay() {
         )}
 
         {showHint && (
-          <div className="bg-[#ff00a0]/10 backdrop-blur-md border border-[#ff00a0]/20 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center text-xs sm:text-sm text-[#ff00a0] font-semibold">
+          <div className="quiz-gameplay-hint bg-[#ff00a0]/10 backdrop-blur-md border border-[#ff00a0]/20 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center text-xs sm:text-sm text-[#ff00a0] font-semibold">
             {currentQuestion.hint || "Think carefully about the question."}
           </div>
         )}
@@ -731,7 +733,7 @@ export default function QuizGameplay() {
               else btnClass = "bg-black/40 backdrop-blur-sm border-white/5 opacity-50"
             }
             return (
-              <button key={idx} onClick={() => handleSelectAnswer(option)} disabled={isAnswerRevealed} className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl text-left text-sm sm:text-lg font-semibold transition-all flex justify-between items-center ${btnClass}`}>
+              <button key={idx} onClick={() => handleSelectAnswer(option)} disabled={isAnswerRevealed} className={`quiz-gameplay-answer p-4 sm:p-6 rounded-xl sm:rounded-2xl text-left text-sm sm:text-lg font-semibold transition-all flex justify-between items-center ${btnClass}`}>
                 <span className="flex gap-2 sm:gap-4 items-center">
                   <span className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm font-mono ${isAnswerRevealed && isCorrect ? 'bg-green-500 text-black' : isAnswerRevealed && isSelected && !isCorrect ? 'bg-red-500 text-white' : 'bg-white/10 text-gray-400'}`}>
                     {String.fromCharCode(65 + idx)}
@@ -751,8 +753,8 @@ export default function QuizGameplay() {
       </div>
 
       {showHintModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
+        <div className="sab-popup-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card quiz-gameplay-dialog bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
             <LightbulbIcon weight="fill" className="w-12 h-12 sm:w-16 sm:h-16 text-yellow-400 mx-auto mb-3 sm:mb-4" />
             <h2 className="text-lg sm:text-xl font-bold mb-1 sm:mb-2">Need a Hint?</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-5 sm:mb-6">Choose how you want to pay.</p>
@@ -788,8 +790,8 @@ export default function QuizGameplay() {
       )}
 
       {showQuitModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
+        <div className="sab-popup-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card quiz-gameplay-dialog bg-[#0f1014] border border-white/10 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
             <XCircleIcon weight="fill" className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-3 sm:mb-4" />
             <h2 className="text-lg sm:text-xl font-bold mb-1 sm:mb-2">Quit Quiz?</h2>
             <p className="text-gray-400 text-xs sm:text-sm mb-6 sm:mb-8">
@@ -809,6 +811,22 @@ export default function QuizGameplay() {
                 Quit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {gameNotice && (
+        <div className="sab-popup-overlay fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="sab-popup-card w-full max-w-sm p-6 text-center">
+            <LightbulbIcon weight="fill" className="mx-auto mb-4 h-12 w-12 text-[#d3ff45]" />
+            <h2 className="mb-2 text-lg font-bold">Hint unavailable</h2>
+            <p className="mb-6 text-sm text-gray-400">{gameNotice}</p>
+            <button
+              onClick={() => setGameNotice(null)}
+              className="w-full bg-[#d3ff45] px-4 py-3 font-bold text-black hover:brightness-110"
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

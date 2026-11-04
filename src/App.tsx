@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import LoadingScreen from './components/LoadingScreen'
+import { WarningCircleIcon } from '@phosphor-icons/react'
 
 import LandingPage from './pages/LandingPage'
 import AgeSelection from './pages/AgeSelection'
@@ -40,7 +41,9 @@ function AuthCallback() {
 
         if (profile.role === 'admin') {
           await supabase.auth.signOut()
-          alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
+          window.dispatchEvent(new CustomEvent('sabta:auth-notice', {
+            detail: 'Admin accounts cannot access the Player app. Please use the Admin portal.',
+          }))
           navigate('/')
           return
         }
@@ -182,6 +185,17 @@ function App() {
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleAuthNotice = (event: Event) => {
+      const notice = (event as CustomEvent<string>).detail
+      if (notice) setAuthNotice(notice)
+    }
+
+    window.addEventListener('sabta:auth-notice', handleAuthNotice)
+    return () => window.removeEventListener('sabta:auth-notice', handleAuthNotice)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -217,7 +231,7 @@ function App() {
       if (data.role === 'admin') {
         await supabase.auth.signOut()
         setProfile(null)
-        alert("Admin accounts cannot access the Player app. Please use the Admin portal.")
+        setAuthNotice('Admin accounts cannot access the Player app. Please use the Admin portal.')
       } else {
         setProfile(data)
       }
@@ -236,6 +250,28 @@ function App() {
         
         {session && <NotificationsHost />}
       </NotificationsProvider>
+      {authNotice && (
+        <div className="sab-popup-overlay fixed inset-0 z-[1000] flex items-center justify-center p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="auth-notice-title"
+            className="sab-popup-card w-full max-w-sm p-6 text-center"
+          >
+            <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-200">
+              <WarningCircleIcon weight="fill" className="h-7 w-7" />
+            </span>
+            <h2 id="auth-notice-title" className="mb-2 text-lg font-bold">Account not available here</h2>
+            <p className="mb-6 text-sm text-gray-400">{authNotice}</p>
+            <button
+              onClick={() => setAuthNotice(null)}
+              className="w-full bg-[#d3ff45] px-4 py-3 font-bold text-black hover:brightness-110"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </BrowserRouter>
   )
 }

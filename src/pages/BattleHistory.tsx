@@ -7,6 +7,7 @@ import {
   SwordIcon, ArrowLeftIcon, TrophyIcon, ClockIcon, TrashIcon,
   XCircleIcon, WarningIcon, MinusIcon, CoinsIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
+import '../css/BattleHistory.css'
 
 type BattleTab = 'friendly' | 'bet'
 
@@ -330,11 +331,11 @@ export default function BattleHistory() {
     return (
       <div
         key={battle.id}
-        className={`relative bg-black/40 backdrop-blur-xl border ${borderClass} rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all w-full max-w-full overflow-hidden`}
+        className={`battle-history-card ${isBet ? 'battle-history-card--bet' : ''} relative bg-black/40 backdrop-blur-xl border ${borderClass} rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all w-full max-w-full overflow-hidden`}
       >
         {/* Left Side */}
-        <div className="flex-1 w-full min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
+        <div className="battle-history-card__main flex-1 w-full min-w-0">
+          <div className="battle-history-card__heading flex items-center gap-2 mb-1 flex-wrap">
             <p className="font-bold text-sm sm:text-base text-white truncate max-w-full">
               {battle.quizzes?.title || 'Quiz Battle'}
             </p>
@@ -349,8 +350,8 @@ export default function BattleHistory() {
             {new Date(battle.created_at).toLocaleDateString()}
           </p>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-400">
-            <div className="flex items-center gap-1.5 shrink-0">
+          <div className="battle-history-card__players flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-400">
+            <div className="battle-history-player flex items-center gap-1.5 shrink-0">
               {battle.challenger?.avatar_url ? (
                 <img src={battle.challenger.avatar_url} className="w-5 h-5 rounded-full object-cover" />
               ) : (
@@ -365,7 +366,7 @@ export default function BattleHistory() {
 
             <span className={`font-bold shrink-0 ${isBet ? 'text-yellow-400' : 'text-[#ff00a0]'}`}>VS</span>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="battle-history-player flex items-center gap-1.5 shrink-0">
               {battle.opponent?.avatar_url ? (
                 <img src={battle.opponent.avatar_url} className="w-5 h-5 rounded-full object-cover" />
               ) : (
@@ -381,11 +382,11 @@ export default function BattleHistory() {
         </div>
 
         {/* Right Side */}
-        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0 shrink-0">
+        <div className="battle-history-card__actions flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0 shrink-0">
           
           {/* ✅ SCORE / POT (Fixed to show score once played) */}
           {!(isBet && isBetTerminal) && (
-            <div className="text-center shrink-0 mr-auto sm:mr-0">
+            <div className="battle-history-score text-center shrink-0 mr-auto sm:mr-0">
               <p className="text-[10px] text-gray-500 uppercase font-bold">
                 {isBet && !(iHavePlayed || theyHavePlayed) ? 'Pot' : 'Score · Challenger / Opponent'}
               </p>
@@ -512,12 +513,18 @@ export default function BattleHistory() {
 
   const displayedBattles = activeTab === 'friendly' ? friendlyBattles : betBattles
   const modalCopy = getModalCopy()
+  const completedCount = displayedBattles.filter((battle) => {
+    const bothPlayed = battle.challenger_score != null && battle.opponent_score != null
+    return activeTab === 'bet' ? battle.status === 'completed' : battle.status === 'completed' || bothPlayed
+  }).length
+  const inProgressCount = displayedBattles.length - completedCount
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex relative">
+    <div className="battle-history-page min-h-screen bg-[#050505] text-white flex relative">
+      <div className="battle-history-ambient" aria-hidden="true" />
 
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+        <div className="battle-history-background fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
           <img
             src={equippedBackground}
             alt="bg"
@@ -528,28 +535,43 @@ export default function BattleHistory() {
         </div>
       )}
 
-      <div className="w-full max-w-3xl mx-auto pt-4 p-4 sm:p-8 lg:p-12 relative z-10">
+      <main className="battle-history-shell w-full max-w-3xl mx-auto pt-4 p-4 sm:p-8 lg:p-12 relative z-10">
 
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/10 p-3 rounded-xl transition shrink-0"
-          >
-            <ArrowLeftIcon weight="bold" className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2 drop-shadow-md">
-              <SwordIcon weight="fill" className="text-[#ff00a0]" /> Battle History
-            </h1>
-            <p className="text-gray-400 text-sm mt-1 drop-shadow-md">View your past 1v1 challenges.</p>
+        <header className="battle-history-hero">
+          <div className="battle-history-hero__topline">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="battle-history-back"
+              aria-label="Back to dashboard"
+            >
+              <ArrowLeftIcon weight="bold" />
+            </button>
+            <span>PLAYER HUB <i>/</i> MATCH ARCHIVE</span>
           </div>
-        </div>
+          <div className="battle-history-hero__content">
+            <div>
+              <span className="battle-history-eyebrow"><SwordIcon weight="fill" /> THE ARENA LOG</span>
+              <h1>Battle <span>history.</span></h1>
+              <p>Every matchup has a story. Review your duels, wagers, and unfinished challenges.</p>
+            </div>
+            <div className="battle-history-record">
+              <span className="battle-history-record__icon"><TrophyIcon weight="fill" /></span>
+              <small>{activeTab === 'friendly' ? 'FRIENDLY MATCHES' : 'WAGER MATCHES'}</small>
+              <strong>{displayedBattles.length.toString().padStart(2, '0')}</strong>
+              <span>ON RECORD</span>
+            </div>
+          </div>
+          <div className="battle-history-stats">
+            <span><i className="battle-history-dot battle-history-dot--lime" /> {completedCount} COMPLETED</span>
+            <span><i className="battle-history-dot battle-history-dot--cyan" /> {inProgressCount} NEED ATTENTION</span>
+          </div>
+        </header>
 
-        {/* ✅ TABS */}
-        <div className="grid grid-cols-2 gap-2 mb-6 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5">
+        <div className="battle-history-tabs grid grid-cols-2 gap-2 mb-6 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5" role="tablist" aria-label="Battle type">
           <button
             onClick={() => setActiveTab('friendly')}
+            role="tab"
+            aria-selected={activeTab === 'friendly'}
             className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition ${
               activeTab === 'friendly'
                 ? 'bg-[#ff00a0] text-white shadow-[0_0_15px_rgba(255,0,160,0.3)]'
@@ -566,6 +588,8 @@ export default function BattleHistory() {
           </button>
           <button
             onClick={() => setActiveTab('bet')}
+            role="tab"
+            aria-selected={activeTab === 'bet'}
             className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition ${
               activeTab === 'bet'
                 ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.3)]'
@@ -583,9 +607,9 @@ export default function BattleHistory() {
         </div>
 
         {/* Battle List */}
-        <div className="space-y-4">
+        <section className="battle-history-list space-y-4" aria-label={activeTab === 'friendly' ? 'Friendly battles' : 'Bet battles'}>
           {displayedBattles.length === 0 ? (
-            <div className="text-center py-16 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl">
+            <div className="battle-history-empty text-center py-16 bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl">
               {activeTab === 'friendly' ? (
                 <>
                   <SwordIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -603,13 +627,13 @@ export default function BattleHistory() {
           ) : (
             displayedBattles.map(battle => renderBattleCard(battle, activeTab === 'bet'))
           )}
-        </div>
-      </div>
+        </section>
+      </main>
 
       {/* ✅ CUSTOM CONFIRMATION MODAL */}
       {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`bg-[#0f1014] border rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide ${
+        <div className="sab-popup-overlay battle-history-modal-backdrop fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`sab-popup-card battle-history-modal bg-[#0f1014] border rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide ${
             modalCopy.color === 'yellow' ? 'border-yellow-500/30 shadow-[0_0_50px_rgba(234,179,8,0.15)]'
             : modalCopy.color === 'red' ? 'border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.15)]'
             : 'border-white/10 shadow-[0_0_50px_rgba(255,0,160,0.1)]'
@@ -665,8 +689,8 @@ export default function BattleHistory() {
 
       {/* ✅ INLINE ALERT MODAL */}
       {alertData && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide shadow-2xl animate-in zoom-in-95">
+        <div className="sab-popup-overlay battle-history-modal-backdrop fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card battle-history-modal bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative max-h-[90vh] overflow-y-auto scrollbar-hide shadow-2xl animate-in zoom-in-95">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
               alertData.type === 'success' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-500'
             }`}>

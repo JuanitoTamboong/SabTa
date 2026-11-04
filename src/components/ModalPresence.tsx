@@ -61,9 +61,14 @@ export default function ModalPresence({
   return (
     <div
       aria-hidden={!visible}
-      className={`sab-presence-backdrop ${visible ? 'is-visible' : ''} ${className}`}
+      role="presentation"
+      className={`sab-presence-backdrop sab-popup-backdrop ${visible ? 'is-visible' : ''} ${className}`}
     >
-      <div className={`sab-presence-modal ${visible ? 'is-visible' : ''} ${panelClassName}`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={`sab-presence-modal sab-popup-surface ${visible ? 'is-visible' : ''} ${panelClassName}`}
+      >
         {content}
       </div>
     </div>

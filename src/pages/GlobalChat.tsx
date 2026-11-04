@@ -356,7 +356,7 @@ export default function GlobalChat() {
                         
                         {/* The Reaction Menu Popup */}
                         {showReactionMenu === msg.id && (
-                          <div className={`absolute -top-12 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95 ${isMe ? 'right-0' : 'left-0'}`}>
+                          <div className={`sab-popup-reaction absolute -top-12 bg-[#1a1c23] border border-white/10 rounded-full px-2 py-1 flex gap-1 shadow-xl z-50 animate-in zoom-in-95 ${isMe ? 'right-0' : 'left-0'}`}>
                             {['👍', '😂', '❤️', '😢', '😮', '😡'].map(emoji => (
                               <button 
                                 key={emoji} 

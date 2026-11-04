@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import LoadingScreen from '../components/LoadingScreen'
+import PlayerAvatar from '../components/PlayerAvatar'
 import { 
   UserPlusIcon, UserCheckIcon, ArrowLeftIcon, 
   TrophyIcon, LightningIcon, MedalIcon, TargetIcon, XIcon, ClockIcon, 
   PaletteIcon, ImageIcon, StarIcon, FireIcon, CoinsIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
+import '../css/PlayerProfile.css'
 
 export default function PlayerProfile() {
   const { playerId } = useParams()
@@ -470,39 +472,41 @@ export default function PlayerProfile() {
   const playerBadge = getPlayerBadge(player.points || 0, allBadges)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
+    <div className="public-player-page min-h-screen bg-[#050505] text-white flex flex-col items-center p-3 sm:p-6 relative">
       
       {equippedBg?.cosmetic_items?.preview_url && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img src={equippedBg.cosmetic_items.preview_url} className="w-full h-full object-cover opacity-60 md:opacity-40 scale-105" />
-          <div className="absolute inset-0 bg-[#050505]/30 md:bg-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/80 via-[#050505]/40 to-[#050505]" />
+        <div className="public-player-background fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+          <img src={equippedBg.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover scale-105" />
+          <div className="public-player-background__overlay" />
         </div>
       )}
 
-      <div className="w-full max-w-3xl relative z-10 pt-2">
-        <button onClick={() => navigate(-1)} className="mb-4 flex items-center gap-2 text-gray-400 hover:text-white bg-black/40 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 transition text-sm">
-          <ArrowLeftIcon weight="bold" className="w-4 h-4" /> Back
+      <div className="public-player-shell w-full max-w-3xl relative z-10 pt-2">
+        <button onClick={() => navigate(-1)} className="public-player-back mb-4 flex items-center gap-2 text-gray-400 hover:text-white bg-black/40 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 transition text-sm">
+          <ArrowLeftIcon weight="bold" className="w-4 h-4" /> <span>Back</span>
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-          
-          <div className="md:col-span-7 bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
-            
-            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#00f0ff]/10 to-transparent pointer-events-none" />
+        <header className="public-player-heading">
+          <div>
+            <span className="public-player-eyebrow"><span /> PLAYER CARD</span>
+            <h1>Meet the <span>challenger.</span></h1>
+          </div>
+          <span className="public-player-tier">{player.age_category?.toUpperCase() || 'PLAYER'} TIER</span>
+        </header>
 
-            <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 flex items-center justify-center">
-              <div className="absolute inset-[12%] rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-3xl font-bold uppercase shadow-inner">
-                {player.avatar_url ? (
-                  <img src={player.avatar_url} className="w-full h-full object-cover" />
-                ) : (
-                  player.display_name?.charAt(0)
-                )}
-              </div>
-              {equippedBorder?.cosmetic_items?.preview_url && (
-                <img src={equippedBorder.cosmetic_items.preview_url} className="absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-md" />
-              )}
-            </div>
+        <div className="public-player-layout grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
+          
+          <div className="public-player-card md:col-span-7 bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden">
+            
+            <div className="public-player-card__glow absolute top-0 left-0 w-full h-24 pointer-events-none" />
+            <span className="public-player-card__label">SABTA ARENA · PLAYER</span>
+
+            <PlayerAvatar
+              className="public-player-avatar w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4"
+              avatarUrl={player.avatar_url}
+              borderUrl={equippedBorder?.cosmetic_items?.preview_url}
+              displayName={player.display_name}
+            />
 
             <div className="relative w-full flex justify-center mt-2 mb-4 z-30">
               {playerBadge && (
@@ -515,12 +519,12 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-white mb-1 tracking-tight">{player.display_name}</h1>
-            <span className="inline-block text-[#ccff00] font-mono text-[10px] sm:text-xs bg-[#ccff00]/10 px-3 py-1 rounded-full border border-[#ccff00]/20 mb-3">
+            <h2 className="public-player-name text-2xl sm:text-3xl font-black text-white mb-1 tracking-tight">{player.display_name}</h2>
+            <span className="public-player-rank inline-block text-[#ccff00] font-mono text-[10px] sm:text-xs bg-[#ccff00]/10 px-3 py-1 rounded-full border border-[#ccff00]/20 mb-3">
               {player.age_category?.toUpperCase()} TIER
             </span>
 
-            <div className="mb-6 min-h-[20px]">
+            <div className="public-player-social-status mb-6 min-h-[20px]">
               {isMutual && (
                 <p className="text-xs text-[#ccff00] font-bold flex items-center justify-center gap-1.5">
                   <UserCheckIcon weight="fill" className="w-4 h-4" /> You are connected
@@ -533,7 +537,7 @@ export default function PlayerProfile() {
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <div className="public-player-actions flex flex-col sm:flex-row gap-2 justify-center">
               <button 
                 onClick={handleFollow}
                 disabled={followLoading}
@@ -627,10 +631,10 @@ export default function PlayerProfile() {
             )}
           </div>
 
-          <div className="md:col-span-5 space-y-4 sm:space-y-6">
+          <div className="public-player-details md:col-span-5 space-y-4 sm:space-y-6">
             
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+            <div className="public-player-stats grid grid-cols-1 gap-3">
+              <div className="public-player-stat public-player-stat--points bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-[#ccff00]/10 rounded-bl-full" />
                 <div>
                   <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Total Points</p>
@@ -639,13 +643,13 @@ export default function PlayerProfile() {
                 <LightningIcon weight="fill" className="text-[#ccff00] w-8 h-8 opacity-50" />
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
+              <div className="public-player-stat-row grid grid-cols-2 gap-3">
+                <div className="public-player-stat public-player-stat--streak bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <FireIcon weight="fill" className="text-[#ff00a0] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{player.current_streak}</p>
                   <p className="text-[9px] text-gray-400 uppercase font-bold">Streak</p>
                 </div>
-                <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
+                <div className="public-player-stat public-player-stat--level bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center">
                   <MedalIcon weight="fill" className="text-[#00f0ff] w-5 h-5 mb-1" />
                   <p className="text-xl font-bold">{Math.floor(player.points / 100) + 1}</p>
                   <p className="text-[9px] text-gray-400 uppercase font-bold">Level</p>
@@ -653,21 +657,22 @@ export default function PlayerProfile() {
               </div>
             </div>
 
-            <div className="bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-              <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
-                <StarIcon weight="fill" className="text-[#ccff00]" /> Equipped Cosmetics
-              </h3>
+            <div className="public-player-cosmetics bg-black/20 md:bg-black/40 backdrop-blur-md md:backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+              <div className="public-player-section-heading">
+                <div><span className="public-player-eyebrow">PERSONAL LOADOUT</span><h3>Equipped cosmetics</h3></div>
+                <StarIcon weight="fill" />
+              </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+              <div className="public-player-cosmetics-list space-y-2">
+                <div className="public-player-cosmetic flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
+                  <div className="public-player-cosmetic__preview w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedTheme?.cosmetic_items?.preview_url ? (
                       <img src={equippedTheme.cosmetic_items.preview_url} className="w-full h-full object-cover rounded-lg" />
                     ) : (
                       <PaletteIcon weight="fill" className="w-4 h-4 text-gray-500" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="public-player-cosmetic__copy min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Quiz Theme</p>
                       <span className={getOwnedBadgeStyle(totalThemes, 'theme')}>
@@ -678,15 +683,15 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <div className="public-player-cosmetic flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
+                  <div className="public-player-cosmetic__preview w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBg?.cosmetic_items?.preview_url ? (
                       <img src={equippedBg.cosmetic_items.preview_url} className="w-full h-full object-cover rounded-lg" />
                     ) : (
                       <ImageIcon weight="fill" className="w-4 h-4 text-gray-500" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="public-player-cosmetic__copy min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Background</p>
                       <span className={getOwnedBadgeStyle(totalBgs, 'bg')}>
@@ -697,15 +702,20 @@ export default function PlayerProfile() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <div className="public-player-cosmetic flex items-center gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5">
+                  <div className="public-player-cosmetic__preview public-player-cosmetic__preview--frame w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                     {equippedBorder?.cosmetic_items?.preview_url ? (
-                      <img src={equippedBorder.cosmetic_items.preview_url} className="w-full h-full object-contain p-0.5" />
+                      <PlayerAvatar
+                        className="public-player-cosmetic__avatar w-full h-full"
+                        avatarUrl={player.avatar_url}
+                        borderUrl={equippedBorder.cosmetic_items.preview_url}
+                        displayName={player.display_name}
+                      />
                     ) : (
                       <TrophyIcon weight="fill" className="w-4 h-4 text-gray-500" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="public-player-cosmetic__copy min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] text-gray-500 uppercase font-bold">Avatar Border</p>
                       <span className={getOwnedBadgeStyle(totalBorders, 'border')}>
@@ -714,6 +724,10 @@ export default function PlayerProfile() {
                     </div>
                     <p className="text-[11px] font-bold truncate">{equippedBorder?.cosmetic_items?.name || 'Default Border'}</p>
                   </div>
+                </div>
+                <div className="public-player-note">
+                  <span><TargetIcon weight="fill" /></span>
+                  <p>Think you can beat <strong>{player.display_name}</strong>? Send a challenge and settle it in the arena.</p>
                 </div>
               </div>
             </div>
@@ -725,8 +739,8 @@ export default function PlayerProfile() {
       {/* STEP 1: CHALLENGE TYPE SELECTOR                */}
       {/* ══════════════════════════════════════════════ */}
       {showChallengeTypeModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
+        <div className="sab-popup-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-white/10 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
 
             <button
               onClick={() => setShowChallengeTypeModal(false)}
@@ -781,8 +795,8 @@ export default function PlayerProfile() {
       {/* STEP 2A: FRIENDLY QUIZ PICKER                 */}
       {/* ══════════════════════════════════════════════ */}
       {showChallengeModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
+        <div className="sab-popup-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
             
             <button 
               onClick={() => setShowChallengeModal(false)} 
@@ -842,8 +856,8 @@ export default function PlayerProfile() {
       {/* STEP 2B: BET WAGER + QUIZ PICKER               */}
       {/* ══════════════════════════════════════════════ */}
       {showBetModal && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
+        <div className="sab-popup-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-5 sm:p-6 max-w-sm w-full relative shadow-2xl">
             
             <button 
               onClick={() => setShowBetModal(false)} 
@@ -953,8 +967,8 @@ export default function PlayerProfile() {
       {/* CUSTOM ALERT MODAL                             */}
       {/* ══════════════════════════════════════════════ */}
       {alertData && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
               alertData.type === 'success' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-500'
             }`}>

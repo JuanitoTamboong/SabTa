@@ -7,9 +7,11 @@ import ModalPresence from '../components/ModalPresence'
 import {
   CoinsIcon, SignOutIcon, HouseIcon, GameControllerIcon, TrophyIcon,
   ShoppingBagIcon, UserIcon, CheckCircleIcon, StarIcon, PaletteIcon,
-  ImageIcon, XCircleIcon, XIcon, EyeIcon, ShieldIcon // 👈 ADDED ShieldIcon
+  ImageIcon, XCircleIcon, XIcon, EyeIcon, ShieldIcon, CaretRightIcon,
+  SparkleIcon, MagnifyingGlassIcon
 } from '@phosphor-icons/react'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
+import '../css/RewardsShop.css'
 
 export default function RewardsShop() {
   const navigate = useNavigate()
@@ -133,199 +135,165 @@ export default function RewardsShop() {
     return <LoadingScreen title="Opening the rewards shop" subtitle="Checking your coins and loading the latest items." />
   }
 
+  const shopTabs = [
+    { id: 'all', label: 'All items', icon: ShoppingBagIcon },
+    { id: 'background', label: 'Backgrounds', icon: ImageIcon },
+    { id: 'quiz_theme', label: 'Quiz themes', icon: PaletteIcon },
+    { id: 'avatar_border', label: 'Avatar borders', icon: StarIcon },
+  ]
+  const ownedCount = items.filter((item) => inventory.includes(item.id)).length
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex relative">
-      
+    <div className="rewards-shop-page">
+      <div className="rewards-shop-ambient" aria-hidden="true" />
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img 
-            src={equippedBackground} 
-            alt="bg" 
-            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" 
-          />
-          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+        <div className="rewards-shop-background" aria-hidden="true">
+          <img src={equippedBackground} alt="" />
         </div>
       )}
 
-      {/* DESKTOP SIDEBAR */}
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
-        <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
-          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
-             <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
-          </div>
-          <span className="text-2xl font-bold tracking-tighter">SAB<span className="text-[#ccff00]">TA</span></span>
-        </div>
-        <nav className="flex flex-col w-full gap-2">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <HouseIcon weight="fill" className="w-6 h-6" /> Home
-          </button>
-          <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
-          </button>
-          <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
-          </button>
-          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
-          <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
-          </button>
-          <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition">
-            <ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop
-          </button>
-          <button onClick={() => navigate('/profile')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <UserIcon weight="fill" className="w-6 h-6" /> My Profile
-          </button>
+      <aside className="rewards-shop-sidebar">
+        <button className="rewards-shop-brand" onClick={() => navigate('/dashboard')} aria-label="SabTa home">
+          <span className="rewards-shop-brand__mark"><img src={sabtaLogo} alt="" /></span>
+          <span className="rewards-shop-brand__word">SAB<span>TA</span><small>PLAYER ARENA</small></span>
+        </button>
+        <span className="rewards-shop-sidebar__label">MENU</span>
+        <nav className="rewards-shop-nav" aria-label="Main navigation">
+          <button onClick={() => navigate('/dashboard')}><HouseIcon weight="fill" /><span>Overview</span></button>
+          <button onClick={() => navigate('/quizzes')}><GameControllerIcon weight="fill" /><span>Play quiz</span></button>
+          <button onClick={() => navigate('/leaderboard')}><TrophyIcon weight="fill" /><span>Leaderboard</span></button>
+          <button onClick={() => navigate('/clans')}><ShieldIcon weight="fill" /><span>Clans</span></button>
+          <button className="is-active" aria-current="page"><ShoppingBagIcon weight="fill" /><span>Rewards shop</span></button>
+          <button onClick={() => navigate('/profile')}><UserIcon weight="fill" /><span>My profile</span></button>
         </nav>
-        <div className="mt-auto w-full">
-          <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition">
-            <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
-          </button>
-        </div>
+        <button className="rewards-shop-sidebar__logout" onClick={handleLogout}><SignOutIcon weight="fill" /> Logout</button>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
-        
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1">Rewards Shop</h1>
-            <p className="text-gray-400 text-xs md:text-sm">Spend your coins on exclusive cosmetics.</p>
-          </div>
-          
-          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <div className="bg-black/50 backdrop-blur-md border border-[#ff00a0]/30 px-4 py-2 rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(255,0,160,0.1)]">
-              <CoinsIcon weight="fill" className="text-[#ff00a0] w-5 h-5" />
-              <span className="font-bold text-[#ff00a0] text-lg">{profile?.coins || 0} COINS</span>
-            </div>
-            <button onClick={handleLogout} className="md:hidden bg-red-500/10 text-red-400 p-2.5 rounded-xl border border-red-500/20">
-              <SignOutIcon weight="bold" className="w-5 h-5" />
-            </button>
+      <main className="rewards-shop-main">
+        <header className="rewards-shop-topbar">
+          <button className="rewards-shop-brand rewards-shop-brand--mobile" onClick={() => navigate('/dashboard')} aria-label="SabTa home">
+            <span className="rewards-shop-brand__mark"><img src={sabtaLogo} alt="" /></span>
+            <span className="rewards-shop-brand__word">SAB<span>TA</span></span>
+          </button>
+          <div className="rewards-shop-breadcrumb"><span>PLAYER HUB</span><i>/</i> REWARDS SHOP</div>
+          <div className="rewards-shop-topbar__right">
+            <span className="rewards-shop-wallet"><CoinsIcon weight="fill" /><strong>{(profile?.coins || 0).toLocaleString()}</strong><small>COINS</small></span>
+            <button className="rewards-shop-topbar__logout" onClick={handleLogout} aria-label="Log out"><SignOutIcon weight="bold" /></button>
           </div>
         </header>
 
-        {/* Tabs */}
-        <div className="flex overflow-x-auto gap-2 mb-8 pb-2 relative z-10 scrollbar-hide">
-          {[
-            { id: 'all', label: 'All Items', icon: ShoppingBagIcon },
-            { id: 'background', label: 'Backgrounds', icon: ImageIcon },
-            { id: 'quiz_theme', label: 'Quiz Themes', icon: PaletteIcon },
-            { id: 'avatar_border', label: 'Borders', icon: StarIcon },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl whitespace-nowrap font-semibold text-sm transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-[#ccff00] text-black shadow-[0_0_15px_rgba(204,255,0,0.2)]' 
-                  : 'bg-black/40 backdrop-blur-md text-gray-400 border border-white/5 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              <tab.icon weight={activeTab === tab.id ? "fill" : "regular"} className="w-5 h-5" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ITEMS GRID */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6 relative z-10 w-full">
-          {filteredItems.length === 0 ? (
-            <div className="col-span-full text-center py-20 bg-black/40 backdrop-blur-md rounded-3xl border border-white/10">
-              <ShoppingBagIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400 font-bold mb-1">No items available</p>
-              <p className="text-gray-500 text-sm">Check back later for new cosmetics!</p>
+        <div className="rewards-shop-content">
+          <section className="rewards-shop-hero">
+            <div className="rewards-shop-hero__copy">
+              <span className="rewards-shop-eyebrow"><SparkleIcon weight="fill" /> THE REWARDS VAULT</span>
+              <h1>Make the arena<br /><span>your own.</span></h1>
+              <p>Find your next look. Unlock a new backdrop. Build a loadout that feels like you.</p>
+              <div className="rewards-shop-hero__meta"><span><span /> {items.length} ITEMS TO DISCOVER</span><i /> <span>{ownedCount} IN YOUR COLLECTION</span></div>
             </div>
-          ) : (
-            filteredItems.map(item => {
-              const isOwned = inventory.includes(item.id)
-              const canAfford = (profile?.coins || 0) >= item.price
+            <div className="rewards-shop-hero__wallet">
+              <span className="rewards-shop-hero__coin"><CoinsIcon weight="fill" /></span>
+              <small>YOUR COIN BALANCE</small>
+              <strong>{(profile?.coins || 0).toLocaleString()}</strong>
+              <span className="rewards-shop-hero__wallet-label">READY TO SPEND</span>
+            </div>
+            <span className="rewards-shop-hero__orb rewards-shop-hero__orb--one" aria-hidden="true" />
+            <span className="rewards-shop-hero__orb rewards-shop-hero__orb--two" aria-hidden="true" />
+          </section>
 
-              return (
-                <div key={item.id} className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl overflow-hidden group hover:border-white/20 transition-all flex flex-col min-w-0 w-full shadow-lg">
-                  
-                  <div 
-                    className="h-28 md:h-48 bg-black/30 relative flex items-center justify-center overflow-hidden border-b border-white/5 p-1 md:p-4 cursor-pointer"
-                    onClick={() => setSelectedItem(item)}
-                  >
-                    {item.preview_url ? (
-                      <img src={item.preview_url} alt={item.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
-                    ) : (
-                      <div className="text-gray-600 flex flex-col items-center">
-                        <ImageIcon weight="duotone" className="w-6 h-6 mb-1" />
-                        <span className="text-[10px]">No Preview</span>
-                      </div>
-                    )}
-                    
-                    <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 bg-black/60 backdrop-blur-md px-1.5 md:px-3 py-0.5 md:py-1 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider border border-white/10 pointer-events-none">
-                      <span className={`${
-                        item.rarity === 'legendary' ? 'text-[#ff00a0]' :
-                        item.rarity === 'epic' ? 'text-[#ccff00]' :
-                        item.rarity === 'rare' ? 'text-[#00f0ff]' :
-                        'text-gray-300'
-                      }`}>{item.rarity || 'Common'}</span>
-                    </div>
-                  </div>
+          <section className="rewards-shop-controls" aria-label="Shop categories">
+            <div className="rewards-shop-controls__heading"><span>THE COLLECTION</span><small>Browse by category</small></div>
+            <div className="rewards-shop-tabs" role="tablist" aria-label="Cosmetic category">
+              {shopTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  className={activeTab === tab.id ? 'is-active' : ''}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <tab.icon weight={activeTab === tab.id ? 'fill' : 'regular'} />
+                  <span>{tab.label}</span>
+                  <small>{tab.id === 'all' ? items.length : items.filter((item) => item.cosmetic_type === tab.id).length}</small>
+                </button>
+              ))}
+            </div>
+            <span className="rewards-shop-sort"><MagnifyingGlassIcon /> {filteredItems.length} RESULTS</span>
+          </section>
 
-                  <div className="p-2 md:p-5 flex-1 flex flex-col min-w-0">
-                    
-                    <div className="mb-2 md:mb-4 cursor-pointer flex flex-col justify-between items-start gap-1" onClick={() => setSelectedItem(item)}>
-                      <div className="flex-1 min-w-0 w-full">
-                        <h3 className="text-[11px] md:text-lg font-bold text-white mb-0.5 hover:text-[#ccff00] transition truncate leading-tight w-full">{item.name}</h3>
-                        <p className="hidden md:block text-xs text-gray-400 line-clamp-2">{item.description}</p>
-                      </div>
-                      {!isOwned && (
-                        <div className="flex items-center gap-1 font-bold text-[#ff00a0] text-[10px] md:text-base shrink-0 mt-1">
-                          <CoinsIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> 
-                          <span>{item.price}</span>
-                        </div>
-                      )}
-                    </div>
+          <div className="rewards-shop-grid">
+            {filteredItems.length === 0 ? (
+              <div className="rewards-shop-empty">
+                <span><ShoppingBagIcon weight="duotone" /></span>
+                <strong>Nothing in this collection yet</strong>
+                <p>Check back soon for fresh cosmetics.</p>
+              </div>
+            ) : (
+              filteredItems.map((item, index) => {
+                const isOwned = inventory.includes(item.id)
+                const canAfford = (profile?.coins || 0) >= item.price
+                const rarity = item.rarity?.toLowerCase() || 'common'
 
-                    <div className="mt-auto pt-2 md:pt-4 border-t border-white/5 w-full">
-                      {isOwned ? (
-                        <div className="flex items-center justify-center gap-1 text-green-400 font-bold text-[9px] md:text-sm bg-green-500/10 px-1 py-1.5 rounded-lg w-full">
-                          <CheckCircleIcon weight="fill" className="w-3 h-3 md:w-4 md:h-4" /> Owned
-                        </div>
+                return (
+                  <article key={item.id} className={`rewards-item rewards-item--${rarity}`} style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}>
+                    <button className="rewards-item__preview" onClick={() => setSelectedItem(item)} aria-label={`View ${item.name}`}>
+                      {item.preview_url ? (
+                        <img src={item.preview_url} alt={item.name} />
                       ) : (
-                        <div className="flex gap-1.5 w-full">
-                          <button
-                            onClick={() => setSelectedItem(item)}
-                            className="flex-none flex items-center justify-center p-1.5 md:p-2.5 rounded-lg md:rounded-xl font-bold transition bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
-                            title="View Details"
-                          >
-                            <EyeIcon weight="bold" className="w-3 h-3 md:w-5 md:h-5" />
-                          </button>
-
-                          <button
-                            onClick={() => setPurchaseItem(item)}
-                            disabled={!canAfford}
-                            className={`flex-1 px-1 md:px-5 py-1.5 md:py-2.5 rounded-lg md:rounded-xl font-bold text-[10px] md:text-sm transition text-center ${
-                              canAfford 
-                                ? 'bg-white text-black hover:bg-[#ccff00] shadow-[0_0_10px_rgba(255,255,255,0.2)]' 
-                                : 'bg-white/5 text-gray-500 cursor-not-allowed'
-                            }`}
-                          >
-                            {canAfford ? 'Buy' : 'Locked'}
-                          </button>
-                        </div>
+                        <span className="rewards-item__no-preview"><ImageIcon weight="duotone" /> No preview</span>
                       )}
+                      <span className={`rewards-item__rarity rewards-item__rarity--${rarity}`}>{item.rarity || 'Common'}</span>
+                      {isOwned && <span className="rewards-item__owned"><CheckCircleIcon weight="fill" /> OWNED</span>}
+                      <span className="rewards-item__view"><EyeIcon weight="bold" /></span>
+                    </button>
+                    <div className="rewards-item__body">
+                      <div className="rewards-item__copy">
+                        <span>{item.cosmetic_type === 'avatar_border' ? 'AVATAR BORDER' : item.cosmetic_type === 'quiz_theme' ? 'QUIZ THEME' : 'PROFILE BACKGROUND'}</span>
+                        <h2>{item.name}</h2>
+                        <p>{item.description || 'A fresh addition to your collection.'}</p>
+                      </div>
+                      <div className="rewards-item__footer">
+                        {isOwned ? (
+                          <span className="rewards-item__owned-label"><CheckCircleIcon weight="fill" /> In your collection</span>
+                        ) : (
+                          <>
+                            <span className="rewards-item__price"><CoinsIcon weight="fill" /> {item.price.toLocaleString()}</span>
+                            <button
+                              className={`rewards-item__buy ${canAfford ? '' : 'is-locked'}`}
+                              onClick={() => setPurchaseItem(item)}
+                              disabled={!canAfford}
+                            >
+                              {canAfford ? 'Get item' : 'Need more'} <CaretRightIcon weight="bold" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )
-            })
-          )}
+                  </article>
+                )
+              })
+            )}
+          </div>
         </div>
       </main>
+
+      <nav className="rewards-shop-mobile-nav" aria-label="Mobile navigation">
+        <button onClick={() => navigate('/dashboard')}><HouseIcon weight="fill" /><span>Home</span></button>
+        <button onClick={() => navigate('/quizzes')}><GameControllerIcon weight="fill" /><span>Play</span></button>
+        <button onClick={() => navigate('/leaderboard')}><TrophyIcon weight="fill" /><span>Ranks</span></button>
+        <button onClick={() => navigate('/clans')}><ShieldIcon weight="fill" /><span>Clans</span></button>
+        <button className="is-active" aria-current="page"><ShoppingBagIcon weight="fill" /><span>Shop</span></button>
+        <button onClick={() => navigate('/profile')}><UserIcon weight="fill" /><span>Profile</span></button>
+      </nav>
 
       {/* FULL DETAILS MODAL */}
       <ModalPresence
         open={!!selectedItem && !purchaseItem}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        className="rewards-shop-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
         panelClassName="w-full max-w-md"
       >
         {selectedItem && !purchaseItem && (
-          <div className="bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
+          <div className="rewards-shop-modal bg-[#0f1014] border border-white/10 rounded-[2rem] p-5 md:p-8 w-full text-center relative shadow-2xl max-h-[90vh] overflow-y-auto mb-16 md:mb-0 scrollbar-hide">
             <button 
               onClick={() => setSelectedItem(null)} 
               className="absolute top-4 right-4 bg-white/5 hover:bg-white/10 p-2 rounded-full transition z-10"
@@ -384,11 +352,11 @@ export default function RewardsShop() {
       {/* PURCHASE CONFIRMATION MODAL */}
       <ModalPresence
         open={!!purchaseItem}
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        className="rewards-shop-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
         panelClassName="w-full max-w-sm"
       >
         {purchaseItem && (
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 w-full text-center relative shadow-2xl">
+          <div className="rewards-shop-modal rewards-shop-confirmation bg-[#0f1014] border border-white/10 rounded-3xl p-6 md:p-8 w-full text-center relative shadow-2xl">
             <h2 className="text-2xl font-bold mb-2">Confirm Purchase</h2>
             <p className="text-gray-400 text-sm mb-6">Are you sure you want to buy this item?</p>
             
@@ -429,34 +397,6 @@ export default function RewardsShop() {
         </div>
       )}
 
-      {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
-        <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <HouseIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Home</span>
-        </button>
-        <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <GameControllerIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Play</span>
-        </button>
-        <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <TrophyIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Ranks</span>
-        </button>
-        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
-        <button onClick={() => navigate('/clans')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <ShieldIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Clans</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-[#ccff00]">
-          <ShoppingBagIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Shop</span>
-        </button>
-        <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition">
-          <UserIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Profile</span>
-        </button>
-      </nav>
     </div>
   )
 }

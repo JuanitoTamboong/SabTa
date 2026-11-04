@@ -1,0 +1,190 @@
+.sab-popup-backdrop {
+  position: fixed;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background: rgba(5, 8, 12, .78) !important;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.sab-popup-backdrop::before,
+.sab-popup-overlay::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: none;
+  content: "";
+}
+
+.sab-popup-surface {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+.sab-presence-chat {
+  border: 1px solid rgba(207, 225, 238, .13) !important;
+  border-radius: 17px !important;
+  background: linear-gradient(145deg, #1a2028, #12171e) !important;
+  color: #f3f7fa;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .54) !important;
+}
+
+.sab-popup-reaction {
+  border-color: rgba(207, 225, 238, .15) !important;
+  background: linear-gradient(150deg, #1a252d, #10171e) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .48) !important;
+}
+
+.sab-popup-surface > :first-child,
+.sab-popup-card {
+  position: relative;
+  border: 1px solid rgba(207, 225, 238, .13) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(145deg, #1b2129, #12171e) !important;
+  color: #f3f7fa;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, .58),
+    0 0 0 1px rgba(255, 255, 255, .035),
+    inset 0 1px rgba(255, 255, 255, .09) !important;
+}
+
+.sab-popup-surface > :first-child::before,
+.sab-popup-card::before {
+  position: absolute;
+  top: 0;
+  right: 12%;
+  left: 12%;
+  height: 2px;
+  border-radius: 0 0 99px 99px;
+  background: linear-gradient(90deg, transparent, rgba(207, 216, 226, .42), transparent);
+  pointer-events: none;
+  content: "";
+}
+
+.sab-popup-card {
+  position: relative;
+}
+
+.sab-popup-card :where(*),
+.sab-popup-surface > :first-child :where(*) {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.sab-popup-card h1,
+.sab-popup-card h2,
+.sab-popup-card h3,
+.sab-popup-surface > :first-child h1,
+.sab-popup-surface > :first-child h2,
+.sab-popup-surface > :first-child h3 {
+  color: #f3f7fa;
+  letter-spacing: -.025em;
+  text-shadow: none;
+}
+
+.sab-popup-card p,
+.sab-popup-surface > :first-child p {
+  text-wrap: pretty;
+}
+
+.sab-popup-card .text-gray-500,
+.sab-popup-card .text-gray-600,
+.sab-popup-card .text-slate-500,
+.sab-popup-surface > :first-child .text-gray-500,
+.sab-popup-surface > :first-child .text-gray-600,
+.sab-popup-surface > :first-child .text-slate-500 {
+  color: #c3cbd3 !important;
+}
+
+.sab-popup-card .text-gray-400,
+.sab-popup-card .text-slate-400,
+.sab-popup-surface > :first-child .text-gray-400,
+.sab-popup-surface > :first-child .text-slate-400 {
+  color: #d3d9df !important;
+}
+
+.sab-popup-card button,
+.sab-popup-surface > :first-child button {
+  border-radius: 10px;
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.sab-popup-card button:not(:disabled):active,
+.sab-popup-surface > :first-child button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+.sab-popup-card button:disabled,
+.sab-popup-surface > :first-child button:disabled {
+  cursor: not-allowed;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.sab-popup-card input,
+.sab-popup-card textarea,
+.sab-popup-surface > :first-child input,
+.sab-popup-surface > :first-child textarea {
+  border-color: rgba(207, 225, 238, .13);
+  border-radius: 10px;
+  background: rgba(5, 9, 13, .62);
+  color: #edf2f4;
+}
+
+.sab-popup-card input:focus,
+.sab-popup-card textarea:focus,
+.sab-popup-surface > :first-child input:focus,
+.sab-popup-surface > :first-child textarea:focus {
+  border-color: rgba(207, 225, 238, .35);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(207, 225, 238, .06);
+}
+
+.sab-popup-card::-webkit-scrollbar,
+.sab-popup-surface > :first-child::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sab-popup-card::-webkit-scrollbar-thumb,
+.sab-popup-surface > :first-child::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(207, 225, 238, .18);
+}
+
+.sab-popup-overlay {
+  position: fixed;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background: rgba(5, 8, 12, .78) !important;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+@media (max-width: 520px) {
+  .sab-popup-surface > :first-child,
+  .sab-popup-card {
+    border-radius: 17px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sab-popup-overlay,
+  .sab-popup-card,
+  .sab-popup-card button,
+  .sab-popup-surface > :first-child button {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

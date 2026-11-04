@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { LoadingIndicator } from '../components/LoadingScreen'
 import LoadingScreen from '../components/LoadingScreen'
+import PlayerAvatar from '../components/PlayerAvatar'
 import {
   TrophyIcon,
   LightningIcon,
@@ -25,7 +26,9 @@ import {
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
+import sabtaMascot from '../assets/images/sabta-center.png'
 import { useNotifications } from './notifications/NotificationsProvider'
+import '../css/UserDashboard.css'
 
 type SeasonInfo = {
   seasonNumber: number
@@ -249,494 +252,242 @@ export default function UserDashboard() {
   const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex relative">
+    <div className="game-dashboard">
+      <div className="game-dashboard__ambient" aria-hidden="true" />
       {equippedBackground && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img
-            src={equippedBackground}
-            alt="bg"
-            className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105"
-          />
-          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+        <div className="game-dashboard__cosmetic-bg" aria-hidden="true">
+          <img src={equippedBackground} alt="" />
         </div>
       )}
 
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
-        <div
-          className="flex items-center gap-3 mb-8 px-4 cursor-pointer"
-          onClick={() => navigate('/dashboard')}
-        >
-          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
-            <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
-          </div>
-          <span className="text-2xl font-bold tracking-tighter">
-            SAB<span className="text-[#ccff00]">TA</span>
-          </span>
-        </div>
-        <nav className="flex flex-col w-full gap-2">
-          <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition">
-            <HouseIcon weight="fill" className="w-6 h-6" /> Home
+      <aside className="game-sidebar">
+        <button className="game-brand" onClick={() => navigate('/dashboard')} aria-label="SabTa home">
+          <span className="game-brand__mark"><img src={sabtaLogo} alt="" /></span>
+          <span className="game-brand__word">SAB<span>TA</span><small>PLAYER ARENA</small></span>
+        </button>
+
+        <div className="game-sidebar__section-label">MENU</div>
+        <nav className="game-nav" aria-label="Main navigation">
+          <button className="game-nav__item is-active" aria-current="page">
+            <HouseIcon weight="fill" /><span>Overview</span><i />
           </button>
-          <button
-            onClick={() => navigate('/quizzes')}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
-          >
-            <GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz
+          <button className="game-nav__item" onClick={() => navigate('/quizzes')}>
+            <GameControllerIcon weight="fill" /><span>Play quiz</span><CaretRightIcon className="game-nav__arrow" />
           </button>
-          <button
-            onClick={() => navigate('/leaderboard')}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
-          >
-            <TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard
+          <button className="game-nav__item" onClick={() => navigate('/leaderboard')}>
+            <TrophyIcon weight="fill" /><span>Leaderboard</span><CaretRightIcon className="game-nav__arrow" />
           </button>
-          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
-          <button
-            onClick={() => navigate('/clans')}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
-          >
-            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
+          <button className="game-nav__item" onClick={() => navigate('/clans')}>
+            <ShieldIcon weight="fill" /><span>Clans</span><CaretRightIcon className="game-nav__arrow" />
           </button>
-          <button
-            onClick={() => navigate('/rewards')}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
-          >
-            <ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop
+          <button className="game-nav__item" onClick={() => navigate('/rewards')}>
+            <ShoppingBagIcon weight="fill" /><span>Rewards shop</span><CaretRightIcon className="game-nav__arrow" />
           </button>
-          <button
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"
-          >
-            <UserIcon weight="fill" className="w-6 h-6" /> My Profile
+          <button className="game-nav__item" onClick={() => navigate('/profile')}>
+            <UserIcon weight="fill" /><span>My profile</span><CaretRightIcon className="game-nav__arrow" />
           </button>
         </nav>
-        <div className="mt-auto w-full">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition"
-          >
-            <SignOutIcon weight="fill" className="w-6 h-6" /> Logout
-          </button>
+
+        <div className="game-season-card">
+          <span className="game-season-card__icon"><HourglassIcon weight="fill" /></span>
+          <div>
+            <span className="game-season-card__label">CURRENT SEASON</span>
+            <strong>{season?.name || 'The Arena'}</strong>
+            <small>{season ? (season.daysLeft <= 0 ? 'Ends today' : `${season.daysLeft} days remaining`) : 'Your next victory awaits'}</small>
+          </div>
+        </div>
+
+        <div className="game-sidebar__bottom">
+          <div className="game-sidebar-player">
+            <PlayerAvatar
+              className="game-avatar--small"
+              avatarUrl={avatarUrl}
+              borderUrl={equippedBorder}
+              displayName={profile?.display_name}
+            />
+            <div className="game-sidebar-player__info">
+              <strong>{profile?.display_name || 'Player'}</strong>
+              <span>LEVEL {stats.level} ? {profile?.age_category?.toUpperCase() || 'ROOKIE'}</span>
+            </div>
+            <button className="game-logout" onClick={handleLogout} aria-label="Log out" title="Log out">
+              <SignOutIcon weight="bold" />
+            </button>
+          </div>
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
-        <div className="absolute top-0 right-0 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-[#00f0ff]/5 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#ff00a0]/5 rounded-full blur-[100px] pointer-events-none" />
-
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 relative z-10 gap-4">
-          <div>
-            <h1 className="text-xl md:text-3xl font-bold mb-1 leading-tight flex items-center gap-2 flex-wrap">
-              {getGreeting()}, <br className="hidden sm:block" />
-              <span className="text-[#ccff00]">
-                {profile?.display_name?.split(' ')[0] || 'Player'}
-              </span>
-              !
-
-              {currentBadge && (
-                <img
-                  src={currentBadge.image_url}
-                  alt={currentBadge.name}
-                  title={`${currentBadge.name} Tier`}
-                  className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-md"
-                />
-              )}
-            </h1>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <p className="text-gray-400 text-xs flex flex-wrap items-center gap-1.5">
-                <FireIcon weight="fill" className="text-[#ff00a0]" />
-                <span className="font-bold text-white">
-                  {profile?.current_streak || 0} Day Streak
-                </span>
-                <span>•</span> Level {stats.level}
-                <span>•</span> {profile?.age_category?.toUpperCase()} Tier
-              </p>
-
-              {/* 🔧 SEASON TIMER INDICATOR */}
-              {season && (
-                <div
-                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                    season.daysLeft <= 7
-                      ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse'
-                      : 'bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff]/20'
-                  }`}
-                  title={
-                    season.endDate
-                      ? `Ends on ${new Date(season.endDate).toLocaleDateString()}`
-                      : undefined
-                  }
-                >
-                  <HourglassIcon weight="fill" />
-                  {season.daysLeft <= 0
-                    ? `${season.name} Ends Today!`
-                    : `${season.name} • ${season.daysLeft} Day${season.daysLeft > 1 ? 's' : ''} Left`}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex items-center gap-2">
-              <div className="bg-black/50 backdrop-blur-md border border-[#ff00a0]/30 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-                <CoinsIcon weight="fill" className="text-[#ff00a0] w-4 h-4" />
-                <span className="font-bold text-xs text-[#ff00a0]">
-                  {profile?.coins || 0}
-                </span>
-              </div>
-              <div className="bg-black/50 backdrop-blur-md border border-white/10 px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-                <LightningIcon weight="fill" className="text-[#ccff00] w-4 h-4" />
-                <span className="font-bold text-xs">
-                  {profile?.points || 0} PTS
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center">
-                <div className="absolute inset-[15%] rounded-full bg-gradient-to-br from-[#00f0ff] to-blue-600 flex items-center justify-center font-bold text-black uppercase overflow-hidden z-10">
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    profile?.display_name?.charAt(0) || 'P'
-                  )}
-                </div>
-                {equippedBorder && (
-                  <img
-                    src={equippedBorder}
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
-                  />
-                )}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="md:hidden bg-red-500/10 text-red-400 p-2 rounded-xl border border-red-500/20"
-              >
-                <SignOutIcon weight="bold" className="w-4 h-4" />
-              </button>
-            </div>
+      <main className="game-main">
+        <header className="game-topbar">
+          <button className="game-brand game-brand--mobile" onClick={() => navigate('/dashboard')} aria-label="SabTa home">
+            <span className="game-brand__mark"><img src={sabtaLogo} alt="" /></span>
+            <span className="game-brand__word">SAB<span>TA</span></span>
+          </button>
+          <div className="game-topbar__crumb"><span>PLAYER HUB</span><i>/</i> OVERVIEW</div>
+          <div className="game-topbar__right">
+            <div className="game-wallet game-wallet--coins"><CoinsIcon weight="fill" /><strong>{profile?.coins || 0}</strong><span>COINS</span></div>
+            <div className="game-wallet game-wallet--points"><LightningIcon weight="fill" /><strong>{profile?.points || 0}</strong><span>PTS</span></div>
+            <button className="game-avatar-button" onClick={() => navigate('/profile')} aria-label="Open profile">
+              <PlayerAvatar
+                className="game-avatar--top"
+                avatarUrl={avatarUrl}
+                borderUrl={equippedBorder}
+                displayName={profile?.display_name}
+              />
+            </button>
           </div>
         </header>
 
-        {/* STATS GRID */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6 relative z-10">
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-              <GameControllerIcon
-                weight="duotone"
-                className="text-[#00f0ff] w-4 h-4 sm:w-5 sm:h-5"
-              />
-              <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                Played
-              </p>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold">{stats.totalQuizzes}</p>
-          </div>
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-              <TrophyIcon
-                weight="duotone"
-                className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5"
-              />
-              <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                Best Score
-              </p>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold">
-              {stats.bestScore}{' '}
-              <span className="text-[10px] sm:text-xs text-gray-500">pts</span>
-            </p>
-          </div>
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 p-3 sm:p-4 rounded-2xl flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-              <TargetIcon
-                weight="duotone"
-                className="text-[#ccff00] w-4 h-4 sm:w-5 sm:h-5"
-              />
-              <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                Accuracy
-              </p>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold">{stats.accuracy}%</p>
-          </div>
-
-          <button
-            onClick={() => navigate('/battles')}
-            className="bg-gradient-to-br from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/30 p-3 sm:p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden group hover:bg-[#ff00a0]/20 transition shadow-[0_0_15px_rgba(255,0,160,0.1)] text-left"
-          >
-            <div className="absolute top-0 right-0 w-12 h-12 bg-[#ff00a0]/10 rounded-bl-full group-hover:scale-110 transition" />
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 relative z-10">
-              <SwordIcon
-                weight="fill"
-                className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5"
-              />
-              <p className="text-[9px] sm:text-[10px] text-gray-300 font-semibold uppercase tracking-wider">
-                Battles
-              </p>
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-[#ff00a0] relative z-10 flex items-center gap-1">
-              History <CaretRightIcon weight="bold" className="w-4 h-4" />
-            </p>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 relative z-10">
-          <div
-            className="relative bg-black/50 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl overflow-hidden group cursor-pointer"
-            onClick={() => navigate('/quizzes')}
-          >
-            <div className="absolute right-[-20px] top-[-20px] w-40 h-40 bg-[#ccff00]/20 rounded-full blur-2xl group-hover:bg-[#ccff00]/40 transition-all duration-500" />
-            <div className="relative z-10 flex flex-col items-start">
-              <div className="bg-[#ccff00]/20 text-[#ccff00] px-3 py-1 rounded-full text-[10px] font-bold mb-3 uppercase tracking-wider">
-                {profile?.age_category || 'General'} Tier
+        <div className="game-content">
+          <section className="game-hero">
+            <div className="game-hero__grid" aria-hidden="true" />
+            <div className="game-hero__content">
+              <div className="game-kicker"><span className="game-live-dot" /> YOUR ARENA IS READY</div>
+              <h1>{getGreeting()},<br /><span>{profile?.display_name?.split(' ')[0] || 'Player'}.</span></h1>
+              <p>Every question is a chance to climb. Pick a quiz, build your streak, and make your next move count.</p>
+              <div className="game-hero__actions">
+                <button className="game-button game-button--primary" onClick={() => navigate('/quizzes')}>
+                  <GameControllerIcon weight="fill" /> Choose your quiz <CaretRightIcon weight="bold" />
+                </button>
+                <button className="game-button game-button--quiet" onClick={() => navigate('/battles')}>
+                  <SwordIcon weight="fill" /> Battle history
+                </button>
               </div>
-              <h2 className="text-base sm:text-lg font-bold mb-1">
-                Ready to test your knowledge?
-              </h2>
-              <p className="text-gray-400 text-xs mb-4 max-w-[250px]">
-                Jump straight into a quick quiz and earn points & coins to
-                unlock new themes.
-              </p>
-              <button className="bg-[#ccff00] text-black px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-white transition shadow-[0_0_20px_rgba(204,255,0,0.3)] text-xs sm:text-sm">
-                Select Quiz <CaretRightIcon weight="bold" />
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xs sm:text-sm font-bold">Recent Activity</h3>
-              <ClockIcon className="text-gray-500 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </div>
-            {recentActivity.length === 0 ? (
-              <div className="text-gray-500 text-xs text-center py-6 bg-black/20 rounded-2xl border border-white/5">
-                No recent quizzes played.
+              <div className="game-hero__meta">
+                <span><FireIcon weight="fill" /> {profile?.current_streak || 0} DAY STREAK</span>
+                <b />
+                <span>{profile?.age_category?.toUpperCase() || 'GENERAL'} TIER</span>
+                {season && <><b /><span className={season.daysLeft <= 7 ? 'is-urgent' : ''}><HourglassIcon weight="fill" /> {season.daysLeft <= 0 ? 'FINAL DAY' : `${season.daysLeft}D LEFT`}</span></>}
               </div>
-            ) : (
-              <div className="space-y-2">
-                {recentActivity.map((attempt) => {
-                  const totalQ =
-                    attempt.correct_answers +
-                    attempt.incorrect_answers +
-                    attempt.unanswered_questions
-                  const acc =
-                    totalQ > 0
-                      ? Math.round((attempt.correct_answers / totalQ) * 100)
-                      : 0
-
-                  return (
-                    <div
-                      key={attempt.id}
-                      className="flex items-center justify-between p-2.5 sm:p-3 bg-black/40 border border-white/5 rounded-2xl"
-                    >
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                          <CheckCircleIcon
-                            weight="fill"
-                            className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4"
-                          />
-                        </div>
-                        <div>
-                          <p className="font-bold text-[11px] sm:text-xs">
-                            {attempt.category_name}
-                          </p>
-                          <p className="text-[9px] sm:text-[10px] text-gray-500">
-                            {new Date(attempt.created_at).toLocaleDateString()} • {acc}%
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right flex items-center gap-1.5 sm:gap-2">
-                        <span className="font-bold text-[#ccff00] text-[10px] sm:text-xs">
-                          +{attempt.score} pts
-                        </span>
-                        <span className="font-bold text-[#ff00a0] text-[10px] sm:text-xs flex items-center gap-0.5">
-                          <CoinsIcon
-                            weight="fill"
-                            className="w-2.5 h-2.5 sm:w-3 sm:h-3"
-                          />
-                          {attempt.real_coins_earned > 0 ? `+${attempt.real_coins_earned}` : attempt.real_coins_earned}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-[#ff00a0]/10 rounded-bl-full" />
-            <div className="flex justify-between items-center mb-3 relative z-10">
-              <h3 className="text-xs sm:text-sm font-bold">Daily Challenge</h3>
-              <TargetIcon className="text-[#ff00a0] w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <p className="text-[11px] sm:text-xs text-gray-400 mb-3 relative z-10 flex flex-wrap items-center gap-1.5">
-              Complete 3 quizzes today for{' '}
-              <span className="font-bold text-[#ccff00] flex items-center gap-0.5">
-                +25 PTS
-              </span>{' '}
-              <span className="text-gray-500">&</span>{' '}
-              <span className="font-bold text-[#ff00a0] flex items-center gap-0.5">
-                <CoinsIcon weight="fill" className="w-3 h-3" />
-                +50
-              </span>
-            </p>
-            <div className="w-full bg-white/5 rounded-full h-1.5 mb-1.5 relative z-10">
-              <div
-                className="bg-[#ff00a0] h-1.5 rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min((stats.quizzesToday / 3) * 100, 100)}%`,
-                }}
-              />
+            <div className="game-hero__art" aria-hidden="true">
+              <div className="game-hero__orbit game-hero__orbit--one" />
+              <div className="game-hero__orbit game-hero__orbit--two" />
+              <img src={sabtaMascot} alt="" />
+              <span className="game-hero__art-label">SABTA<br />ARENA</span>
             </div>
-            <p className="text-[9px] sm:text-[10px] text-right text-gray-400 font-bold relative z-10">
-              {stats.quizzesToday} / 3 Completed
-            </p>
-          </div>
+            {currentBadge && <div className="game-hero__badge"><img src={currentBadge.image_url} alt={currentBadge.name} /><span>{currentBadge.name}<small>YOUR RANK</small></span></div>}
+          </section>
 
-          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-3xl p-3 sm:p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xs sm:text-sm font-bold">
-                Top {profile?.age_category || 'Players'}
-              </h3>
-              <MedalIcon
-                weight="fill"
-                className="text-[#ccff00] w-3.5 h-3.5 sm:w-4 sm:h-4"
-              />
-            </div>
-            <div className="space-y-3">
-              {topPlayersLoading ? (
-                <LoadingIndicator label="Loading top players..." className="justify-center py-2 text-xs" />
-              ) : topPlayers.length === 0 ? (
-                <div className="text-gray-500 text-xs text-center py-2">
-                  No players yet.
-                </div>
-              ) : (
-                topPlayers.map((player, idx) => {
-                  const topPlayerBadge = getPlayerBadge(player.points || 0, allBadges)
-
-                  return (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 sm:gap-3"
-                    >
-                      <span
-                        className={`text-[10px] sm:text-xs font-bold w-3 sm:w-4 ${
-                          idx === 0
-                            ? 'text-[#ccff00]'
-                            : idx === 1
-                            ? 'text-gray-300'
-                            : 'text-[#cd7f32]'
-                        }`}
-                      >
-                        #{idx + 1}
-                      </span>
-                      <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center">
-                        <div className="absolute inset-[15%] rounded-full bg-white/10 flex items-center justify-center text-[9px] sm:text-[10px] font-bold uppercase overflow-hidden z-10">
-                          {player.avatar_url ? (
-                            <img
-                              src={player.avatar_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            player.display_name?.charAt(0) || 'P'
-                          )}
-                        </div>
-                        {player.border_url && (
-                          <img
-                            src={player.border_url}
-                            className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[11px] sm:text-xs font-bold truncate">
-                            {player.display_name}
-                          </p>
-
-                          {topPlayerBadge && (
-                            <img
-                              src={topPlayerBadge.image_url}
-                              alt={topPlayerBadge.name}
-                              title={topPlayerBadge.name}
-                              className="w-4 h-4 object-contain shrink-0"
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[9px] sm:text-[10px] font-bold text-[#ccff00]">
-                          {player.points} pts
-                        </span>
-                        <span className="text-[8px] sm:text-[9px] font-bold text-[#ff00a0] flex items-center gap-0.5">
-                          <CoinsIcon
-                            weight="fill"
-                            className="w-2 h-2 sm:w-2.5 sm:h-2.5"
-                          />
-                          {player.coins || 0}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-            <button
-              onClick={() => navigate('/leaderboard')}
-              className="w-full mt-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-[11px] sm:text-xs font-bold transition"
-            >
-              View Leaderboard
+          <section className="game-stats" aria-label="Your game stats">
+            <article className="game-stat-card game-stat-card--cyan">
+              <div className="game-stat-card__top"><span>QUIZZES PLAYED</span><GameControllerIcon weight="fill" /></div>
+              <strong>{stats.totalQuizzes.toLocaleString()}</strong>
+              <small>Keep the momentum going</small>
+            </article>
+            <article className="game-stat-card game-stat-card--violet">
+              <div className="game-stat-card__top"><span>PERSONAL BEST</span><TrophyIcon weight="fill" /></div>
+              <strong>{stats.bestScore}<small>PTS</small></strong>
+              <small>Your highest scoring run</small>
+            </article>
+            <article className="game-stat-card game-stat-card--lime">
+              <div className="game-stat-card__top"><span>ACCURACY</span><TargetIcon weight="fill" /></div>
+              <strong>{stats.accuracy}<small>%</small></strong>
+              <small>Precision makes champions</small>
+            </article>
+            <button className="game-stat-card game-stat-card--pink game-stat-card--link" onClick={() => navigate('/battles')}>
+              <div className="game-stat-card__top"><span>YOUR BATTLES</span><SwordIcon weight="fill" /></div>
+              <strong>ENTER <CaretRightIcon weight="bold" /></strong>
+              <small>Review your battle history</small>
             </button>
+          </section>
+
+          <div className="game-dashboard-grid">
+            <div className="game-dashboard-main-column">
+              <section className="game-panel game-challenge">
+                <div className="game-section-heading">
+                  <div><span className="game-overline">DAILY QUEST</span><h2>One more step to greatness</h2></div>
+                  <span className="game-quest-chip"><TargetIcon weight="fill" /> REPEATABLE</span>
+                </div>
+                <div className="game-challenge__body">
+                  <div className="game-challenge__emblem"><LightningIcon weight="fill" /></div>
+                  <div className="game-challenge__details">
+                    <strong>Complete 3 quizzes today</strong>
+                    <span>Finish your daily run and collect bonus loot.</span>
+                    <div className="game-progress"><div style={{ width: `${Math.min((stats.quizzesToday / 3) * 100, 100)}%` }} /></div>
+                    <div className="game-challenge__progress"><span>{stats.quizzesToday} <i>/ 3 MATCHES</i></span><span>{Math.min(Math.round((stats.quizzesToday / 3) * 100), 100)}%</span></div>
+                  </div>
+                  <div className="game-rewards"><span>REWARDS</span><strong><LightningIcon weight="fill" /> +25 <i>PTS</i></strong><strong><CoinsIcon weight="fill" /> +50 <i>COINS</i></strong></div>
+                  <button className="game-icon-button" onClick={() => navigate('/quizzes')} aria-label="Start a quiz"><CaretRightIcon weight="bold" /></button>
+                </div>
+              </section>
+
+              <section className="game-panel game-activity">
+                <div className="game-section-heading">
+                  <div><span className="game-overline">YOUR RECENT RUNS</span><h2>Battle log</h2></div>
+                  <ClockIcon className="game-heading-icon" />
+                </div>
+                {recentActivity.length === 0 ? (
+                  <div className="game-empty-state"><span><GameControllerIcon weight="fill" /></span><strong>No runs logged yet</strong><p>Your next great score starts with one quiz.</p><button onClick={() => navigate('/quizzes')}>Play your first quiz <CaretRightIcon weight="bold" /></button></div>
+                ) : (
+                  <div className="game-run-list">
+                    {recentActivity.map((attempt, index) => {
+                      const totalQ = attempt.correct_answers + attempt.incorrect_answers + attempt.unanswered_questions
+                      const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
+                      return (
+                        <article key={attempt.id} className="game-run">
+                          <span className={`game-run__index ${index === 0 ? 'is-current' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
+                          <span className="game-run__icon"><CheckCircleIcon weight="fill" /></span>
+                          <div className="game-run__info"><strong>{attempt.category_name}</strong><span>{new Date(attempt.created_at).toLocaleDateString()} <i>?</i> {acc}% accuracy</span></div>
+                          <div className="game-run__score"><strong>+{attempt.score}<small> PTS</small></strong><span><CoinsIcon weight="fill" /> +{attempt.real_coins_earned}</span></div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <aside className="game-dashboard-side-column">
+              <section className="game-panel game-leaderboard">
+                <div className="game-section-heading">
+                  <div><span className="game-overline">THE RACE IS ON</span><h2>Top {profile?.age_category || 'players'}</h2></div>
+                  <MedalIcon weight="fill" className="game-heading-icon game-heading-icon--lime" />
+                </div>
+                {topPlayersLoading ? (
+                  <LoadingIndicator label="Loading top players..." className="game-leaderboard__loading" />
+                ) : topPlayers.length === 0 ? (
+                  <div className="game-leaderboard__empty">No players yet. Be the first to set the pace.</div>
+                ) : (
+                  <div className="game-leaderboard__list">
+                    {topPlayers.map((player, index) => {
+                      const topPlayerBadge = getPlayerBadge(player.points || 0, allBadges)
+                      return (
+                        <div key={player.id || index} className={`game-leaderboard-player ${index === 0 ? 'is-first' : ''}`}>
+                          <span className="game-leaderboard-player__rank">{String(index + 1).padStart(2, '0')}</span>
+                          <PlayerAvatar
+                            className="game-avatar--leader"
+                            avatarUrl={player.avatar_url}
+                            borderUrl={player.border_url}
+                            displayName={player.display_name}
+                          />
+                          <div className="game-leaderboard-player__name"><strong>{player.display_name}</strong>{topPlayerBadge && <img src={topPlayerBadge.image_url} alt={topPlayerBadge.name} title={topPlayerBadge.name} />}</div>
+                          <span className="game-leaderboard-player__points">{player.points || 0}<small> PTS</small></span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <button className="game-leaderboard__button" onClick={() => navigate('/leaderboard')}>View full leaderboard <CaretRightIcon weight="bold" /></button>
+              </section>
+
+              <section className="game-level-card">
+                <div className="game-level-card__header"><span>PLAYER LEVEL</span><span>LVL {stats.level}</span></div>
+                <div className="game-level-card__number">{String(stats.level).padStart(2, '0')}<span> / NEXT LEVEL</span></div>
+                <div className="game-progress game-progress--level"><div style={{ width: `${(profile?.points ?? 0) % 100}%` }} /></div>
+                <div className="game-level-card__footer"><span>{(profile?.points ?? 0) % 100} / 100 XP</span><span>{profile?.points || 0} TOTAL PTS</span></div>
+              </section>
+            </aside>
           </div>
         </div>
       </main>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
-        <button className="flex flex-col items-center gap-1 text-[#ccff00]">
-          <HouseIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Home</span>
-        </button>
-        <button
-          onClick={() => navigate('/quizzes')}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
-        >
-          <GameControllerIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Play</span>
-        </button>
-        <button
-          onClick={() => navigate('/leaderboard')}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
-        >
-          <TrophyIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Ranks</span>
-        </button>
-        {/* 👇 ADDED CLANS BUTTON TO MOBILE BOTTOM NAV 👇 */}
-        <button
-          onClick={() => navigate('/clans')}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
-        >
-          <ShieldIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Clans</span>
-        </button>
-        <button
-          onClick={() => navigate('/rewards')}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
-        >
-          <ShoppingBagIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Shop</span>
-        </button>
-        <button
-          onClick={() => navigate('/profile')}
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition"
-        >
-          <UserIcon weight="fill" className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Profile</span>
-        </button>
+      <nav className="game-mobile-nav" aria-label="Mobile navigation">
+        <button className="is-active" aria-current="page"><HouseIcon weight="fill" /><span>Home</span></button>
+        <button onClick={() => navigate('/quizzes')}><GameControllerIcon weight="fill" /><span>Play</span></button>
+        <button onClick={() => navigate('/leaderboard')}><TrophyIcon weight="fill" /><span>Ranks</span></button>
+        <button onClick={() => navigate('/clans')}><ShieldIcon weight="fill" /><span>Clans</span></button>
+        <button onClick={() => navigate('/rewards')}><ShoppingBagIcon weight="fill" /><span>Shop</span></button>
+        <button onClick={() => navigate('/profile')}><UserIcon weight="fill" /><span>Profile</span></button>
       </nav>
     </div>
   )

@@ -8,10 +8,12 @@ import {
   LightningIcon, CheckCircleIcon, PencilSimpleIcon, FloppyDiskIcon, 
   CalendarBlankIcon, TargetIcon, CoinsIcon, MedalIcon, StarIcon, CheckIcon,
   CameraIcon, UsersIcon, CaretRightIcon, UserPlusIcon, UserMinusIcon,
-  ShieldIcon // 👈 ADDED ShieldIcon
+  ShieldIcon, WarningCircleIcon
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
+import PlayerAvatar from '../components/PlayerAvatar'
+import '../css/Profile.css'
 
 export default function Profile() {
   const navigate = useNavigate()
@@ -20,9 +22,10 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [equipping, setEquipping] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  
+
   // 🔧 Badge State
   const [allBadges, setAllBadges] = useState<BadgeInfo[]>([])
 
@@ -76,11 +79,11 @@ export default function Profile() {
         setHistory(attempts)
         const totalQuizzes = attempts.length
         const bestScore = totalQuizzes > 0 ? Math.max(...attempts.map(a => a.score)) : 0
-        
+
         const totalCorrect = attempts.reduce((acc, curr) => acc + curr.correct_answers, 0)
         const totalQuestionsAttempted = attempts.reduce((acc, curr) => acc + (curr.correct_answers + curr.incorrect_answers + curr.unanswered_questions), 0)
         const avgAccuracy = totalQuestionsAttempted > 0 ? (totalCorrect / totalQuestionsAttempted) * 100 : 0
-        
+
         const totalCoinsEarned = attempts.reduce((acc, curr) => acc + (curr.correct_answers * 150), 0)
 
         setStats({ totalQuizzes, bestScore, accuracy: Math.round(avgAccuracy), totalCoinsEarned })
@@ -91,7 +94,7 @@ export default function Profile() {
         .from('user_inventory')
         .select('*, cosmetic_items(*)')
         .eq('user_id', user.id)
-      
+
       if (invData) {
         setInventory(invData.filter(i => i.cosmetic_items !== null))
       }
@@ -156,11 +159,11 @@ export default function Profile() {
       const { error } = await supabase
         .from('follows')
         .insert({ follower_id: profile.id, following_id: targetId })
-      
+
       if (error && error.code !== '23505') throw error
       await refreshFriends(profile.id)
     } catch (err: any) {
-      alert(err.message || 'Failed to follow back.')
+      setPopupMessage(err.message || 'Failed to follow back.')
     } finally {
       setFollowBackLoading(null)
     }
@@ -176,11 +179,11 @@ export default function Profile() {
         .delete()
         .eq('follower_id', profile.id)
         .eq('following_id', targetId)
-      
+
       if (error) throw error
       await refreshFriends(profile.id)
     } catch (err: any) {
-      alert(err.message || 'Failed to unfollow.')
+      setPopupMessage(err.message || 'Failed to unfollow.')
     } finally {
       setUnfollowLoading(null)
     }
@@ -198,7 +201,7 @@ export default function Profile() {
       setProfile({ ...profile, display_name: editName })
       setIsEditing(false)
     } catch (err) {
-      alert("Failed to update name.")
+      setPopupMessage('Failed to update name.')
     } finally {
       setSaving(false)
     }
@@ -211,7 +214,7 @@ export default function Profile() {
     e.target.value = ''
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.')
+      setPopupMessage('Please select an image file.')
       return
     }
 
@@ -220,7 +223,7 @@ export default function Profile() {
       const compressedFile = await new Promise<File>((resolve, reject) => {
         const img = new Image();
         img.src = URL.createObjectURL(file);
-        
+
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const MAX_SIZE = 500;
@@ -237,12 +240,12 @@ export default function Profile() {
 
           canvas.width = width;
           canvas.height = height;
-          
+
           const ctx = canvas.getContext('2d');
           if (!ctx) return reject(new Error("Canvas not supported"));
-          
+
           ctx.drawImage(img, 0, 0, width, height);
-          
+
           canvas.toBlob(
             (blob) => {
               if (blob) {
@@ -298,7 +301,7 @@ export default function Profile() {
       setProfile({ ...profile, avatar_url: publicUrl })
     } catch (err: any) {
       console.error(err)
-      alert(err.message || 'Upload failed.')
+      setPopupMessage(err.message || 'Upload failed.')
     } finally {
       setUploadingAvatar(false)
     }
@@ -322,17 +325,17 @@ export default function Profile() {
           }
           return invItem;
         } 
-        
+
         if (invItem.cosmetic_items?.cosmetic_type === itemType) {
           return { ...invItem, is_equipped: invItem.cosmetic_item_id === itemId }
         }
-        
+
         return invItem;
       })
-      
+
       setInventory(updatedInventory)
     } catch (err: any) {
-      alert(err.message)
+      setPopupMessage(err.message)
     } finally {
       setEquipping(false)
     }
@@ -368,82 +371,69 @@ export default function Profile() {
   const currentBadge = getPlayerBadge(profile?.points || 0, allBadges)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex relative">
-      
+    <div className="profile-page min-h-screen bg-[#050505] text-white flex relative">
+
       {/* BACKGROUND */}
       {equippedBackground?.cosmetic_items?.preview_url && (
-        <div className="fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
-          <img src={equippedBackground.cosmetic_items.preview_url} alt="bg" className="w-full h-full object-cover opacity-70 md:opacity-50 scale-105" />
-          <div className="absolute inset-0 bg-[#050505]/40 md:bg-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505] md:bg-gradient-to-br md:from-[#050505]/90 md:via-[#050505]/50 md:to-transparent" />
+        <div className="profile-page__cosmetic-bg fixed inset-0 z-0 pointer-events-none w-full h-full overflow-hidden">
+          <img src={equippedBackground.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover scale-105" />
+          <div className="profile-page__cosmetic-overlay" />
         </div>
       )}
 
       {/* SIDEBAR */}
-      <aside className="hidden lg:flex w-64 border-r border-white/10 bg-[#0f1014]/90 backdrop-blur-xl flex-col items-start py-8 px-4 gap-4 fixed h-full z-20">
-        <div className="flex items-center gap-3 mb-8 px-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
-          <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
-             <img src={sabtaLogo} alt="SabTa" className="w-8 h-8 object-contain" />
-          </div>
-          <span className="text-2xl font-bold tracking-tighter">SAB<span className="text-[#ccff00]">TA</span></span>
-        </div>
-        <nav className="flex flex-col w-full gap-2">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><HouseIcon weight="fill" className="w-6 h-6" /> Home</button>
-          <button onClick={() => navigate('/quizzes')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><GameControllerIcon weight="fill" className="w-6 h-6" /> Play Quiz</button>
-          <button onClick={() => navigate('/leaderboard')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><TrophyIcon weight="fill" className="w-6 h-6" /> Leaderboard</button>
-          {/* 👇 ADDED CLANS BUTTON HERE 👇 */}
-          <button onClick={() => navigate('/clans')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition">
-            <ShieldIcon weight="fill" className="w-6 h-6" /> Clans
-          </button>
-          <button onClick={() => navigate('/rewards')} className="flex items-center gap-4 w-full p-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold transition"><ShoppingBagIcon weight="fill" className="w-6 h-6" /> Rewards Shop</button>
-          <button className="flex items-center gap-4 w-full p-3 rounded-xl bg-[#ccff00]/10 text-[#ccff00] font-bold transition"><UserIcon weight="fill" className="w-6 h-6" /> My Profile</button>
+      <aside className="profile-sidebar hidden lg:flex fixed h-full z-20">
+        <button className="profile-brand" onClick={() => navigate('/dashboard')} aria-label="SabTa home">
+          <span className="profile-brand__mark"><img src={sabtaLogo} alt="" /></span>
+          <span className="profile-brand__word">SAB<span>TA</span><small>PLAYER ARENA</small></span>
+        </button>
+        <span className="profile-sidebar__label">MENU</span>
+        <nav className="profile-nav" aria-label="Main navigation">
+          <button onClick={() => navigate('/dashboard')}><HouseIcon weight="fill" /><span>Overview</span></button>
+          <button onClick={() => navigate('/quizzes')}><GameControllerIcon weight="fill" /><span>Play quiz</span></button>
+          <button onClick={() => navigate('/leaderboard')}><TrophyIcon weight="fill" /><span>Leaderboard</span></button>
+          <button onClick={() => navigate('/clans')}><ShieldIcon weight="fill" /><span>Clans</span></button>
+          <button onClick={() => navigate('/rewards')}><ShoppingBagIcon weight="fill" /><span>Rewards shop</span></button>
+          <button className="is-active" aria-current="page"><UserIcon weight="fill" /><span>My profile</span></button>
         </nav>
-        <div className="mt-auto w-full">
-          <button onClick={handleLogout} className="flex items-center gap-4 w-full p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-semibold transition"><SignOutIcon weight="fill" className="w-6 h-6" /> Logout</button>
-        </div>
+        <button className="profile-sidebar__logout" onClick={handleLogout}>
+          <SignOutIcon weight="fill" /> Logout
+        </button>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
-        
-        <header className="mb-6 md:mb-10 relative z-10 flex justify-between items-start">
+      <main className="profile-main flex-1 lg:ml-64 p-4 pb-28 lg:p-12 relative z-10 w-full overflow-x-hidden">
+
+        <header className="profile-header mb-6 md:mb-10 relative z-10 flex justify-between items-start">
           <div>
+            <span className="profile-header__eyebrow">PLAYER HUB / IDENTITY</span>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">My Profile</h1>
             <p className="text-gray-400 text-xs md:text-sm">Manage your account settings and view your history.</p>
           </div>
           <button onClick={handleLogout} className="md:hidden bg-red-500/10 text-red-400 p-2.5 rounded-xl border border-red-500/20"><SignOutIcon weight="bold" className="w-5 h-5" /></button>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 relative z-10">
-          
-          <div className="lg:col-span-4 space-y-6 md:space-y-8">
+        <div className="profile-layout grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 relative z-10">
+
+          <div className="profile-overview lg:col-span-4 space-y-6 md:space-y-8">
             {/* Main Profile Card */}
-            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
+            <div className="profile-card bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00f0ff]/10 to-transparent" />
 
               <input ref={fileInputRef} id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-              
-              <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && fileInputRef.current?.click()} title="Click to change profile picture">
-                <div className="relative w-36 h-36 md:w-40 md:h-40 flex items-center justify-center">
-                  
-                  {/* Avatar Image */}
-                  <div className="absolute inset-[18%] rounded-full bg-white/10 flex items-center justify-center text-4xl font-bold uppercase overflow-hidden z-10 shadow-inner">
-                    {uploadingAvatar ? (
-                      <div className="text-xs text-[#ccff00] font-mono animate-pulse">UPLOADING...</div>
-                    ) : avatarUrl ? (
-                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      profile?.display_name?.charAt(0) || 'P'
-                    )}
-                  </div>
 
-                  {/* Avatar Border Overlay */}
-                  {equippedBorder?.cosmetic_items?.preview_url && (
-                    <img src={equippedBorder.cosmetic_items.preview_url} alt="Border" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" />
-                  )}
+              <div className="profile-card__avatar-upload relative group cursor-pointer" onClick={() => !uploadingAvatar && fileInputRef.current?.click()} title="Click to change profile picture">
+                <div className="relative w-36 h-36 md:w-40 md:h-40">
+                  <PlayerAvatar
+                    className="w-full h-full"
+                    avatarUrl={avatarUrl}
+                    borderUrl={equippedBorder?.cosmetic_items?.preview_url}
+                    displayName={profile?.display_name}
+                    loading={uploadingAvatar}
+                  />
 
                   {/* Camera Hover Overlay */}
-                  <div className="hidden md:flex absolute inset-[18%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
+                  <div className="hidden md:flex absolute inset-[16%] bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex-col items-center justify-center transition-opacity z-30">
                     <CameraIcon weight="bold" className="w-7 h-7 text-white mb-0.5" />
                     <span className="text-[9px] text-white font-bold uppercase tracking-wider">Change</span>
                   </div>
@@ -455,7 +445,7 @@ export default function Profile() {
               </div>
 
               {/* 🔧 BADGE LOWERED SLIGHTLY FOR BREATHING ROOM */}
-              <div className="relative w-full flex justify-center mt-2 mb-4 z-30">
+              <div className="profile-card__badge relative w-full flex justify-center mt-2 mb-4 z-30">
                 {currentBadge && (
                   <img 
                     src={currentBadge.image_url} 
@@ -488,16 +478,16 @@ export default function Profile() {
                 )}
               </div>
 
-              <div className="w-full space-y-3 mt-6 relative z-10">
-                <div className="flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-white/5">
+              <div className="profile-wallet w-full space-y-3 mt-6 relative z-10">
+                <div className="profile-wallet__item flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-white/5">
                   <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><MedalIcon weight="fill" className="text-gray-500 w-5 h-5" /> Total Points</span>
                   <span className="font-bold text-[#ccff00] text-lg flex items-center gap-1.5"><LightningIcon weight="fill"/> {profile?.points || 0}</span>
                 </div>
-                <div className="flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-[#ff00a0]/20">
+                <div className="profile-wallet__item flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-[#ff00a0]/20">
                   <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><ShoppingBagIcon weight="fill" className="text-[#ff00a0] w-5 h-5" /> Coins Balance</span>
                   <span className="font-bold text-[#ff00a0] text-lg flex items-center gap-1.5"><CoinsIcon weight="fill"/> {profile?.coins || 0}</span>
                 </div>
-                <div className="flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-white/5">
+                <div className="profile-wallet__item flex justify-between items-center p-3.5 bg-black/40 rounded-xl border border-white/5">
                   <span className="text-gray-400 text-sm font-semibold flex items-center gap-2"><CalendarBlankIcon className="text-gray-500 w-5 h-5" /> Joined</span>
                   <span className="font-bold text-sm">{new Date(profile?.created_at).toLocaleDateString()}</span>
                 </div>
@@ -505,10 +495,10 @@ export default function Profile() {
             </div>
 
             {/* Lifetime Stats */}
-            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 relative overflow-hidden">
+            <div className="profile-lifetime bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#ccff00]/5 rounded-bl-full" />
               <h3 className="text-lg font-bold mb-5 flex items-center gap-2"><StarIcon weight="fill" className="text-[#ccff00]" /> Lifetime Stats</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="profile-lifetime__grid grid grid-cols-2 gap-4">
                 <div className="bg-black/40 rounded-xl p-4 border border-white/5">
                   <GameControllerIcon weight="duotone" className="text-[#00f0ff] w-6 h-6 mb-2" />
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Played</p>
@@ -534,13 +524,13 @@ export default function Profile() {
           </div>
 
           {/* RIGHT COLUMN: TABS */}
-          <div className="lg:col-span-8">
-            <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
-              
-              <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4">
-                <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History</button>
-                <button onClick={() => setActiveTab('inventory')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'inventory' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>My Inventory</button>
-                <button onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Friends</button>
+          <div className="profile-content-column lg:col-span-8">
+            <div className="profile-content bg-black/50 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-8 h-full">
+
+              <div className="profile-tabs flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-4" role="tablist" aria-label="Profile sections">
+                <button role="tab" aria-selected={activeTab === 'history'} onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'history' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Quiz History <span>{history.length}</span></button>
+                <button role="tab" aria-selected={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'inventory' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>My Inventory <span>{inventory.length}</span></button>
+                <button role="tab" aria-selected={activeTab === 'friends'} onClick={() => setActiveTab('friends')} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeTab === 'friends' ? 'bg-[#ccff00] text-black' : 'text-gray-400 hover:text-white'}`}>Friends <span>{followers.length + following.length}</span></button>
               </div>
 
               {activeTab === 'history' && (
@@ -553,7 +543,7 @@ export default function Profile() {
                       const acc = totalQ > 0 ? Math.round((attempt.correct_answers / totalQ) * 100) : 0
 
                       return (
-                        <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl gap-4">
+                        <div key={attempt.id} className="profile-history-item flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl gap-4">
                           <div className="flex items-center gap-4">
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${acc >= 80 ? 'bg-green-500/10 text-green-400' : acc >= 50 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
                               <CheckCircleIcon weight="fill" className="w-6 h-6" />
@@ -575,7 +565,7 @@ export default function Profile() {
               )}
 
               {activeTab === 'inventory' && (
-                <div className="space-y-8">
+                <div className="profile-inventory-list">
                   {inventory.length === 0 ? (
                     <div className="text-center py-16">
                       <ShoppingBagIcon weight="duotone" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -584,51 +574,70 @@ export default function Profile() {
                       <button onClick={() => navigate('/rewards')} className="bg-[#ccff00] text-black px-6 py-2 rounded-xl font-bold hover:bg-white transition">Visit Shop</button>
                     </div>
                   ) : (
-                    Object.entries(categorizedInventory).map(([type, items]) => (
-                      <div key={type} className="mb-6">
-                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
-                          {categoryLabels[type] || type}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {(items as any[]).map((invItem) => (
-                            <div key={invItem.id} className={`flex items-center justify-between p-4 bg-black/40 border rounded-2xl transition ${invItem.is_equipped ? 'border-[#ccff00]/50 shadow-[0_0_15px_rgba(204,255,0,0.1)]' : 'border-white/5'}`}>
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10">
-                                  {invItem.cosmetic_items?.preview_url ? (
-                                    <img src={invItem.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover" />
+                    Object.entries(categorizedInventory).map(([type, items]) => {
+                      const categoryItems = items as any[]
+                      const hasEquippedItem = categoryItems.some((item) => item.is_equipped)
+
+                      return (
+                        <details
+                          key={type}
+                          className="profile-inventory-category"
+                          open={hasEquippedItem && categoryItems.length <= 4}
+                        >
+                          <summary className="profile-inventory-category__summary">
+                            <span className="profile-inventory-category__title">
+                              <ShoppingBagIcon weight="duotone" />
+                              <span>{categoryLabels[type] || type}</span>
+                            </span>
+                            <span className="profile-inventory-category__meta">
+                              {categoryItems.length} {categoryItems.length === 1 ? 'item' : 'items'}
+                              {hasEquippedItem && <span className="profile-inventory-category__equipped">EQUIPPED</span>}
+                              <CaretRightIcon className="profile-inventory-category__chevron" weight="bold" />
+                            </span>
+                          </summary>
+                          <div className="profile-inventory-category__items">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {categoryItems.map((invItem) => (
+                                <div key={invItem.id} className={`profile-inventory-item flex items-center justify-between p-4 bg-black/40 border rounded-2xl transition ${invItem.is_equipped ? 'border-[#ccff00]/50 shadow-[0_0_15px_rgba(204,255,0,0.1)]' : 'border-white/5'}`}>
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10">
+                                      {invItem.cosmetic_items?.preview_url ? (
+                                        <img src={invItem.cosmetic_items.preview_url} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <StarIcon className="w-full h-full p-3 text-gray-500" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-white text-sm">{invItem.cosmetic_items?.name}</p>
+                                      <p className="text-[10px] uppercase font-bold text-gray-500">{invItem.cosmetic_items?.cosmetic_type}</p>
+                                    </div>
+                                  </div>
+
+                                  {invItem.is_equipped ? (
+                                    <button
+                                      onClick={() => handleEquip(invItem.cosmetic_item_id)}
+                                      disabled={equipping}
+                                      className="text-xs font-bold text-[#ccff00] hover:text-[#b3e600] flex items-center gap-1 bg-[#ccff00]/10 hover:bg-[#ccff00]/20 px-3 py-1.5 rounded-lg border border-[#ccff00]/20 transition disabled:opacity-50"
+                                      title="Click to Unequip"
+                                    >
+                                      <CheckIcon weight="bold" /> Equipped
+                                    </button>
                                   ) : (
-                                    <StarIcon className="w-full h-full p-3 text-gray-500" />
+                                    <button
+                                      onClick={() => handleEquip(invItem.cosmetic_item_id)}
+                                      disabled={equipping}
+                                      className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition disabled:opacity-50"
+                                    >
+                                      Equip
+                                    </button>
                                   )}
                                 </div>
-                                <div>
-                                  <p className="font-bold text-white text-sm">{invItem.cosmetic_items?.name}</p>
-                                  <p className="text-[10px] uppercase font-bold text-gray-500">{invItem.cosmetic_items?.cosmetic_type}</p>
-                                </div>
-                              </div>
-                              
-                              {invItem.is_equipped ? (
-                                <button 
-                                  onClick={() => handleEquip(invItem.cosmetic_item_id)}
-                                  disabled={equipping}
-                                  className="text-xs font-bold text-[#ccff00] hover:text-[#b3e600] flex items-center gap-1 bg-[#ccff00]/10 hover:bg-[#ccff00]/20 px-3 py-1.5 rounded-lg border border-[#ccff00]/20 transition disabled:opacity-50"
-                                  title="Click to Unequip"
-                                >
-                                  <CheckIcon weight="bold" /> Equipped
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => handleEquip(invItem.cosmetic_item_id)}
-                                  disabled={equipping}
-                                  className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition disabled:opacity-50"
-                                >
-                                  Equip
-                                </button>
-                              )}
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
+                          </div>
+                        </details>
+                      )
+                    })
                   )}
                 </div>
               )}
@@ -664,9 +673,9 @@ export default function Profile() {
                       (friendTab === 'followers' ? followers : following).map((connection) => {
                         const player = connection.profiles
                         if (!player) return null
-                        
+
                         const friendBadge = getPlayerBadge(player.points || 0, allBadges)
-                        
+
                         // 🔧 Extract the equipped avatar border for this specific friend
                         const friendEquippedBorder = player.user_inventory?.find(
                           (inv: any) => inv.is_equipped && inv.cosmetic_items?.cosmetic_type === 'avatar_border'
@@ -676,31 +685,16 @@ export default function Profile() {
                           <div 
                             key={player.id} 
                             onClick={() => navigate(`/player/${player.id}`)}
-                            className="flex items-center justify-between p-3 sm:p-4 bg-black/40 border border-white/5 rounded-2xl hover:border-[#ccff00]/50 transition cursor-pointer group"
+                            className="profile-friend-item flex items-center justify-between p-3 sm:p-4 bg-black/40 border border-white/5 rounded-2xl hover:border-[#ccff00]/50 transition cursor-pointer group"
                           >
                             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                              
-                              {/* 🔧 Avatar Container to support Borders */}
-                              <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-                                
-                                {/* Inner Avatar Image */}
-                                <div className="absolute inset-[15%] rounded-full bg-white/10 overflow-hidden flex items-center justify-center text-sm font-bold uppercase z-10">
-                                  {player.avatar_url ? (
-                                    <img src={player.avatar_url} className="w-full h-full object-cover" />
-                                  ) : (
-                                    player.display_name?.charAt(0) || 'P'
-                                  )}
-                                </div>
 
-                                {/* Avatar Border Overlay */}
-                                {friendEquippedBorder?.cosmetic_items?.preview_url && (
-                                  <img 
-                                    src={friendEquippedBorder.cosmetic_items.preview_url} 
-                                    alt="Border" 
-                                    className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20" 
-                                  />
-                                )}
-                              </div>
+                              <PlayerAvatar
+                                className="w-12 h-12 sm:w-14 sm:h-14"
+                                avatarUrl={player.avatar_url}
+                                borderUrl={friendEquippedBorder?.cosmetic_items?.preview_url}
+                                displayName={player.display_name}
+                              />
 
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -731,7 +725,7 @@ export default function Profile() {
                                   <span className="sm:hidden">Back</span>
                                 </button>
                               )}
-                              
+
                               {friendTab === 'following' && (
                                 <button
                                   onClick={(e) => {
@@ -766,7 +760,7 @@ export default function Profile() {
       </main>
 
       {/* MOBILE NAVIGATION */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2">
+      <nav className="profile-mobile-nav lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1014]/95 backdrop-blur-md border-t border-white/10 flex justify-around items-center h-16 z-50 px-2" aria-label="Mobile navigation">
         <button onClick={() => navigate('/dashboard')} className="flex flex-col items-center gap-1 text-gray-400"><HouseIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Home</span></button>
         <button onClick={() => navigate('/quizzes')} className="flex flex-col items-center gap-1 text-gray-400"><GameControllerIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Play</span></button>
         <button onClick={() => navigate('/leaderboard')} className="flex flex-col items-center gap-1 text-gray-400"><TrophyIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Ranks</span></button>
@@ -776,8 +770,26 @@ export default function Profile() {
           <span className="text-[9px] font-bold">Clans</span>
         </button>
         <button onClick={() => navigate('/rewards')} className="flex flex-col items-center gap-1 text-gray-400"><ShoppingBagIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Shop</span></button>
-        <button className="flex flex-col items-center gap-1 text-[#ccff00]"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
+        <button className="is-active flex flex-col items-center gap-1 text-[#ccff00]" aria-current="page"><UserIcon weight="fill" className="w-5 h-5" /><span className="text-[9px] font-bold">Profile</span></button>
       </nav>
+
+      {popupMessage && (
+        <div className="sab-popup-overlay fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="sab-popup-card w-full max-w-sm p-6 text-center">
+            <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-red-400/20 bg-red-400/10 text-red-300">
+              <WarningCircleIcon weight="fill" className="h-7 w-7" />
+            </span>
+            <h2 className="mb-2 text-lg font-bold">Something went wrong</h2>
+            <p className="mb-6 text-sm text-gray-400">{popupMessage}</p>
+            <button
+              onClick={() => setPopupMessage(null)}
+              className="w-full bg-[#d3ff45] px-4 py-3 font-bold text-black hover:brightness-110"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

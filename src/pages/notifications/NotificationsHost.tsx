@@ -17,6 +17,7 @@ import {
 import { useNotifications } from './NotificationsProvider'
 import SeasonEndModal from './SeasonEndModal'
 import AnnouncementModal from './AnnouncementModal'
+import '../../css/NotificationsPopups.css'
 
 export default function NotificationsHost() {
   const location = useLocation()
@@ -165,9 +166,9 @@ export default function NotificationsHost() {
 
       {/* NEW CONTENT BANNER (Mobile Optimized) */}
       {showNewContentBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[92%] sm:w-full max-w-2xl bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#00f0ff]/20 p-2 rounded-xl shrink-0">
+        <div className="notification-content-banner fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[92%] sm:w-full max-w-2xl bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
+          <div className="notification-content-banner__copy flex items-center gap-3">
+            <div className="notification-content-banner__icon bg-[#00f0ff]/20 p-2 rounded-xl shrink-0">
               <SparkleIcon weight="fill" className="w-5 h-5 text-[#00f0ff]" />
             </div>
             <div>
@@ -175,14 +176,12 @@ export default function NotificationsHost() {
                 New Content Available!
               </h3>
               <p className="text-xs text-gray-300">
-                <span className="font-bold text-[#00f0ff]">
-                  {newContentCount} new items
-                </span>{' '}
-                have been added for your tier.
+                <span className="font-bold text-[#00f0ff]">{newContentCount} fresh drops</span>
+                {' '}— new quizzes and cosmetics are waiting in your arena.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+          <div className="notification-content-banner__actions flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
             <button
               onClick={() => {
                 dismissNewContent()
@@ -204,14 +203,14 @@ export default function NotificationsHost() {
 
       {/* COMBINED BATTLE BANNERS (Mobile Optimized) */}
       {(visibleIncomingBattles.length > 0 || incomingBetBattles.length > 0) && (
-        <div className="fixed top-4 right-4 z-[80] w-[92%] sm:w-[calc(100%-2rem)] max-w-md max-h-[80vh] overflow-y-auto space-y-3 pb-4">
+        <div className="notification-battle-stack fixed top-4 right-4 z-[80] w-[92%] sm:w-[calc(100%-2rem)] max-w-md max-h-[80vh] overflow-y-auto space-y-3 pb-4">
           {visibleIncomingBattles.map((battle) => (
             <div
               key={battle.id}
-              className="bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(255,0,160,0.25)] animate-in slide-in-from-right-4"
+              className="notification-battle-card notification-battle-card--friendly bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(255,0,160,0.25)] animate-in slide-in-from-right-4"
             >
               <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-[#ff00a0] shrink-0">
+                <div className="notification-battle-card__avatar relative w-10 h-10 rounded-full overflow-hidden border-2 border-[#ff00a0] shrink-0">
                   {battle.profiles?.avatar_url ? (
                     <img
                       src={battle.profiles.avatar_url}
@@ -227,7 +226,7 @@ export default function NotificationsHost() {
                 <div className="min-w-0">
                   <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
                     <SwordIcon weight="fill" className="text-[#ff00a0]" />
-                    Incoming Challenge!
+                    Friendly Battle!
                   </h3>
                   <p className="text-xs text-gray-300 truncate">
                     <span className="font-bold text-white">
@@ -237,7 +236,7 @@ export default function NotificationsHost() {
                   </p>
                 </div>
               </div>
-              <div className="min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+              <div className="notification-battle-card__quiz min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
                 <p className="truncate text-xs font-bold text-white">
                   {battle.quizzes?.title || 'Quiz challenge'}
                 </p>
@@ -252,7 +251,7 @@ export default function NotificationsHost() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="notification-battle-card__actions flex items-center gap-2">
                 <button
                   onClick={() => openDeclineModal(battle.id)}
                   className="flex-1 bg-white/10 text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-red-500/20 hover:text-red-400 transition"
@@ -276,10 +275,10 @@ export default function NotificationsHost() {
             return (
               <div
                 key={battle.id}
-                className="bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-yellow-500/20 to-yellow-500/5 border border-yellow-500/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(234,179,8,0.25)] animate-in slide-in-from-right-4"
+                className="notification-battle-card notification-battle-card--bet bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-yellow-500/20 to-yellow-500/5 border border-yellow-500/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(234,179,8,0.25)] animate-in slide-in-from-right-4"
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-yellow-500 shrink-0">
+                  <div className="notification-battle-card__avatar relative w-10 h-10 rounded-full overflow-hidden border-2 border-yellow-500 shrink-0">
                     {battle.profiles?.avatar_url ? (
                       <img
                         src={battle.profiles.avatar_url}
@@ -295,7 +294,7 @@ export default function NotificationsHost() {
                   <div className="min-w-0">
                     <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
                       <CoinsIcon weight="fill" className="text-yellow-400" />
-                      Bet Challenge!
+                      Wager Battle!
                     </h3>
                     <p className="text-xs text-gray-300 truncate">
                       <span className="font-bold text-white">
@@ -314,7 +313,7 @@ export default function NotificationsHost() {
                     )}
                   </div>
                 </div>
-                <div className="min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+                <div className="notification-battle-card__quiz min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
                   <p className="truncate text-xs font-bold text-white">
                     {battle.quizzes?.title || 'Quiz challenge'}
                   </p>
@@ -329,7 +328,7 @@ export default function NotificationsHost() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="notification-battle-card__actions flex items-center gap-2">
                   <button
                     onClick={() =>
                       openBetDeclineModal(battle.id, battle.wager_amount)
@@ -355,8 +354,8 @@ export default function NotificationsHost() {
 
       {/* DAILY STREAK REWARD MODAL (Mobile Optimized) */}
       {showStreakModal && (
-        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ff00a0] to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(255,0,160,0.4)] animate-bounce">
               <FireIcon
                 weight="fill"
@@ -404,8 +403,8 @@ export default function NotificationsHost() {
 
       {/* DAILY CHALLENGE REWARD MODAL (Mobile Optimized) */}
       {showDailyBonusModal && (
-        <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-[#ccff00] to-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-[0_0_40px_rgba(204,255,0,0.4)] animate-bounce">
               <TargetIcon
                 weight="fill"
@@ -449,8 +448,8 @@ export default function NotificationsHost() {
 
       {/* FRIENDLY DECLINE MODAL */}
       {declineModal.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.1)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.1)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg bg-[#ff00a0]/20 text-[#ff00a0]">
               <XCircleIcon
                 weight="fill"
@@ -488,8 +487,8 @@ export default function NotificationsHost() {
 
       {/* BET DECLINE MODAL */}
       {betDeclineModal.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(234,179,8,0.15)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-yellow-500/30 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(234,179,8,0.15)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg bg-yellow-500/20 text-yellow-400">
               <CoinsIcon weight="fill" className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
@@ -531,8 +530,8 @@ export default function NotificationsHost() {
 
       {/* INLINE ALERT MODAL */}
       {alertData && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
+        <div className="sab-popup-overlay fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="sab-popup-card bg-[#0f1014] border border-white/10 rounded-3xl p-6 max-w-xs w-full text-center relative shadow-2xl animate-in zoom-in-95">
             <div
               className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
                 alertData.type === 'success'
