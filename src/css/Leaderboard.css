@@ -1208,6 +1208,24 @@
     gap: 7px;
   }
 
+  .leaderboard-topbar__logout {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .07);
+    color: #e7edf2;
+    cursor: pointer;
+  }
+
+  .leaderboard-topbar__logout svg {
+    width: 17px;
+    height: 17px;
+  }
+
   .leaderboard-points {
     min-height: 32px;
     gap: 5px;

@@ -164,6 +164,7 @@ export default function QuizGameplay() {
   
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
+  const [answerHoverEnabled, setAnswerHoverEnabled] = useState(true)
   
   // Review & Hint State
   const [responses, setResponses] = useState<any[]>([])
@@ -374,6 +375,7 @@ export default function QuizGameplay() {
 
   const nextQuestion = () => {
     if (currentQIndex < questions.length - 1) {
+      setAnswerHoverEnabled(false)
       setCurrentQIndex((prev) => prev + 1)
       setSelectedAnswer(null)
       setIsAnswerRevealed(false)
@@ -680,7 +682,10 @@ export default function QuizGameplay() {
         </div>
       </div>
 
-      <div className="quiz-gameplay-content w-full max-w-3xl relative z-10">
+      <div
+        className={`quiz-gameplay-content w-full max-w-3xl relative z-10${answerHoverEnabled ? ' is-answer-hover-enabled' : ''}`}
+        onPointerMove={() => setAnswerHoverEnabled(true)}
+      >
         <div className="quiz-gameplay-progress-row flex justify-between items-center mb-6">
           <div className="quiz-gameplay-question-count text-gray-400 font-mono text-xs sm:text-sm bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">Q {currentQIndex + 1} / {questions.length}</div>
           <div className={`quiz-gameplay-timer flex items-center gap-1.5 sm:gap-2 text-lg sm:text-xl font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border backdrop-blur-md ${timeLeft <= 5 ? 'is-urgent text-red-500 border-red-500/50 bg-red-500/20 animate-pulse' : 'text-[#00f0ff] border-[#00f0ff]/30 bg-[#00f0ff]/10'}`}>
@@ -726,7 +731,7 @@ export default function QuizGameplay() {
           {currentQuestion.options.map((option: string, idx: number) => {
             const isCorrect = option === currentQuestion.correct_answer
             const isSelected = option === selectedAnswer
-            let btnClass = "bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 hover:bg-white/10"
+            let btnClass = "bg-black/40 backdrop-blur-md border border-white/10"
             if (isAnswerRevealed) {
               if (isCorrect) btnClass = "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
               else if (isSelected && !isCorrect) btnClass = "bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]"

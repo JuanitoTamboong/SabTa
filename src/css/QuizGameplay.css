@@ -195,7 +195,7 @@
   transition: transform .16s ease, border-color .16s ease, background .16s ease, opacity .16s ease;
 }
 
-.quiz-gameplay-answer:not(:disabled):hover {
+.quiz-gameplay-content.is-answer-hover-enabled .quiz-gameplay-answer:not(:disabled):hover {
   transform: translateY(-2px);
   border-color: rgba(211, 255, 69, .32);
   background: rgba(211, 255, 69, .055) !important;

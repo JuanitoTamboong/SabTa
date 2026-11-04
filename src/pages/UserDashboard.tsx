@@ -334,6 +334,14 @@ export default function UserDashboard() {
                 displayName={profile?.display_name}
               />
             </button>
+            <button
+              className="game-topbar__logout"
+              onClick={handleLogout}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <SignOutIcon weight="bold" />
+            </button>
           </div>
         </header>
 
