@@ -13,16 +13,40 @@ import {
   GiftIcon,
   LightningIcon,
   XCircleIcon,
+  UserCheckIcon,
 } from '@phosphor-icons/react'
 import { useNotifications } from './NotificationsProvider'
 import SeasonEndModal from './SeasonEndModal'
 import AnnouncementModal from './AnnouncementModal'
+import PlayerAvatar from '../../components/PlayerAvatar'
 import '../../css/NotificationsPopups.css'
+
+type FriendRequestNotification = {
+  id: string
+  follower_id: string
+  profiles: {
+    display_name: string | null
+    avatar_url: string | null
+    user_inventory?: {
+      is_equipped: boolean
+      cosmetic_items: {
+        preview_url: string | null
+        cosmetic_type: string | null
+      } | {
+        preview_url: string | null
+        cosmetic_type: string | null
+      }[] | null
+    }[]
+  }
+}
 
 export default function NotificationsHost() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeBattleId = new URLSearchParams(location.search).get('battleId')
+  const isPlayingQuiz =
+    location.pathname.startsWith('/play') ||
+    location.pathname.startsWith('/quizzes')
   const {
     profile,
     setProfile,
@@ -30,6 +54,8 @@ export default function NotificationsHost() {
     setIncomingBattles,
     incomingBetBattles,
     setIncomingBetBattles,
+    incomingFriendRequests,
+    dismissFriendRequest,
     showStreakModal,
     setShowStreakModal,
     streakReward,
@@ -47,6 +73,10 @@ export default function NotificationsHost() {
     battleId: string | null
   }>({ isOpen: false, battleId: null })
   const [declining, setDeclining] = useState(false)
+  const [friendRequestAction, setFriendRequestAction] = useState<string | null>(null)
+  const [dismissedFriendlyBattleIds, setDismissedFriendlyBattleIds] = useState<Set<string>>(
+    () => new Set()
+  )
 
   const [betDeclineModal, setBetDeclineModal] = useState<{
     isOpen: boolean
@@ -55,8 +85,20 @@ export default function NotificationsHost() {
   }>({ isOpen: false, battleId: null, wager: 0 })
   const [betDeclining, setBetDeclining] = useState(false)
   const visibleIncomingBattles = incomingBattles.filter(
-    (battle) => battle.id !== activeBattleId
+    (battle) =>
+      battle.id !== activeBattleId &&
+      !dismissedFriendlyBattleIds.has(battle.id)
   )
+  const friendRequest = incomingFriendRequests[0]
+  const friendRequestBorder = friendRequest?.profiles.user_inventory?.find((item) => {
+    const cosmetic = Array.isArray(item.cosmetic_items)
+      ? item.cosmetic_items[0]
+      : item.cosmetic_items
+    return item.is_equipped && cosmetic?.cosmetic_type === 'avatar_border'
+  })
+  const friendRequestBorderItem = Array.isArray(friendRequestBorder?.cosmetic_items)
+    ? friendRequestBorder.cosmetic_items[0]
+    : friendRequestBorder?.cosmetic_items
 
   const openDeclineModal = (battleId: string) => {
     setDeclineModal({ isOpen: true, battleId })
@@ -89,6 +131,45 @@ export default function NotificationsHost() {
   const handleAcceptBattle = (battleId: string, quizId: string) => {
     setIncomingBattles((prev) => prev.filter((b) => b.id !== battleId))
     navigate(`/play/${quizId}?battleId=${battleId}&opponent=true`)
+  }
+
+  const acceptFriendRequest = async (request: FriendRequestNotification) => {
+    if (!profile?.id || friendRequestAction) return
+    setFriendRequestAction(request.id)
+    try {
+      const { error } = await supabase.from('follows').insert({
+        follower_id: profile.id,
+        following_id: request.follower_id,
+      })
+      if (error && error.code !== '23505') throw error
+      dismissFriendRequest(request.id)
+    } catch (error: unknown) {
+      setAlertData({
+        title: 'Accept Failed',
+        message: (error instanceof Error && error.message) || 'Could not accept this friend request.',
+        type: 'error',
+      })
+    } finally {
+      setFriendRequestAction(null)
+    }
+  }
+
+  const declineFriendRequest = async (request: FriendRequestNotification) => {
+    if (friendRequestAction) return
+    setFriendRequestAction(request.id)
+    try {
+      const { error } = await supabase.from('follows').delete().eq('id', request.id)
+      if (error) throw error
+      dismissFriendRequest(request.id)
+    } catch (error: unknown) {
+      setAlertData({
+        title: 'Decline Failed',
+        message: (error instanceof Error && error.message) || 'Could not decline this friend request.',
+        type: 'error',
+      })
+    } finally {
+      setFriendRequestAction(null)
+    }
   }
 
   const openBetDeclineModal = (battleId: string, wager: number) => {
@@ -164,6 +245,64 @@ export default function NotificationsHost() {
       <SeasonEndModal />
       <AnnouncementModal />
 
+      {friendRequest && !isPlayingQuiz && (
+        <div className="sab-popup-overlay fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="friend-request-title"
+            className="sab-popup-card bg-[#0f1014] border border-[#ccff00]/25 rounded-2xl p-4 pr-11 max-w-xs w-full relative shadow-[0_0_40px_rgba(204,255,0,0.12)] animate-in zoom-in-95"
+          >
+            <button
+              type="button"
+              onClick={() => dismissFriendRequest(friendRequest.id)}
+              disabled={friendRequestAction !== null}
+              aria-label="Close friend request"
+              title="Close"
+              className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-lg text-gray-400 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            >
+              <XIcon weight="bold" className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <PlayerAvatar
+                className="w-14 h-14 shrink-0"
+                avatarUrl={friendRequest.profiles.avatar_url}
+                displayName={friendRequest.profiles.display_name}
+                borderUrl={friendRequestBorderItem?.preview_url}
+              />
+              <div className="min-w-0">
+                <h2 id="friend-request-title" className="text-base font-bold text-white">
+                  Friend Request
+                </h2>
+                <p className="text-sm text-gray-400 truncate">
+                  <span className="font-semibold text-white">
+                    {friendRequest.profiles.display_name || 'A player'}
+                  </span>{' '}
+                  wants to add you.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => void acceptFriendRequest(friendRequest)}
+                disabled={friendRequestAction !== null}
+                className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-[#ccff00] text-black hover:bg-white transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <UserCheckIcon weight="bold" className="w-3.5 h-3.5" />
+                {friendRequestAction === friendRequest.id ? '...' : 'Accept'}
+              </button>
+              <button
+                onClick={() => void declineFriendRequest(friendRequest)}
+                disabled={friendRequestAction !== null}
+                className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-red-500/10 text-red-300 hover:bg-red-500/20 transition disabled:opacity-50"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* NEW CONTENT BANNER (Mobile Optimized) */}
       {showNewContentBanner && (
         <div className="notification-content-banner fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[92%] sm:w-full max-w-2xl bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
@@ -207,8 +346,19 @@ export default function NotificationsHost() {
           {visibleIncomingBattles.map((battle) => (
             <div
               key={battle.id}
-              className="notification-battle-card notification-battle-card--friendly bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(255,0,160,0.25)] animate-in slide-in-from-right-4"
+              className="notification-battle-card notification-battle-card--friendly bg-[#0f1014]/95 backdrop-blur-xl bg-gradient-to-r from-[#ff00a0]/20 to-[#ff00a0]/5 border border-[#ff00a0]/40 p-4 pr-12 rounded-2xl flex flex-col gap-3 shadow-[0_0_20px_rgba(255,0,160,0.25)] animate-in slide-in-from-right-4"
             >
+              <button
+                type="button"
+                onClick={() =>
+                  setDismissedFriendlyBattleIds((previous) => new Set(previous).add(battle.id))
+                }
+                aria-label="Dismiss friendly battle notification"
+                title="Dismiss"
+                className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+              >
+                <XIcon weight="bold" className="h-4 w-4" />
+              </button>
               <div className="flex items-center gap-3">
                 <div className="notification-battle-card__avatar relative w-10 h-10 rounded-full overflow-hidden border-2 border-[#ff00a0] shrink-0">
                   {battle.profiles?.avatar_url ? (

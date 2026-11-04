@@ -1,5 +1,5 @@
 // src/pages/Profile.tsx
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import LoadingScreen from '../components/LoadingScreen'
@@ -52,6 +52,49 @@ export default function Profile() {
     accuracy: 0,
     totalCoinsEarned: 0,
   })
+
+  // ✅ Function to fetch fresh data from DB and normalize relations
+  const refreshFriends = useCallback(async (userId: string) => {
+    const { data: followersData } = await supabase
+      .from('follows')
+           .select(`
+        follower_id,
+        profiles!follower_id!inner (
+          id, display_name, avatar_url, points, role,
+          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
+        )
+      `)
+      .eq('following_id', userId)
+      .eq('profiles.role', 'player')
+
+    const { data: followingData } = await supabase
+      .from('follows')
+      .select(`
+        following_id,
+        profiles!following_id (
+          id, display_name, avatar_url, points,
+          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
+        )
+      `)
+      .eq('follower_id', userId)
+
+    const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+
+    const validFollowing = (followingData || []).filter(f => normalizeProfile(f.profiles) !== null);
+    const followingIds = new Set(validFollowing.map(f => normalizeProfile(f.profiles).id));
+
+    const enrichedFollowers = (followersData || [])
+      .map(f => {
+        const profile = normalizeProfile(f.profiles);
+        if (!profile) return null;
+        const isMutual = followingIds.has(profile.id);
+        return { ...f, profiles: profile, isMutual };
+      })
+      .filter(f => f !== null && f.isMutual === false);
+
+    setFollowers(enrichedFollowers)
+    setFollowing(validFollowing)
+  }, [])
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -106,50 +149,45 @@ export default function Profile() {
     }
 
     fetchProfileData()
-  }, [navigate])
+  }, [navigate, refreshFriends])
 
-  // ✅ Function to fetch fresh data from DB and normalize relations
-  const refreshFriends = async (userId: string) => {
-    const { data: followersData } = await supabase
-      .from('follows')
-           .select(`
-        follower_id, 
-        profiles!follower_id!inner (
-          id, display_name, avatar_url, points, role,
-          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
-        )
-      `)
-      .eq('following_id', userId)
-      .eq('profiles.role', 'player')
+  useEffect(() => {
+    if (!profile?.id) return
 
-    const { data: followingData } = await supabase
-      .from('follows')
-      .select(`
-        following_id, 
-        profiles!following_id (
-          id, display_name, avatar_url, points,
-          user_inventory!user_id ( is_equipped, cosmetic_items ( preview_url, cosmetic_type ) )
-        )
-      `)
-      .eq('follower_id', userId)
+    const refreshVisibleFollowers = () => {
+      void refreshFriends(profile.id)
+    }
 
-    const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+    window.addEventListener('sabta:friend-request-dismissed', refreshVisibleFollowers)
 
-    const validFollowing = (followingData || []).filter(f => normalizeProfile(f.profiles) !== null);
-    const followingIds = new Set(validFollowing.map(f => normalizeProfile(f.profiles).id));
+    const channel = supabase
+      .channel(`profile-followers-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'follows',
+          filter: `following_id=eq.${profile.id}`,
+        },
+        refreshVisibleFollowers
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'follows',
+        },
+        refreshVisibleFollowers
+      )
+      .subscribe()
 
-    const enrichedFollowers = (followersData || [])
-      .map(f => {
-        const profile = normalizeProfile(f.profiles);
-        if (!profile) return null;
-        const isMutual = followingIds.has(profile.id);
-        return { ...f, profiles: profile, isMutual };
-      })
-      .filter(f => f !== null && f.isMutual === false); 
-
-    setFollowers(enrichedFollowers)
-    setFollowing(validFollowing)
-  }
+    return () => {
+      window.removeEventListener('sabta:friend-request-dismissed', refreshVisibleFollowers)
+      void supabase.removeChannel(channel)
+    }
+  }, [profile?.id, refreshFriends])
 
   // ✅ Follow back from the Followers tab
   const handleFollowBack = async (targetId: string, targetProfile: any) => {

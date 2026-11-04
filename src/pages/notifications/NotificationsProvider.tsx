@@ -16,6 +16,25 @@ type AlertData = {
   type: 'success' | 'error'
 } | null
 
+type FriendRequestNotification = {
+  id: string
+  follower_id: string
+  profiles: {
+    display_name: string | null
+    avatar_url: string | null
+    user_inventory?: {
+      is_equipped: boolean
+      cosmetic_items: {
+        preview_url: string | null
+        cosmetic_type: string | null
+      } | {
+        preview_url: string | null
+        cosmetic_type: string | null
+      }[] | null
+    }[]
+  }
+}
+
 type SeasonTopPlayer = {
   rank: number
   user_id: string
@@ -38,6 +57,9 @@ interface NotificationsContextType {
   incomingBetBattles: any[]
   setIncomingBetBattles: React.Dispatch<React.SetStateAction<any[]>>
   refreshIncomingBattles: (userId: string) => Promise<void>
+  incomingFriendRequests: FriendRequestNotification[]
+  refreshIncomingFriendRequests: (userId: string) => Promise<void>
+  dismissFriendRequest: (requestId: string) => void
   showStreakModal: boolean
   setShowStreakModal: (v: boolean) => void
   streakReward: { coins: number; newStreak: number }
@@ -59,6 +81,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any>(null)
   const [incomingBattles, setIncomingBattles] = useState<any[]>([])
   const [incomingBetBattles, setIncomingBetBattles] = useState<any[]>([])
+  const [incomingFriendRequests, setIncomingFriendRequests] = useState<FriendRequestNotification[]>([])
+  const dismissedFriendRequestIds = useRef(new Set<string>())
   const [showStreakModal, setShowStreakModal] = useState(false)
   const [streakReward, setStreakReward] = useState({ coins: 0, newStreak: 0 })
   const [showDailyBonusModal, setShowDailyBonusModal] = useState(false)
@@ -93,6 +117,88 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       console.error('Error refreshing battles:', error)
     }
   }, [])
+
+  const refreshIncomingFriendRequests = useCallback(async (userId: string) => {
+    const [{ data: followers, error: followersError }, { data: following, error: followingError }] =
+      await Promise.all([
+        supabase
+          .from('follows')
+          .select('id, follower_id, profiles!follower_id!inner(id, display_name, avatar_url, role, user_inventory!user_id(is_equipped, cosmetic_items(preview_url, cosmetic_type)))')
+          .eq('following_id', userId)
+          .eq('profiles.role', 'player'),
+        supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', userId),
+      ])
+
+    if (followersError || followingError) {
+      console.error('Error refreshing friend requests:', followersError || followingError)
+      return
+    }
+
+    let dismissedIds: string[] = []
+    try {
+      const savedIds = localStorage.getItem(`sabta-dismissed-friend-requests:${userId}`)
+      const parsedIds: unknown = savedIds ? JSON.parse(savedIds) : []
+      if (Array.isArray(parsedIds) && parsedIds.every((id) => typeof id === 'string')) {
+        dismissedIds = parsedIds
+      }
+    } catch (error) {
+      console.error('Could not load dismissed friend requests:', error)
+    }
+
+    const followingIds = new Set((following || []).map((follow) => follow.following_id))
+    const dismissedIdsSet = new Set(dismissedIds)
+    const requests = (followers || []).flatMap((follow: {
+      id: string
+      follower_id: string
+      profiles: FriendRequestNotification['profiles'] | FriendRequestNotification['profiles'][] | null
+    }) => {
+      const requester = Array.isArray(follow.profiles) ? follow.profiles[0] : follow.profiles
+      if (
+        !requester ||
+        followingIds.has(follow.follower_id) ||
+        dismissedIdsSet.has(follow.id) ||
+        dismissedFriendRequestIds.current.has(`${userId}:${follow.id}`)
+      ) {
+        return []
+      }
+
+      return [{
+        id: follow.id,
+        follower_id: follow.follower_id,
+        profiles: {
+          display_name: requester.display_name,
+          avatar_url: requester.avatar_url,
+          user_inventory: requester.user_inventory,
+        },
+      }]
+    })
+
+    setIncomingFriendRequests(requests)
+  }, [])
+
+  const dismissFriendRequest = useCallback((requestId: string) => {
+    if (profile?.id) {
+      const dismissedKey = `${profile.id}:${requestId}`
+      dismissedFriendRequestIds.current.add(dismissedKey)
+
+      try {
+        const storageKey = `sabta-dismissed-friend-requests:${profile.id}`
+        const savedIds: unknown = JSON.parse(localStorage.getItem(storageKey) || '[]')
+        const ids = Array.isArray(savedIds) && savedIds.every((id) => typeof id === 'string')
+          ? savedIds
+          : []
+        localStorage.setItem(storageKey, JSON.stringify([...new Set([...ids, requestId])]))
+      } catch (error) {
+        console.error('Could not save dismissed friend request:', error)
+      }
+    }
+
+    setIncomingFriendRequests((requests) => requests.filter((request) => request.id !== requestId))
+    window.dispatchEvent(new Event('sabta:friend-request-dismissed'))
+  }, [profile])
 
   const checkAndShowDailyChallenge = async () => {
     try {
@@ -263,6 +369,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         }, 50)
 
         await refreshIncomingBattles(user.id)
+        await refreshIncomingFriendRequests(user.id)
         if (isMounted) await checkForNewContent(user.id, profileData.age_category)
       } catch (error) {
         console.error('Notifications bootstrap error:', error)
@@ -275,7 +382,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       isMounted = false
       clearTimeout(timer)
     }
-  }, [refreshIncomingBattles, checkForNewContent, checkSeasonAnnouncement])
+  }, [
+    refreshIncomingBattles,
+    refreshIncomingFriendRequests,
+    checkForNewContent,
+    checkSeasonAnnouncement,
+  ])
 
   // 🔄 FALLBACK POLLING (15s battles, 2m content)
   useEffect(() => {
@@ -283,6 +395,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     const battleInterval = setInterval(() => {
       refreshIncomingBattles(profile.id)
+    }, 15000)
+    const friendRequestInterval = setInterval(() => {
+      refreshIncomingFriendRequests(profile.id)
     }, 15000)
 
     const contentInterval = setInterval(() => {
@@ -294,6 +409,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearInterval(battleInterval)
+      clearInterval(friendRequestInterval)
       clearInterval(contentInterval)
       clearInterval(seasonInterval)
     }
@@ -301,6 +417,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     profile?.id,
     profile?.age_category,
     refreshIncomingBattles,
+    refreshIncomingFriendRequests,
     checkForNewContent,
     checkSeasonAnnouncement,
   ])
@@ -385,6 +502,42 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }, [profile?.id, refreshIncomingBattles])
 
+  // 📡 INSTANT FRIEND REQUEST NOTIFICATIONS
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const friendRequestChannel = supabase
+      .channel(`friend-requests-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'follows',
+          filter: `following_id=eq.${profile.id}`,
+        },
+        () => {
+          void refreshIncomingFriendRequests(profile.id)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'follows',
+        },
+        () => {
+          void refreshIncomingFriendRequests(profile.id)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(friendRequestChannel)
+    }
+  }, [profile?.id, refreshIncomingFriendRequests])
+
   const dismissNewContent = () => {
     setShowNewContentBanner(false)
   }
@@ -399,6 +552,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         incomingBetBattles,
         setIncomingBetBattles,
         refreshIncomingBattles,
+        incomingFriendRequests,
+        refreshIncomingFriendRequests,
+        dismissFriendRequest,
         showStreakModal,
         setShowStreakModal,
         streakReward,
