@@ -888,6 +888,25 @@
   background: #fff !important;
 }
 
+.rewards-shop-buy-now {
+  border: 1px solid #8da94e;
+  background: #a9c66a !important;
+  color: #17200d !important;
+  box-shadow: none !important;
+}
+
+.rewards-shop-buy-now:hover:not(:disabled) {
+  border-color: #a7c96a;
+  background: #b8d77a !important;
+  color: #17200d !important;
+}
+
+.rewards-shop-buy-now:disabled {
+  border-color: rgba(255, 255, 255, .1);
+  background: #303740 !important;
+  color: #c4cbd2 !important;
+}
+
 @keyframes rewards-item-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }

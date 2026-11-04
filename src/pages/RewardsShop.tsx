@@ -336,7 +336,7 @@ export default function RewardsShop() {
               <button 
                 onClick={() => setPurchaseItem(selectedItem)}
                 disabled={(profile?.coins || 0) < selectedItem.price}
-                className={`w-full py-3 rounded-xl font-bold transition ${
+                className={`rewards-shop-buy-now w-full py-3 rounded-xl font-bold transition ${
                   (profile?.coins || 0) >= selectedItem.price 
                     ? 'bg-[#ccff00] text-black hover:bg-white' 
                     : 'bg-white/5 text-gray-500 cursor-not-allowed'
