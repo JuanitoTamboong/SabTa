@@ -96,6 +96,30 @@
   line-height: 1.8;
 }
 
+.announcement-modal__message-link {
+  display: inline;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+  background: rgba(204, 255, 0, .1);
+  color: #d7ff4d !important;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgba(204, 255, 0, .75);
+  text-underline-offset: 3px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.announcement-modal__message-link:hover,
+.announcement-modal__message-link:focus-visible {
+  background: rgba(204, 255, 0, .2);
+  color: #eaffaa !important;
+}
+
+.announcement-modal__message-link:focus-visible {
+  outline: 2px solid #ccff00;
+  outline-offset: 3px;
+}
+
 .announcement-modal__body > p:last-child {
   display: inline-flex;
   max-width: 100%;

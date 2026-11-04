@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, BellRing, Download, Info, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useNotifications } from './NotificationsProvider'
@@ -24,6 +24,47 @@ function isHttpUrl(value: unknown): value is string {
   } catch {
     return false
   }
+}
+
+function renderMessageWithLinks(message: string): ReactNode[] {
+  const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi
+  const nodes: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = urlPattern.exec(message)) !== null) {
+    const rawUrl = match[0]
+    const trailingPunctuation = rawUrl.match(/[.,!?;:)\]}]+$/)?.[0] ?? ''
+    const linkText = rawUrl.slice(0, rawUrl.length - trailingPunctuation.length)
+    if (!linkText) continue
+
+    nodes.push(message.slice(lastIndex, match.index))
+    const href = linkText.toLowerCase().startsWith('www.')
+      ? `https://${linkText}`
+      : linkText
+
+    if (isHttpUrl(href)) {
+      nodes.push(
+        <a
+          key={`announcement-link-${match.index}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="announcement-modal__message-link"
+        >
+          {linkText}
+        </a>
+      )
+    } else {
+      nodes.push(linkText)
+    }
+
+    if (trailingPunctuation) nodes.push(trailingPunctuation)
+    lastIndex = match.index + rawUrl.length
+  }
+
+  nodes.push(message.slice(lastIndex))
+  return nodes
 }
 
 function isAnnouncement(value: unknown): value is Announcement {
@@ -212,7 +253,7 @@ export default function AnnouncementModal() {
             {announcement.title}
           </h2>
           <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-gray-300 sm:text-base">
-            {announcement.message}
+            {renderMessageWithLinks(announcement.message)}
           </p>
           {apkDownloadUrl && (
             <a
