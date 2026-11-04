@@ -1,5 +1,5 @@
 // src/pages/LandingPage.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { SocialLogin } from '@capgo/capacitor-social-login'
 import { supabase } from '../lib/supabase'
@@ -26,9 +26,151 @@ import sabtaLogo from '../assets/icons/sabta-logo.png'
 import sabtaEagle from '../assets/images/sabta-center.png' 
 import '../css/LandingPage.css'
 
+type LandingAnnouncement = {
+  id: string
+  title: string
+  message: string
+  apk_url: string
+  published_at: string
+  ends_at: string | null
+}
+
+function isLandingAnnouncement(value: unknown): value is LandingAnnouncement {
+  if (!value || typeof value !== 'object') return false
+
+  const item = value as Record<string, unknown>
+  return (
+    typeof item.id === 'string' &&
+    typeof item.title === 'string' &&
+    typeof item.message === 'string' &&
+    isApkUrl(item.apk_url) &&
+    typeof item.published_at === 'string' &&
+    (item.ends_at === null || typeof item.ends_at === 'string')
+  )
+}
+
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function isApkUrl(value: unknown): value is string {
+  if (!isHttpUrl(value)) return false
+
+  try {
+    return new URL(value).pathname.toLowerCase().endsWith('.apk')
+  } catch {
+    return false
+  }
+}
+
+function renderAnnouncementMessage(message: string): ReactNode[] {
+  const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi
+  const nodes: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = urlPattern.exec(message)) !== null) {
+    const rawUrl = match[0]
+    const trailingPunctuation = rawUrl.match(/[.,!?;:)\]}]+$/)?.[0] ?? ''
+    const linkText = rawUrl.slice(0, rawUrl.length - trailingPunctuation.length)
+    if (!linkText) continue
+
+    nodes.push(message.slice(lastIndex, match.index))
+    const href = linkText.toLowerCase().startsWith('www.')
+      ? `https://${linkText}`
+      : linkText
+
+    if (isHttpUrl(href)) {
+      nodes.push(
+        <a
+          key={`landing-announcement-link-${match.index}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sabta-announcement__message-link"
+        >
+          {linkText}
+        </a>
+      )
+    } else {
+      nodes.push(linkText)
+    }
+
+    if (trailingPunctuation) nodes.push(trailingPunctuation)
+    lastIndex = match.index + rawUrl.length
+  }
+
+  nodes.push(message.slice(lastIndex))
+  return nodes
+}
+
 export default function LandingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [announcement, setAnnouncement] = useState<LandingAnnouncement | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchAnnouncement = async () => {
+      const { data, error: announcementError } = await supabase
+        .from('announcements')
+        .select('id, title, message, apk_url, published_at, ends_at')
+        .eq('is_active', true)
+        .ilike('apk_url', '%.apk%')
+        .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`)
+        .order('published_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (announcementError) {
+        console.error('Failed to load landing page announcement:', announcementError)
+        return
+      }
+
+      if (!isMounted) return
+      if (data && isLandingAnnouncement(data)) {
+        setAnnouncement(data)
+      } else {
+        setAnnouncement(null)
+      }
+    }
+
+    const channel = supabase
+      .channel('landing-announcements')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'announcements' },
+        () => void fetchAnnouncement()
+      )
+      .subscribe((status, subscriptionError) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Landing page announcement subscription failed:', subscriptionError)
+        }
+      })
+
+    void fetchAnnouncement()
+
+    return () => {
+      isMounted = false
+      void supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!announcement?.ends_at) return
+
+    const remaining = new Date(announcement.ends_at).getTime() - Date.now()
+    const timeout = window.setTimeout(() => setAnnouncement(null), Math.max(remaining, 0))
+    return () => window.clearTimeout(timeout)
+  }, [announcement])
 
   // ✅ NEW: Reject Admin accounts on the Player app
   useEffect(() => {
@@ -131,6 +273,15 @@ export default function LandingPage() {
     { letter: 'D', answer: 'Mercury' },
   ]
 
+  const announcementApkUrl =
+    announcement?.apk_url && isApkUrl(announcement.apk_url)
+      ? (() => {
+          const url = new URL(announcement.apk_url)
+          url.searchParams.set('download', 'SabTa.apk')
+          return url.toString()
+        })()
+      : null
+
   return (
     <main className="sabta-page" id="home">
       <div className="sabta-grid-bg" aria-hidden="true" />
@@ -159,6 +310,28 @@ export default function LandingPage() {
           {loading ? 'Connecting...' : 'Sign in'}
         </button>
       </header>
+
+      {announcement && (
+        <aside className="sabta-announcement" aria-labelledby="sabta-announcement-title">
+          <div className="sabta-announcement__content">
+            <span className="sabta-announcement__badge">
+              Android app update
+            </span>
+            <h2 id="sabta-announcement-title">{announcement.title}</h2>
+            <p>{renderAnnouncementMessage(announcement.message)}</p>
+          </div>
+          {announcementApkUrl && (
+            <a
+              className="sabta-announcement__download"
+              href={announcementApkUrl}
+              download="SabTa.apk"
+            >
+              Download APK
+              <ArrowRightIcon weight="bold" aria-hidden="true" />
+            </a>
+          )}
+        </aside>
+      )}
 
       <section className="sabta-hero" aria-labelledby="sabta-hero-title">
         
