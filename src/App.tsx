@@ -17,6 +17,8 @@ import PlayerProfile from './pages/PlayerProfile'
 import Quizzes from './pages/Quizzes'
 import BattleHistory from './pages/BattleHistory'
 import Clans from './pages/Clans'
+import ClanWarArena from './pages/ClanWarArena'  
+import WarLog from './pages/WarLog' // 🔥 NEW IMPORT
 
 import { NotificationsProvider } from './pages/notifications/NotificationsProvider'
 import NotificationsHost from './pages/notifications/NotificationsHost'
@@ -69,11 +71,14 @@ function AuthCallback() {
 function AppRoutes({ session, profile }: { session: any, profile: any }) {
   const location = useLocation()
   
-  // 🔧 FIXED: Hide the global chat bubble on Quiz, Play, and Clans pages
+  // Hide the global chat bubble on Quiz, Play, Clans, War, and Battle pages
   const isFullScreenPage = 
     location.pathname.startsWith('/quizzes') || 
     location.pathname.startsWith('/play') || 
-    location.pathname.startsWith('/clans')
+    location.pathname.startsWith('/quiz') || 
+    location.pathname.startsWith('/clans') ||
+    location.pathname.startsWith('/war-log') || // 🔥 Hide chat here too
+    location.pathname.startsWith('/war')  
 
   return (
     <>
@@ -157,6 +162,15 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
           }
         />
 
+        {/* 🔥 NEW: War Log Page */}
+        <Route
+          path="/war-log"
+          element={
+            session && profile?.age_category ? <WarLog /> :
+            <Navigate to="/onboarding" />
+          }
+        />
+
         <Route
           path="/rewards"
           element={
@@ -169,6 +183,15 @@ function AppRoutes({ session, profile }: { session: any, profile: any }) {
           path="/play/:quizId"
           element={
             session && profile?.age_category ? <QuizGameplay /> :
+            <Navigate to="/onboarding" />
+          }
+        />
+
+        {/* 🔥 Clan War Arena with 2-hour timer lobby */}
+        <Route
+          path="/war/:warId"
+          element={
+            session && profile?.age_category ? <ClanWarArena /> :
             <Navigate to="/onboarding" />
           }
         />

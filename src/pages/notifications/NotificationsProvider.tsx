@@ -73,6 +73,8 @@ interface NotificationsContextType {
   checkAndShowDailyChallenge: () => Promise<void>
   seasonAnnouncement: SeasonAnnouncement
   dismissSeasonAnnouncement: () => Promise<void>
+  warReward: any
+  setWarReward: (r: any) => void
 }
 
 const NotificationsContext = createContext<NotificationsContextType | null>(null)
@@ -90,6 +92,30 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [newContentCount, setNewContentCount] = useState(0)
   const [alertData, setAlertData] = useState<AlertData>(null)
   const [seasonAnnouncement, setSeasonAnnouncement] = useState<SeasonAnnouncement>(null)
+  
+  // 🔥 NEW: War Reward state
+  const [warReward, setWarReward] = useState<any>(null)
+
+  // 🔥 NEW: Fetch recent war rewards (Global) & attach queue
+  const checkWarRewards = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_my_war_rewards', { p_since: null })
+      if (error) throw error
+
+      const seenMap = JSON.parse(localStorage.getItem('sabta_seen_war_rewards') || '{}')
+      
+      // Filter out any rewards the user has already seen
+      const freshRewards = (data || []).filter((r: any) => !seenMap[r.war_id])
+      
+      if (freshRewards.length > 0) {
+        // Attach the remaining rewards as a queue to the first reward
+        const firstReward = { ...freshRewards[0], queue: freshRewards.slice(1) }
+        setWarReward(firstReward)
+      }
+    } catch (error) {
+      console.error('Failed to check war rewards:', error)
+    }
+  }, [])
 
   const refreshIncomingBattles = useCallback(async (userId: string) => {
     try {
@@ -278,7 +304,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ✨ NEW CONTENT CHECK (Fallback for page load)
   const checkForNewContent = useCallback(
     async (userId: string, ageCategory: string | null) => {
       if (!ageCategory) return
@@ -371,6 +396,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         await refreshIncomingBattles(user.id)
         await refreshIncomingFriendRequests(user.id)
         if (isMounted) await checkForNewContent(user.id, profileData.age_category)
+        
+        // 🔥 NEW: Check for war rewards on boot
+        if (isMounted) await checkWarRewards(user.id)
+        
       } catch (error) {
         console.error('Notifications bootstrap error:', error)
       }
@@ -387,9 +416,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     refreshIncomingFriendRequests,
     checkForNewContent,
     checkSeasonAnnouncement,
+    checkWarRewards,
   ])
 
-  // 🔄 FALLBACK POLLING (15s battles, 2m content)
+  // 🔄 FALLBACK POLLING (15s battles, 2m content, 1m war rewards)
   useEffect(() => {
     if (!profile?.id) return
 
@@ -403,15 +433,22 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const contentInterval = setInterval(() => {
       checkForNewContent(profile.id, profile.age_category)
     }, 120000)
+    
     const seasonInterval = setInterval(() => {
       void checkSeasonAnnouncement()
     }, 30000)
+    
+    // 🔥 NEW: Poll for war rewards every 1 minute just in case they finish a war while online
+    const warRewardInterval = setInterval(() => {
+      void checkWarRewards(profile.id)
+    }, 60000)
 
     return () => {
       clearInterval(battleInterval)
       clearInterval(friendRequestInterval)
       clearInterval(contentInterval)
       clearInterval(seasonInterval)
+      clearInterval(warRewardInterval)
     }
   }, [
     profile?.id,
@@ -420,6 +457,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     refreshIncomingFriendRequests,
     checkForNewContent,
     checkSeasonAnnouncement,
+    checkWarRewards,
   ])
 
   // 📡 INSTANT POP-UP VIA SUPABASE REALTIME (New Content)
@@ -568,6 +606,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         checkAndShowDailyChallenge,
         seasonAnnouncement,
         dismissSeasonAnnouncement,
+        warReward,
+        setWarReward,
       }}
     >
       {children}

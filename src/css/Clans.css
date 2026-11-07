@@ -282,9 +282,11 @@
   letter-spacing: .14em;
 }
 
+/* FIXED: Clan name is white with a dark shadow so it's always readable */
 .clans-current-panel__identity h2 {
   margin-top: 4px;
-  color: #d3ff45 !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   font-size: 20px;
   letter-spacing: -.03em;
 }
@@ -750,6 +752,31 @@
 .clans-modal .border-\[\#ccff00\] {
   border-color: rgba(211, 255, 69, .28) !important;
 }
+
+/* ========================================== */
+/* FIX FOR WAR ROOM & EDIT BUTTON READABILITY */
+/* ========================================== */
+
+/* Force all solid green buttons to have black text and NO glow */
+.clans-page button[class*="bg-[#ccff00]"] {
+  color: #000000 !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* On hover, keep text black and slightly darken the green so it doesn't turn white */
+.clans-page button[class*="bg-[#ccff00]"]:hover {
+  color: #000000 !important;
+  background-color: #b3e600 !important; 
+}
+
+/* Ensure the "Update Fighters" button (white bg) keeps its black text */
+.clans-page button.bg-white {
+  color: #000000 !important;
+}
+
+/* ========================================== */
 
 @media (max-width: 640px) {
   .clans-content {

@@ -18,6 +18,7 @@ import {
 import { useNotifications } from './NotificationsProvider'
 import SeasonEndModal from './SeasonEndModal'
 import AnnouncementModal from './AnnouncementModal'
+import WarRewardModal from './WarRewardModal'
 import PlayerAvatar from '../../components/PlayerAvatar'
 import '../../css/NotificationsPopups.css'
 
@@ -66,6 +67,8 @@ export default function NotificationsHost() {
     dismissNewContent,
     alertData,
     setAlertData,
+    warReward,
+    setWarReward,
   } = useNotifications()
 
   const [declineModal, setDeclineModal] = useState<{
@@ -204,7 +207,6 @@ export default function NotificationsHost() {
     if (!betDeclineModal.battleId) return
     setBetDeclining(true)
     
-    // ✅ Optimistically remove the banner immediately
     const battleIdToRemove = betDeclineModal.battleId
     setIncomingBetBattles((prev) =>
       prev.filter((b) => b.id !== battleIdToRemove)
@@ -225,7 +227,6 @@ export default function NotificationsHost() {
         type: 'error',
       })
       
-      // Restore the banner if it failed
       if (profile?.id) {
         const { data } = await supabase
           .from('bet_battles')
@@ -244,6 +245,27 @@ export default function NotificationsHost() {
     <>
       <SeasonEndModal />
       <AnnouncementModal />
+
+      {/* 🔥 WAR REWARD POPUP (z-[9999] to stay on top of everything) */}
+      {warReward && (
+        <WarRewardModal
+          reward={warReward}
+          onDismiss={() => {
+            const seenMap = JSON.parse(localStorage.getItem('sabta_seen_war_rewards') || '{}')
+            seenMap[warReward.war_id] = new Date().toISOString()
+            localStorage.setItem('sabta_seen_war_rewards', JSON.stringify(seenMap))
+            
+            setWarReward(null)
+
+            setTimeout(() => {
+              const pendingRewards = (warReward.queue || []).filter((r: any) => !seenMap[r.war_id])
+              if (pendingRewards.length > 0) {
+                setWarReward(pendingRewards[0])
+              }
+            }, 100)
+          }}
+        />
+      )}
 
       {friendRequest && !isPlayingQuiz && (
         <div className="sab-popup-overlay fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -303,7 +325,7 @@ export default function NotificationsHost() {
         </div>
       )}
 
-      {/* NEW CONTENT BANNER (Mobile Optimized) */}
+      {/* NEW CONTENT BANNER */}
       {showNewContentBanner && (
         <div className="notification-content-banner fixed top-4 left-1/2 -translate-x-1/2 z-[90] w-[92%] sm:w-full max-w-2xl bg-gradient-to-r from-[#00f0ff]/20 to-[#00f0ff]/5 border border-[#00f0ff]/40 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(0,240,255,0.15)] animate-in slide-in-from-top-4">
           <div className="notification-content-banner__copy flex items-center gap-3">
@@ -340,7 +362,7 @@ export default function NotificationsHost() {
         </div>
       )}
 
-      {/* COMBINED BATTLE BANNERS (Mobile Optimized) */}
+      {/* COMBINED BATTLE BANNERS */}
       {(visibleIncomingBattles.length > 0 || incomingBetBattles.length > 0) && (
         <div className="notification-battle-stack fixed top-4 right-4 z-[80] w-[92%] sm:w-[calc(100%-2rem)] max-w-md max-h-[80vh] overflow-y-auto space-y-3 pb-4">
           {visibleIncomingBattles.map((battle) => (
@@ -502,7 +524,7 @@ export default function NotificationsHost() {
         </div>
       )}
 
-      {/* DAILY STREAK REWARD MODAL (Mobile Optimized) */}
+      {/* DAILY STREAK REWARD MODAL */}
       {showStreakModal && (
         <div className="sab-popup-overlay fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="sab-popup-card bg-[#0f1014] border border-[#ff00a0]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(255,0,160,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
@@ -551,7 +573,7 @@ export default function NotificationsHost() {
         </div>
       )}
 
-      {/* DAILY CHALLENGE REWARD MODAL (Mobile Optimized) */}
+      {/* DAILY CHALLENGE REWARD MODAL */}
       {showDailyBonusModal && (
         <div className="sab-popup-overlay fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="sab-popup-card bg-[#0f1014] border border-[#ccff00]/30 rounded-3xl sm:rounded-[2rem] p-6 sm:p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(204,255,0,0.2)] max-h-[90vh] overflow-y-auto animate-in zoom-in-95">

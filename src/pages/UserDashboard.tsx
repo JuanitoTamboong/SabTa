@@ -22,7 +22,7 @@ import {
   CoinsIcon,
   SwordIcon,
   HourglassIcon,
-  ShieldIcon, // 👈 ADDED THIS
+  ShieldIcon,
 } from '@phosphor-icons/react'
 import { fetchAllBadges, getPlayerBadge, type BadgeInfo } from '../lib/badges'
 import sabtaLogo from '../assets/icons/sabta-logo.png'
@@ -320,7 +320,8 @@ export default function UserDashboard() {
             />
             <div className="game-sidebar-player__info">
               <strong>{profile?.display_name || 'Player'}</strong>
-              <span>LEVEL {stats.level} ? {profile?.age_category?.toUpperCase() || 'ROOKIE'}</span>
+              {/* ✅ FIXED: Replaced the weird '?' with a bullet point '•' */}
+              <span>LEVEL {stats.level} • {profile?.age_category?.toUpperCase() || 'ROOKIE'}</span>
             </div>
             <button className="game-logout" onClick={handleLogout} aria-label="Log out" title="Log out">
               <SignOutIcon weight="bold" />
@@ -448,7 +449,7 @@ export default function UserDashboard() {
                         <article key={attempt.id} className="game-run">
                           <span className={`game-run__index ${index === 0 ? 'is-current' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
                           <span className="game-run__icon"><CheckCircleIcon weight="fill" /></span>
-                          <div className="game-run__info"><strong>{attempt.category_name}</strong><span>{new Date(attempt.created_at).toLocaleDateString()} <i>?</i> {acc}% accuracy</span></div>
+                          <div className="game-run__info"><strong>{attempt.category_name}</strong><span>{new Date(attempt.created_at).toLocaleDateString()} • {acc}% accuracy</span></div>
                           <div className="game-run__score"><strong>+{attempt.score}<small> PTS</small></strong><span><CoinsIcon weight="fill" /> +{attempt.real_coins_earned}</span></div>
                         </article>
                       )
