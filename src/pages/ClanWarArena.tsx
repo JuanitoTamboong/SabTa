@@ -164,9 +164,17 @@ export default function ClanWarArena() {
       await fetchFighters()
       setLoading(false)
 
-      const startTime = new Date(war.starts_at).getTime()
+      // 🔥 FIX: Safe check for null starts_at
       const checkWarStatus = () => {
+        if (!war.starts_at) {
+          setIsWarActive(false)
+          setTimeLeft({ h: '--', m: '--', s: '--' })
+          return
+        }
+
+        const startTime = new Date(war.starts_at).getTime()
         const now = Date.now()
+        
         if (now >= startTime) {
           setIsWarActive(true)
           if (timerRef.current) clearInterval(timerRef.current)
@@ -211,6 +219,7 @@ export default function ClanWarArena() {
 
   useEffect(() => {
     const fetchQuiz = async () => {
+      // 🔥 FIX: Add isWarActive check
       if (!isWarActive || !warId || result || rulesAcknowledged) return
       
       const { data: existingAttack } = await supabase
@@ -260,7 +269,6 @@ export default function ClanWarArena() {
     return () => clearTimeout(t)
   }, [questionTimer, isWarActive, questions, result, rulesAcknowledged])
 
-  // 🔥 FIXED: Prevent double click completely
   const handleSelectOption = (option: string) => {
     if (isProcessingClick.current || isSubmitting) return
     
@@ -457,30 +465,42 @@ export default function ClanWarArena() {
           <div className="game-panel mb-4">
             <div className="p-2 border-b border-white/10 flex items-center justify-center gap-2 bg-black/20">
               <ClockIcon weight="bold" className="w-3 h-3 text-purple-400" />
-              <h3 className="text-[10px] font-bold text-white uppercase tracking-widest">War Begins In</h3>
+              <h3 className="text-[10px] font-bold text-white uppercase tracking-widest">
+                {/* 🔥 FIX: Dynamic header based on starts_at */}
+                {warData.starts_at ? 'War Begins In' : 'Waiting for Opponent'}
+              </h3>
             </div>
-            <div className="p-4 flex items-center justify-center gap-2">
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center">
-                  <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.h}</span>
+            
+            {warData.starts_at ? (
+              <div className="p-4 flex items-center justify-center gap-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center">
+                    <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.h}</span>
+                  </div>
+                  <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Hours</p>
                 </div>
-                <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Hours</p>
-              </div>
-              <span className="text-lg text-purple-400 font-black mb-4">:</span>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center">
-                  <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.m}</span>
+                <span className="text-lg text-purple-400 font-black mb-4">:</span>
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center">
+                    <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.m}</span>
+                  </div>
+                  <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Minutes</p>
                 </div>
-                <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Minutes</p>
-              </div>
-              <span className="text-lg text-purple-400 font-black mb-4">:</span>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center animate-pulse">
-                  <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.s}</span>
+                <span className="text-lg text-purple-400 font-black mb-4">:</span>
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 bg-black/50 border border-purple-500/30 rounded-lg flex items-center justify-center animate-pulse">
+                    <span className="text-xl font-mono font-black text-[#ccff00]">{timeLeft.s}</span>
+                  </div>
+                  <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Seconds</p>
                 </div>
-                <p className="text-[7px] font-bold text-gray-500 uppercase mt-1">Seconds</p>
               </div>
-            </div>
+            ) : (
+              <div className="p-6 text-center animate-pulse">
+                <p className="text-sm font-bold text-gray-400">
+                  The countdown will start once the enemy clan joins the arena.
+                </p>
+              </div>
+            )}
           </div>
 
           <button onClick={() => navigate('/clans')} className="game-button game-button--quiet w-full py-2 text-xs">
@@ -800,7 +820,6 @@ export default function ClanWarArena() {
             </div>
           </div>
 
-          {/* ✅ FIXED BUTTON: Explicit Black Text & Dark Green Hover */}
           <button 
             onClick={() => navigate('/clans')}
             className={`game-button w-full py-3 ${
@@ -834,14 +853,12 @@ export default function ClanWarArena() {
   const progress = ((currentIndex + 1) / questions.length) * 100
   const ts: number = warData?.team_size ?? 5
 
-  // 🔥 Check if the user has picked at least 1 answer
   const hasStartedQuiz = Object.keys(answers).length > 0
 
   return (
     <div className="game-dashboard flex flex-col">
       <header className="p-4 flex items-center justify-between border-b border-white/10 bg-[#0f1014] relative z-10">
         
-        {/* Show back button if they haven't started, otherwise show lock icon */}
         <div className="w-10 flex items-center justify-center">
           {!hasStartedQuiz ? (
             <button 
